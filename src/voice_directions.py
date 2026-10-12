@@ -19,8 +19,21 @@ def attach_speaker_profiles(assignments, profiles):
     if not isinstance(profiles, dict):
         return result
     profiles = {str(key).strip().lower(): value for key, value in profiles.items()}
+    # Saved project profile keys historically omit punctuation, while manuscript
+    # speaker IDs retain it (alexanderholdermale vs alexander-holder-male).
+    # Only accept an unambiguous normalized match; never guess by substring.
+    aliases = {}
+    for key, value in profiles.items():
+        alias = re.sub(r'[^a-z0-9]', '', key)
+        aliases.setdefault(alias, []).append(value)
     for speaker, assignment in result.items():
-        profile = clean_speaker_profile(profiles.get(str(speaker).strip().lower()))
+        key = str(speaker).strip().lower()
+        raw = profiles.get(key)
+        if raw is None:
+            matches = aliases.get(re.sub(r'[^a-z0-9]', '', key), [])
+            if len(matches) == 1:
+                raw = matches[0]
+        profile = clean_speaker_profile(raw)
         if profile and isinstance(assignment, dict):
             assignment["extra"] = {**(assignment.get("extra") or {}), "speaker_profile": profile}
     return result

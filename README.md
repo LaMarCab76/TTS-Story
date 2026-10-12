@@ -1,3 +1,27 @@
+## Gemini TTS cloud preview
+
+Gemini candidates now appear directly beneath the existing Speaker Properties controls when the speaker opens, including candidates created in bulk. New auditions preserve the previously assigned voice until a replacement is selected. Pending auditions are retained without rebilling; completed/selected auditions can receive new candidates in a new batch. Bulk results distinguish newly created auditions from retained ones. **Generate Voice** uses that same profile's prompt, model, and candidate count; there is no second speaker-design form to open. Failed bulk requests are shown as errors instead of an unexplained empty audition, including Google's error reason when available. Cloud batch checkpoints save in parallel with the next speaker's requests (one save at a time), and pause/completion still wait for checkpoint persistence.
+
+**Bulk Gemini casting:** Use **Generate Voices** beside **Build Profiles**, select **Gemini TTS · Cloud Voice Design**, and choose Flash or Flash-Lite. Up to four candidates per speaker run concurrently; speakers run sequentially, with pause/resume checkpoints between speakers. Creation requires the dedicated Gemini TTS key and billing confirmation. Existing speaker auditions are preserved instead of generating duplicates. Completed candidates survive partial failures and are saved with the project; open each speaker to audition and select a voice (including single candidates). Google supplies the preview passage. Keep the page open during requests and save the project after selection.
+
+**Selecting a designed voice:** Gemini hosted voices require a Gemini narration engine. If another engine is selected, **Use voice** offers to switch the project's narration engine to Gemini before assigning the candidate. This affects all speakers, so review their assignments before generation. Cancelling preserves all candidates. After confirmed candidate cleanup, audition previews collapse and the selected voice remains in the speaker dropdown.
+
+In Speaker Properties, select **Gemini TTS · Cloud Voice Design** and click **Generate Voice**. Controls and compact candidate previews appear inline, using the speaker's description. Up to four candidates are requested concurrently (subject to Google quotas); successful candidates are retained even if another request fails. Requests are billable and creation is not automatically retried. Selecting a voice keeps the speaker window open; save your project afterward. The standalone designer remains available from Available Voices and settings.
+
+**Manage hosted custom voices:** Open **Available Voices → Gemini Custom Voices · Cloud** to refresh, search by name or ID, play previews, design new voices, or delete individual voices from Google. Compact rows also support checkbox selection, **Select visible**, **Clear selection**, and **Delete selected**. This includes older candidates with no audition grouping. Deletion requires confirmation and leaves existing audio files unchanged, but future synthesis/regeneration needs a replacement wherever the deleted ID was assigned. Preset voices cannot be deleted. Previews load only when Play is clicked and share one player. Renaming hosted voices is not currently offered.
+
+Gemini audition cleanup: after selecting a candidate, confirm removal of its unselected siblings from Google storage. Only IDs recorded together in that audition are removed; presets, the selected voice, and unrelated designs are preserved. Pending auditions belong to the speaker profile and are included when saving the project. Reopening Speaker Properties restores them; a project/speaker-scoped browser draft also protects completed candidates across page reloads. Save the project for portability to another browser. If none of the pending candidates suit the speaker, click **Generate Voice** again and confirm permanent deletion of that pending audition followed by billable replacement generation. Cancel keeps the candidates. Any deletion failure stops replacement generation and retains the failed candidates for retry. Previously assigned voices from other auditions are untouched. Older voices without a speaker-linked audition remain available in the custom voice library. No existing audio files are deleted.
+
+Gemini 3.8 Flash TTS and Flash-Lite TTS are optional cloud engines. Open **Settings → Engine Settings → Gemini TTS**, enter a dedicated TTS API key, choose a default Google preset voice, and save. This key is separate from Gemini manuscript preparation and never falls back to the LLM key. Select either model on the main page, then choose presets in Speaker Properties. **Quick Test** makes a billable synthesis request.
+
+Directed manuscripts are supported: passage directions are sent as structured delivery metadata, separately from spoken text. Permanent Voice Type profiles are not prepended. Local voice samples are neither offered nor uploaded; Google voice cloning is not included. Presets and hosted designed voices are available for single-chunk and bulk-speaker Library regeneration.
+
+**Gemini Voice Design:** The designer starts with the speaker's Voice Design Prompt (or Voice Type). Enter a name and stable vocal description, select Flash or Flash-Lite, and create 1–4 candidates. Play the supplied previews and click **Use voice**, then save your TTS-Story project. These are reusable Google `voice_...` IDs, not local cloning samples. Google chooses the preview text. Google documents a 200-voice project limit and one-year expiry; expired or deleted IDs must be replaced in saved productions. If creation times out, check the custom voice library before retrying to avoid creating duplicate voices. See [Google's Voice Design guide](https://ai.google.dev/gemini-api/docs/voice-design).
+
+Use a billing-enabled Google project for private client manuscripts: paid-service inputs/outputs are not used to improve Google's products; unpaid-service data may be. Commercial output use remains subject to [Google's API terms](https://ai.google.dev/gemini-api/terms), content rights, and usage policies. A separate API key within the same Google project does not isolate billing or quotas. See [current pricing](https://ai.google.dev/gemini-api/docs/pricing#gemini-3.8-flash-tts).
+
+The integration retries rate limits, stops on ambiguous network failures to avoid automatic duplicate billing, and validates audio before saving. Start with a short scene; live account access and output quality must be verified with your own key.
+
 ## ❤️ Thank You for Supporting Our Work
 
 We are deeply grateful to everyone who uses, shares, contributes to, and supports TTS-Story. Your encouragement helps us continue improving the project and keeping it freely available to the community.
@@ -256,9 +280,13 @@ See [Local Data, API Keys, and Backups](docs/help/settings/data-storage.md) and 
 
 ## License
 
-Apache 2.0.
+TTS-Story's application code is licensed under [Apache 2.0](LICENSE). Third-party code, model weights, voice samples, and hosted services retain their own licenses and terms; this license does not replace them or grant commercial rights to every engine's output. Check the selected project's license/model card and the provider's terms before use or redistribution.
 
 ## Credits
+
+TTS-Story integrates the work of the following projects, authors, and providers. Optional engines and remote connections are used only when installed or configured; inclusion here does not imply sponsorship or endorsement.
+
+### Speech models and inference projects
 
 - [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by hexgrad
 - [Chatterbox](https://github.com/resemble-ai/chatterbox) by Resemble AI
@@ -267,11 +295,37 @@ Apache 2.0.
 - [Pocket TTS](https://github.com/kyutai-labs/pocket-tts) by Kyutai
 - [KittenTTS](https://github.com/KittenML/KittenTTS) by KittenML
 - [IndexTTS](https://github.com/index-tts/index-tts) by the Bilibili IndexTTS team
-- [OmniVoice](https://github.com/k2-fsa/OmniVoice) by k2-fsa
-- [Dot.TTS](https://github.com/rednote-hilab/dots.tts) by RedNote HiLab
-- [TTS Samples](https://github.com/yaph/tts-samples) by yaph
-- [StyleTTS2](https://github.com/yl4579/StyleTTS2) by yl4579
-- [Replicate](https://replicate.com) for hosted inference
+- [OmniVoice](https://github.com/k2-fsa/OmniVoice) by the OmniVoice authors and k2-fsa contributors
+- [Dot.TTS / dots.tts](https://github.com/studio-dots-ai/dots.tts) by the dots.tts team (originally hosted under RedNote HiLab)
+- [Audio8 TTS](https://github.com/Edge0-AI/Audio8_TTS) by the Audio8 / Edge0 team; [model card](https://huggingface.co/Edge0/Audio8-TTS-Preview-0.6b)
+- [Breeze TTS 2](https://github.com/breezeblue-ai/breeze-tts) by BreezeBlue; [original model](https://huggingface.co/BreezeBlue/Breeze-TTS-2)
+- [Breeze-TTS-2.cpp](https://github.com/HoppouAI/Breeze-TTS-2.cpp) and its [GGUF conversions](https://huggingface.co/HoppouAI/Breeze-TTS-2.cpp) by HoppouAI — the community C++/Vulkan implementation used by our Breeze Q8 backend, built on [ggml](https://github.com/ggml-org/ggml). Credit for the original model remains with BreezeBlue.
+- [StyleTTS 2](https://github.com/yl4579/StyleTTS2) by Yinghao Aaron Li and coauthors — upstream architecture acknowledged by Kokoro, not a separate selectable TTS-Story engine.
+
+### Remote services and local API connections
+
+- [LocalAI](https://github.com/mudler/LocalAI) by Ettore Di Giacinto (mudler) and contributors — self-hosted TTS connection; individual backend models retain their own authorship and licenses.
+- [BreezeBlue](https://breezeblue.ai/) — hosted Breeze synthesis and voice storage.
+- [Microsoft Azure Speech](https://azure.microsoft.com/en-us/products/ai-foundry/tools/speech) — hosted speech synthesis.
+- [edge-tts](https://github.com/rany2/edge-tts) by rany2 and contributors — community client used for the experimental Microsoft Edge online TTS connection; not the Azure SDK or an official Microsoft client.
+- [ElevenLabs](https://elevenlabs.io/) and [Replicate](https://replicate.com/) — hosted speech/model inference.
+- [OpenAI](https://openai.com/) — API conventions supported by our OpenAI-compatible TTS and LLM connections. A compatible endpoint may be operated by another provider; compatibility does not imply an OpenAI-hosted model.
+- [Google Gemini](https://ai.google.dev/) by Google, [Atlas Cloud](https://www.atlascloud.ai/), and [OpenRouter](https://openrouter.ai/) — LLM connections for manuscript preparation.
+- [Ollama](https://ollama.com/) and [LM Studio](https://lmstudio.ai/) — local LLM server connections for manuscript preparation.
+
+### Audio tools, transcription, and supporting libraries
+
+- [FFmpeg](https://ffmpeg.org/) and its contributors — encoding, merging, metadata, and audio processing; Windows build distributions from [Gyan](https://www.gyan.dev/ffmpeg/builds/) and [BtbN](https://github.com/BtbN/FFmpeg-Builds).
+- [Rubber Band](https://breakfastquay.com/rubberband/) by Breakfast Quay and [SoX](https://sourceforge.net/projects/sox/) by the SoX contributors — time/pitch processing and audio utilities.
+- [FunASR](https://github.com/modelscope/FunASR) and [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) by their respective teams — automatic reference-sample transcription.
+- [eSpeak NG](https://github.com/espeak-ng/espeak-ng) and [Misaki](https://github.com/hexgrad/misaki) — pronunciation/phonemization support for applicable engines.
+- [PyTorch](https://pytorch.org/), [Hugging Face Transformers](https://github.com/huggingface/transformers), and [Hugging Face Hub](https://github.com/huggingface/huggingface_hub) — model execution, loading, and distribution; optional [FlashAttention](https://github.com/Dao-AILab/flash-attention) by Dao-AILab and contributors.
+- [Flask](https://flask.palletsprojects.com/) by Pallets and [Flask-CORS](https://github.com/corydolphin/flask-cors) — web application and cross-origin support.
+- [NumPy](https://numpy.org/), [SciPy](https://scipy.org/), [librosa](https://librosa.org/), [SoundFile](https://github.com/bastibe/python-soundfile), [pydub](https://github.com/jiaaro/pydub), and [pyloudnorm](https://github.com/csteinmetz1/pyloudnorm) — numerical, waveform, and loudness processing.
+- Document import and help rendering use [python-docx](https://python-docx.readthedocs.io/), [pypdf](https://pypdf.readthedocs.io/), [EbookLib](https://github.com/aerkalov/ebooklib), [Beautiful Soup](https://www.crummy.com/software/BeautifulSoup/), [striprtf](https://github.com/joshy/striprtf), [odfpy](https://github.com/eea/odfpy), and [Python-Markdown](https://python-markdown.github.io/).
+- [TTS Samples](https://github.com/yaph/tts-samples) by yaph — external sample library; respect the rights and terms of each reference recording.
+
+These are project acknowledgements, not an exhaustive transitive-dependency or license-compliance inventory. See [core requirements](requirements.txt) and [optional engine requirements](requirements-engines/) for dependency details, and preserve the applicable upstream license and notice files when redistributing components.
 
 ## Support
 

@@ -79,9 +79,17 @@ def test_clone_and_save_are_separate_no_transcript_needed(tmp_path):
     engine = BreezeAPIEngine("test-key", request_func=request)
     assert engine.clone_preview(sample, "Alice", "en")["generated_voice_id"] == "gvi_test"
     assert request.call_count == 1
+    assert request.call_args.kwargs["data"] == {"name": "Alice"}
     engine.save_preview("gvi_test", "Alice", "en")
     assert request.call_args.kwargs["json"] == {"voice_name": "Alice", "language_code": "en"}
     assert request.call_args_list[0].kwargs['timeout'] == (180, 180)
+
+
+def test_provider_error_detail_is_bounded_and_redacts_key():
+    request = Mock(return_value=response({"detail": "bad test-key request"}, status=400))
+    engine = BreezeAPIEngine("test-key", request_func=request)
+    with pytest.raises(BreezeAPIError, match=r"Provider detail: bad \[redacted\] request"):
+        engine.request("POST", "/test")
 
 
 def test_upload_timeout_is_specific_and_never_retried(tmp_path):

@@ -567,9 +567,55 @@ function renderFullStoryBanner() {
     return '';
 }
 
-function displayLibraryItems(items) {
+const LIBRARY_PAGE_SIZE = 20;
+let libraryBrowseItems = [];
+let libraryBrowsePage = 0;
+let libraryBrowseQuery = '';
+
+function displayLibraryItems(items, preservePage = false) {
+    libraryBrowseItems = items;
+    if (!preservePage) libraryBrowsePage = 0;
+    const query = libraryBrowseQuery.trim().toLowerCase();
+    const filtered = query ? items.filter(item =>
+        [item.collection_title, item.audiobook_title, item.title, item.book_title, item.name, item.job_id,
+            ...(item.chapters || []).map(chapter => chapter.title)]
+            .filter(Boolean).join(' ').toLowerCase().includes(query)
+    ) : items;
+    const pages = Math.max(1, Math.ceil(filtered.length / LIBRARY_PAGE_SIZE));
+    libraryBrowsePage = Math.min(libraryBrowsePage, pages - 1);
+    let navigation = document.getElementById('library-pagination');
+    if (!navigation) {
+        navigation = document.createElement('div');
+        navigation.id = 'library-pagination';
+        navigation.style.cssText = 'display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0';
+        navigation.innerHTML = '<input type="search" aria-label="Search audiobooks" placeholder="Search audiobooks..." style="max-width:360px"><button type="button" class="btn btn-secondary" data-page="previous">Previous</button><span role="status"></span><button type="button" class="btn btn-secondary" data-page="next">Next</button>';
+        document.getElementById('library-items').before(navigation);
+        let searchTimer;
+        navigation.querySelector('input').addEventListener('input', event => {
+            libraryBrowseQuery = event.target.value;
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => displayLibraryItems(libraryBrowseItems), 200);
+        });
+        navigation.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
+            libraryBrowsePage += button.dataset.page === 'next' ? 1 : -1;
+            displayLibraryItems(libraryBrowseItems, true);
+        }));
+    }
+    navigation.querySelector('[role="status"]').textContent = `${filtered.length} audiobooks · Page ${libraryBrowsePage + 1} of ${pages}`;
+    navigation.querySelector('[data-page="previous"]').disabled = libraryBrowsePage === 0;
+    navigation.querySelector('[data-page="next"]').disabled = libraryBrowsePage >= pages - 1;
+    renderLibraryPage(filtered.slice(libraryBrowsePage * LIBRARY_PAGE_SIZE, (libraryBrowsePage + 1) * LIBRARY_PAGE_SIZE));
+}
+
+function renderLibraryPage(items) {
     const container = document.getElementById('library-items');
     const emptyMessage = document.getElementById('library-empty');
+    // Explicitly release media resources before replacing the library cards.
+    container.querySelectorAll('audio').forEach(player => {
+        player.pause();
+        player.removeAttribute('src');
+        player.load();
+    });
     
     if (items.length === 0) {
         container.innerHTML = '';
@@ -637,7 +683,7 @@ function displayLibraryItems(items) {
             </div>
             <div class="library-item-details collapsed" data-job-id="${item.job_id}">
                 <div class="library-item-player">
-                    <audio controls id="player-${item.job_id}"></audio>
+                    <audio controls preload="none" id="player-${item.job_id}"></audio>
                 </div>
                 ${renderChapterControls(item)}
                 ${renderFullStoryBanner(item)}
@@ -651,13 +697,11 @@ function displayLibraryItems(items) {
         container.appendChild(itemCard);
 
         const player = itemCard.querySelector(`#player-${item.job_id}`);
-        if (player && initialChapter) {
-            player.src = initialChapter.output_file;
-            player.load();
-        } else if (player) {
-            player.src = item.output_file;
-            player.load();
-        }
+        const ensurePlayerSource = () => {
+            if (player && !player.getAttribute('src')) {
+                player.src = initialChapter?.output_file || item.output_file;
+            }
+        };
 
         const summaryHeader = itemCard.querySelector(`.library-item-summary[data-job-id="${item.job_id}"]`);
         const details = itemCard.querySelector(`.library-item-details[data-job-id="${item.job_id}"]`);
@@ -674,6 +718,7 @@ function displayLibraryItems(items) {
                     return;
                 }
                 const isCollapsed = details.classList.contains('collapsed');
+                if (isCollapsed) ensurePlayerSource();
                 details.classList.toggle('collapsed');
                 toggleBtn.textContent = isCollapsed ? '▼' : '▶';
                 toggleBtn.setAttribute('aria-expanded', String(isCollapsed));
@@ -749,6 +794,7 @@ function displayLibraryItems(items) {
                     }
 
                     // Start playing
+                    ensurePlayerSource();
                     const { fullStorySrc, fullStoryPath } = getFullStoryInfo();
                     if (fullStorySrc) {
                         const separator = fullStorySrc.includes('?') ? '&' : '?';
@@ -1712,12 +1758,16 @@ function renderChunkReviewModal(data) {
     // Extract unique speakers and count their chunks
     const speakerMap = new Map();
     const speakerInstructionMap = new Map();
+    const speakerProfileMap = new Map();
     chunks.forEach(chunk => {
         const speaker = chunk.speaker || 'default';
         if (!speakerMap.has(speaker)) {
             speakerMap.set(speaker, { count: 0, voiceLabel: chunk.voice_label || chunk.voice || 'Default' });
         }
         speakerMap.get(speaker).count++;
+        if (!speakerProfileMap.has(speaker) && chunk.voice_assignment?.extra?.speaker_profile) {
+            speakerProfileMap.set(speaker, chunk.voice_assignment.extra.speaker_profile);
+        }
 
         if (!speakerInstructionMap.has(speaker)) {
             const instruction = getChunkInstruction(chunk);
@@ -1730,8 +1780,7 @@ function renderChunkReviewModal(data) {
     // Build speaker section HTML - accordion layout
     const speakerRows = Array.from(speakerMap.entries()).map(([speaker, info]) => {
         const speakerInstruction = speakerInstructionMap.get(speaker) || '';
-        const profile = chunks.find(chunk => (chunk.speaker || 'default') === speaker
-            && chunk.voice_assignment?.extra?.speaker_profile)?.voice_assignment.extra.speaker_profile || {};
+        const profile = speakerProfileMap.get(speaker) || {};
         return `
         <div class="bulk-speaker-card" data-speaker="${escapeHtml(speaker)}">
             <div class="bulk-speaker-summary" data-speaker="${escapeHtml(speaker)}">
@@ -1802,6 +1851,7 @@ function renderChunkReviewModal(data) {
                                 <select class="bulk-speaker-voice-select" data-speaker="${escapeHtml(speaker)}">
                                     <option value="">-- Select voice --</option>
                                 </select>
+                                <button type="button" class="btn btn-sm bulk-speaker-preview" disabled>Play</button>
                             </div>
                             <button class="btn btn-sm btn-warning bulk-speaker-regen" data-speaker="${escapeHtml(speaker)}" disabled>
                                 Regenerate All
@@ -1975,6 +2025,12 @@ function renderChunkReviewModal(data) {
             <div id="library-regen-progress-statuses" class="library-regen-progress-statuses"></div>
         </section>
         <div class="bulk-speaker-section">
+            <div class="library-regen-controls" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+                <button type="button" class="btn btn-secondary" data-regen-action="pause">Pause regeneration</button>
+                <button type="button" class="btn btn-secondary" data-regen-action="resume">Resume regeneration</button>
+                <button type="button" class="btn btn-secondary" data-regen-action="cancel">Stop queued regeneration</button>
+                <span id="library-regen-control-status" role="status">Controls affect this production. The current chunk finishes first.</span>
+            </div>
             <div class="bulk-speaker-header">
                 <strong>Bulk Speaker Regeneration</strong>
                 <span class="bulk-speaker-hint">Select speakers and choose a voice to regenerate all their chunks</span>
@@ -2520,6 +2576,31 @@ function startChunkSequence(items, startIndex = 0) {
 function wireChunkReviewEvents(jobId, chunks, engine) {
     const body = document.getElementById('chunk-review-modal-body');
     if (!body) return;
+    body.querySelectorAll('[data-regen-action]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const action = button.dataset.regenAction;
+            if (action === 'cancel' && !confirm('Stop queued regeneration for this production? Completed audio is kept; an already-running chunk may finish.')) return;
+            button.disabled = true;
+            const status = body.querySelector('#library-regen-control-status');
+            try {
+                const response = await fetch(`/api/library/${encodeURIComponent(jobId)}/regeneration-control`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action })
+                });
+                if (response.status === 404 || response.status === 405) throw new Error('Restart the backend to enable regeneration controls.');
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error(result.error || 'Unable to control regeneration.');
+                status.textContent = result.message;
+            } catch (error) {
+                status.textContent = error.message;
+            } finally { button.disabled = false; }
+        });
+    });
+    fetch(`/api/library/${encodeURIComponent(jobId)}/regeneration-control`)
+        .then(response => response.ok ? response.json() : null)
+        .then(result => {
+            const status = body.querySelector('#library-regen-control-status');
+            if (result?.paused && status && body.isConnected) status.textContent = result.message;
+        }).catch(() => {});
 
     const playAllButton = body.querySelector('#chunk-review-play-all');
     const playAllLabel = body.querySelector('#chunk-review-play-all-label');
@@ -2564,7 +2645,7 @@ function wireChunkReviewEvents(jobId, chunks, engine) {
             if (e.target.closest('.library-chunk-play')) return;
             
             const chunkId = summary.getAttribute('data-chunk-id');
-            const details = body.querySelector(`.library-chunk-details[data-chunk-id="${chunkId}"]`);
+            const details = summary.closest('.library-chunk-card')?.querySelector('.library-chunk-details');
             const toggle = summary.querySelector('.chunk-expand-toggle');
             
             if (details) {
@@ -2890,6 +2971,7 @@ const libraryCloudCatalogCache = new Map();
 const libraryCloudCatalogRequests = new Map();
 
 async function getLibraryCloudCatalog(engineName) {
+    if (window.isGeminiTtsEngine?.(engineName)) return window.loadGeminiTtsCatalog();
     const choice = window.localAIEngineChoice(engineName);
     const normalized = choice.engine.toLowerCase().replace(/[_-]/g, '');
     const provider = normalized.includes('edgetts')
@@ -2928,6 +3010,7 @@ function mapLibraryCloudVoices(data, provider) {
         id: voice.short_name || voice.voice_id,
         name: `${voice.display_name || voice.short_name || voice.voice_id}${voice.locale ? ` (${voice.locale_name || voice.locale})` : ''}`,
         langCode: voice.locale || '',
+        previewUrl: voice.preview_url || voice.sample_url || '',
         gender: voice.gender || '',
         language: voice.locale || '',
         isEdgeTts: provider === 'edge_tts',
@@ -2996,11 +3079,99 @@ function resolveLocalAIFreeformSelection(select) {
     return { cancelled: false, voice, language };
 }
 
+function initializeReviewCardOnDemand(card, initialize) {
+    if (!card) return;
+    let initialized = false;
+    const activate = () => {
+        if (initialized) return;
+        initialized = true;
+        card.removeEventListener('pointerdown', activate);
+        card.removeEventListener('focusin', activate);
+        initialize();
+    };
+    card.addEventListener('pointerdown', activate);
+    card.addEventListener('focusin', activate);
+}
+
+function deferLibraryVoiceOptions(select, populate) {
+    if (!select) return;
+    // Replace pending callbacks on filter refresh rather than accumulating listeners.
+    select._populateLibraryOptions = populate;
+    if (select.dataset.lazyVoiceBound) return;
+    select.dataset.lazyVoiceBound = 'true';
+    const load = async () => {
+        const callback = select._populateLibraryOptions;
+        if (!callback) return;
+        select._populateLibraryOptions = null;
+        try {
+            await callback();
+        } catch (error) {
+            select._populateLibraryOptions = callback;
+            console.error('Unable to load voice options', error);
+        }
+    };
+    select.addEventListener('focus', load);
+    select.addEventListener('pointerenter', load);
+}
+
+function reviewSpeakerSelections(chunks, fallbackEngine) {
+    const result = new Map();
+    for (const chunk of chunks) {
+        const speaker = chunk.speaker || 'default';
+        if (!result.has(speaker)) result.set(speaker, {engines: new Set(), voices: new Map()});
+        const entry = result.get(speaker);
+        entry.engines.add(chunk.engine || fallbackEngine);
+        const assignment = chunk.voice_assignment || {};
+        const id = assignment.audio_prompt_path || assignment.voice || chunk.voice || '';
+        entry.voices.set(id, {id, name: chunk.voice_label || entry.voices.get(id)?.name || id, isPrompt: !!assignment.audio_prompt_path});
+    }
+    return result;
+}
+
+function bindLibrarySpeakerPreview(card) {
+    const select = card.querySelector('.bulk-speaker-voice-select');
+    const button = card.querySelector('.bulk-speaker-preview');
+    if (!select || !button) return;
+    const urlForSelection = () => {
+        const voice = libraryVoiceMap.get(select.value);
+        const engine = card.querySelector('.bulk-speaker-engine-select')?.value || '';
+        if (engine.startsWith('gemini_tts') && /^voice_[A-Za-z0-9_-]+$/.test(select.value)) return `/api/gemini-tts/voices/${encodeURIComponent(select.value)}/preview`;
+        const supplied = voice?.previewUrl || '';
+        if (/^https?:\/\//i.test(supplied) || /^\/(?!\/)/.test(supplied)) return supplied;
+        return typeof selectedVoicePreviewUrl === 'function' ? selectedVoicePreviewUrl(select) : '';
+    };
+    const update = () => {
+        if (previewButton === button) stopPreviewAudio();
+        button.disabled = !urlForSelection();
+        button.title = button.disabled ? 'No saved preview is available for this selection.' : 'Play selected voice sample without regenerating chunks';
+    };
+    select.addEventListener('change', update);
+    button.onclick = async () => {
+        if (previewButton === button) {stopPreviewAudio(); return;}
+        const url = urlForSelection();
+        if (!url) return;
+        stopPreviewAudio();
+        stopLibraryChunkAudio();
+        const audio = new Audio(url);
+        previewAudio = audio;
+        previewButton = button;
+        button.dataset.originalText = 'Play';
+        button.textContent = 'Stop';
+        const finish = () => {if (previewAudio === audio) stopPreviewAudio();};
+        audio.onended = finish;
+        audio.onerror = () => {finish(); button.title = 'Unable to load preview; the sample may be unavailable.';};
+        try {await audio.play();} catch {audio.onerror();}
+    };
+    card._updateVoicePreview = update;
+    update();
+}
+
 async function populateLibraryVoiceSelects(engine) {
     const body = document.getElementById('chunk-review-modal-body');
     if (!body) return;
 
     const chunks = chunkReviewModalData?.chunks || [];
+    const recordedSpeakers = reviewSpeakerSelections(chunks, engine);
 
     const normalizedEngine = (engine || '').toLowerCase().replace(/[_-]/g, '');
     const isChatterbox = normalizedEngine.includes('chatterbox');
@@ -3012,7 +3183,7 @@ async function populateLibraryVoiceSelects(engine) {
     const isAzureSpeech = normalizedEngine.includes('azurespeech');
     const isEdgeTts = normalizedEngine.includes('edgetts');
     const isElevenLabs = normalizedEngine.includes('elevenlabs');
-    const isOpenAITts = normalizedEngine.includes('openaitts');
+    const isOpenAITts = normalizedEngine.includes('openaitts') || normalizedEngine.startsWith('geminitts');
     const isLocalAITts = normalizedEngine.includes('localaitts');
     const isPocketPreset = normalizedEngine.includes('pocketttspreset');
     const isPocket = normalizedEngine.includes('pockettts') && !isPocketPreset;
@@ -3287,6 +3458,7 @@ async function populateLibraryVoiceSelects(engine) {
     }
 
     async function populateChunkVoiceSelect(select, chunkId, engineName, filters = null, currentLabel = '', selectedValue = '') {
+        select._populateLibraryOptions = null;
         const catalogEngine = engineName;
         engineName = window.localAIEngineChoice(engineName).engine;
         engineName = (engineName || '').toLowerCase().replace(/[_-]/g, '');
@@ -3304,7 +3476,7 @@ async function populateLibraryVoiceSelects(engine) {
         const isAzureSpeech = engineName.includes('azurespeech');
         const isEdgeTts = engineName.includes('edgetts');
         const isElevenLabs = engineName.includes('elevenlabs');
-        const isOpenAITts = engineName.includes('openaitts');
+    const isOpenAITts = engineName.includes('openaitts') || engineName.startsWith('geminitts');
         const isLocalAITts = engineName.includes('localaitts');
         const minDuration = getMinDuration(engineName);
         const activeFilters = filters || libraryVoiceFilters;
@@ -3448,12 +3620,15 @@ async function populateLibraryVoiceSelects(engine) {
 
     // Helper to populate bulk speaker voice select based on engine
     async function populateBulkVoiceSelect(select, speaker, engineName, filters = null) {
+        const previousValue = select.value;
+        const previousLabel = select.selectedOptions?.[0]?.textContent || previousValue;
+        select._populateLibraryOptions = null;
         const catalogEngine = engineName;
         engineName = window.localAIEngineChoice(engineName).engine;
         engineName = (engineName || '').toLowerCase().replace(/[_-]/g, '');
         updateLocalAIManualFields(select, engineName.includes('localaitts'));
         const isPocketPreset = engineName.includes('pocketttspreset');
-        const usesPrompts = engineName.includes('chatterbox')
+        const usesPrompts = engineName.includes('breeze') || engineName.includes('chatterbox')
             || engineName.includes('voxcpm')
             || (engineName.includes('pockettts') && !isPocketPreset)
             || (engineName.includes('qwen3') && engineName.includes('clone'))
@@ -3465,7 +3640,7 @@ async function populateLibraryVoiceSelects(engine) {
         const isAzureSpeech = engineName.includes('azurespeech');
         const isEdgeTts = engineName.includes('edgetts');
         const isElevenLabs = engineName.includes('elevenlabs');
-        const isOpenAITts = engineName.includes('openaitts');
+    const isOpenAITts = engineName.includes('openaitts') || engineName.startsWith('geminitts');
         const isLocalAITts = engineName.includes('localaitts');
         const minDuration = getMinDuration(engineName);
         const activeFilters = filters || libraryVoiceFilters;
@@ -3481,6 +3656,7 @@ async function populateLibraryVoiceSelects(engine) {
                         duration: p.duration_seconds,
                         gender: p.gender,
                         language: p.language,
+                        transcript: p.transcript || p.prompt_text || '',
                         isPrompt: true
                     }));
                 }
@@ -3551,16 +3727,33 @@ async function populateLibraryVoiceSelects(engine) {
         } catch (err) {
             console.error('Failed to load voices for bulk speaker:', err);
         }
+
+        // Breeze API accepts both production-uploaded local samples and saved remote voices.
+        if (engineName === 'breezeapi') {
+            try {
+                const response = await fetch('/api/breeze-api/catalog');
+                const data = await response.json();
+                if (response.ok && data.success) {
+                    bulkVoices.push(...(data.voices || []).map(v => ({
+                        id: v.voice_id || v.id,
+                        name: `${v.name || v.voice_id || v.id} (Breeze saved voice)`,
+                        isPrompt: false,
+                    })).filter(v => v.id));
+                }
+            } catch (err) {
+                console.warn('Failed to load saved Breeze voices:', err);
+            }
+        }
         
         // Apply filters for prompt-based voices
         if (usesPrompts) {
             if (activeFilters.gender && activeFilters.gender !== 'all') {
                 bulkVoices = bulkVoices.filter(v => 
-                    (v.gender || '').toLowerCase() === activeFilters.gender.toLowerCase()
+                    !v.isPrompt || (v.gender || '').toLowerCase() === activeFilters.gender.toLowerCase()
                 );
             }
             if (activeFilters.language && activeFilters.language !== 'all') {
-                bulkVoices = bulkVoices.filter(v => v.language === activeFilters.language);
+                bulkVoices = bulkVoices.filter(v => !v.isPrompt || v.language === activeFilters.language);
             }
         }
         bulkVoices.forEach(voice => libraryVoiceMap.set(voice.id, voice));
@@ -3597,12 +3790,18 @@ async function populateLibraryVoiceSelects(engine) {
             select.appendChild(opt);
         });
         if (isLocalAITts) appendLocalAIFreeformOption(select);
+        if (previousValue) {
+            if (!Array.from(select.options).some(option => option.value === previousValue)) select.add(new Option(previousLabel, previousValue));
+            select.value = previousValue;
+        }
+        select.closest?.('.bulk-speaker-card')?._updateVoicePreview?.();
     }
 
     const chunkById = new Map(chunks.map(chunk => [chunk.id, chunk]));
 
     // Populate chunk engine selects
     body.querySelectorAll('.library-chunk-engine-select').forEach(select => {
+        initializeReviewCardOnDemand(select.closest('.library-chunk-card'), () => {
         const chunkId = select.getAttribute('data-chunk-id');
         const chunk = chunkById.get(chunkId);
         const currentEngine = chunk?.engine || engine;
@@ -3636,7 +3835,9 @@ async function populateLibraryVoiceSelects(engine) {
             <option value="azure_speech">Microsoft Azure Speech</option>
             <option value="edge_tts">Microsoft Edge TTS (Experimental)</option>
             <option value="elevenlabs">ElevenLabs</option>
-            <option value="openai_tts">OpenAI-compatible TTS</option>
+                                    <option value="gemini_tts">Gemini 3.8 Flash TTS · Cloud</option>
+                                    <option value="gemini_tts_lite">Gemini 3.8 Flash-Lite TTS · Cloud</option>
+                                    <option value="openai_tts">OpenAI-compatible TTS</option>
             <option value="localai_tts">LocalAI TTS</option>
         `;
         window.appendLocalAIModelOptions(select);
@@ -3661,7 +3862,7 @@ async function populateLibraryVoiceSelects(engine) {
             const selectedValue = override.audio_prompt_path || override.voice
                 || voiceAssignment.audio_prompt_path || voiceAssignment.voice || '';
             const filters = getPromptFilters(regenSection, '.chunk-voice-filter-gender', '.chunk-voice-filter-language');
-            populateChunkVoiceSelect(voiceSelect, chunkId, currentEngine, filters, currentVoiceLabel, selectedValue);
+            deferLibraryVoiceOptions(voiceSelect, () => populateChunkVoiceSelect(voiceSelect, chunkId, select.value || currentEngine, filters, currentVoiceLabel, selectedValue));
         }
         const normalizedEngineValue = (currentEngine || '').toLowerCase();
         const isQwen = normalizedEngineValue.includes('qwen3') && !normalizedEngineValue.includes('clone');
@@ -3674,7 +3875,8 @@ async function populateLibraryVoiceSelects(engine) {
         if (promptFilters) {
             promptFilters.style.display = usesPrompts ? 'block' : 'none';
             if (usesPrompts) {
-                populatePromptFilterOptions(genderFilter, languageFilter);
+                deferLibraryVoiceOptions(genderFilter, () => populatePromptFilterOptions(genderFilter, languageFilter));
+                deferLibraryVoiceOptions(languageFilter, () => populatePromptFilterOptions(genderFilter, languageFilter));
             }
         }
         if (qwen3Options) {
@@ -3760,8 +3962,10 @@ async function populateLibraryVoiceSelects(engine) {
         });
     });
 
+        });
     // Populate bulk speaker engine selects
     body.querySelectorAll('.bulk-speaker-engine-select').forEach(select => {
+        initializeReviewCardOnDemand(select.closest('.bulk-speaker-card'), () => {
         const speaker = select.getAttribute('data-speaker');
         select.innerHTML = `
             <option value="">-- Same engine --</option>
@@ -3780,14 +3984,26 @@ async function populateLibraryVoiceSelects(engine) {
             <option value="index_tts">IndexTTS</option>
             <option value="dots_tts">Dot.TTS · Voice Clone</option>
             <option value="audio8_tts">Audio8 TTS · Voice Clone</option>
+            <option value="breeze_tts_2">Breeze TTS 2 · Local</option>
+            <option value="breeze_api">Breeze · API</option>
             <option value="azure_speech">Microsoft Azure Speech</option>
             <option value="edge_tts">Microsoft Edge TTS (Experimental)</option>
             <option value="elevenlabs">ElevenLabs</option>
-            <option value="openai_tts">OpenAI-compatible TTS</option>
+                                    <option value="gemini_tts">Gemini 3.8 Flash TTS · Cloud</option>
+                                    <option value="gemini_tts_lite">Gemini 3.8 Flash-Lite TTS · Cloud</option>
+                                    <option value="openai_tts">OpenAI-compatible TTS</option>
             <option value="localai_tts">LocalAI TTS</option>
         `;
         
         window.appendLocalAIModelOptions(select);
+        const recorded = recordedSpeakers.get(speaker);
+        const recordedEngine = recorded?.engines.size === 1 ? [...recorded.engines][0] : '';
+        select.options[0].textContent = recordedEngine ? `Current: ${formatEngineName(recordedEngine)}` : 'Mixed engines — keep each';
+        if (recordedEngine) {
+            if (!Array.from(select.options).some(option => option.value === recordedEngine)) select.add(new Option(formatEngineName(recordedEngine), recordedEngine));
+            select.value = recordedEngine;
+        }
+        select.closest('.bulk-speaker-card')?._updateVoicePreview?.();
         // When engine changes, repopulate the voice dropdown for this speaker and show/hide Qwen3 options
         select.addEventListener('change', async () => {
             const selectedEngine = select.value || engine;
@@ -3800,6 +4016,7 @@ async function populateLibraryVoiceSelects(engine) {
             
             if (voiceSelect) {
                 const filters = getPromptFilters(regenSection, '.bulk-voice-filter-gender', '.bulk-voice-filter-language');
+                voiceSelect.value = '';
                 await populateBulkVoiceSelect(voiceSelect, speaker, selectedEngine, filters);
             }
             
@@ -3807,7 +4024,7 @@ async function populateLibraryVoiceSelects(engine) {
             const normalizedSelectedEngine = window.localAIEngineChoice(selectedEngine).engine.toLowerCase();
             const isQwen = normalizedSelectedEngine.includes('qwen3')
                 && !normalizedSelectedEngine.includes('clone');
-            const usesPrompts = normalizedSelectedEngine.includes('chatterbox')
+            const usesPrompts = normalizedSelectedEngine.includes('breeze') || normalizedSelectedEngine.includes('chatterbox')
                 || normalizedSelectedEngine.includes('voxcpm')
                 || (normalizedSelectedEngine.includes('qwen3') && normalizedSelectedEngine.includes('clone'))
                 || (normalizedSelectedEngine.includes('omnivoice') && normalizedSelectedEngine.includes('clone'))
@@ -3830,9 +4047,22 @@ async function populateLibraryVoiceSelects(engine) {
         });
     });
 
+        });
     // Also populate bulk speaker voice selects
     body.querySelectorAll('.bulk-speaker-voice-select').forEach(select => {
+        const recorded = recordedSpeakers.get(select.dataset.speaker);
         select.innerHTML = '<option value="">-- Select voice --</option>';
+        if (recorded?.voices.size === 1) {
+            const voice = [...recorded.voices.values()][0];
+            if (voice.id) {
+                libraryVoiceMap.set(voice.id, voice);
+                select.add(new Option(`Current: ${voice.name}`, voice.id));
+                select.value = voice.id;
+            }
+        } else if (recorded?.voices.size > 1) select.options[0].textContent = 'Mixed voices — select replacement';
+        bindLibrarySpeakerPreview(select.closest('.bulk-speaker-card'));
+        deferLibraryVoiceOptions(select, () => populateBulkVoiceSelect(select, select.dataset.speaker,
+            select.closest('.bulk-speaker-card').querySelector('.bulk-speaker-engine-select').value || engine));
     });
 
     // Initialize prompt filters and voice lists for bulk speakers
@@ -3845,7 +4075,7 @@ async function populateLibraryVoiceSelects(engine) {
         if (!engineSelect || !voiceSelect) return;
         const selectedEngine = engineSelect.value || engine;
         const normalizedEngine = window.localAIEngineChoice(selectedEngine).engine.toLowerCase();
-        const usesPrompts = normalizedEngine.includes('chatterbox')
+        const usesPrompts = normalizedEngine.includes('breeze') || normalizedEngine.includes('chatterbox')
             || normalizedEngine.includes('voxcpm')
             || (normalizedEngine.includes('pockettts') && !normalizedEngine.includes('pocketttspreset'))
             || (normalizedEngine.includes('qwen3') && normalizedEngine.includes('clone'))
@@ -3854,9 +4084,12 @@ async function populateLibraryVoiceSelects(engine) {
         if (promptFilters) {
             promptFilters.style.display = usesPrompts ? 'block' : 'none';
             if (usesPrompts) {
-                populatePromptFilterOptions(genderFilter, languageFilter);
-                const filters = getPromptFilters(card, '.bulk-voice-filter-gender', '.bulk-voice-filter-language');
-                populateBulkVoiceSelect(voiceSelect, card.dataset.speaker || '', selectedEngine, filters);
+                deferLibraryVoiceOptions(genderFilter, () => populatePromptFilterOptions(genderFilter, languageFilter));
+                deferLibraryVoiceOptions(languageFilter, () => populatePromptFilterOptions(genderFilter, languageFilter));
+                deferLibraryVoiceOptions(voiceSelect, () => {
+                    const filters = getPromptFilters(card, '.bulk-voice-filter-gender', '.bulk-voice-filter-language');
+                    return populateBulkVoiceSelect(voiceSelect, card.dataset.speaker || '', engineSelect.value || engine, filters);
+                });
             }
         }
 
@@ -3948,7 +4181,9 @@ async function triggerBulkSpeakerRegen(
     const isOmniClone = normalizedEngine.includes('omnivoice') && normalizedEngine.includes('clone');
     const isDotsTts = (normalizedEngine.includes('dotstts') || normalizedEngine.includes('indextts'));
     const isAzureSpeech = normalizedEngine.includes('azurespeech');
-    const usesVoicePrompts = isChatterbox || isVoxCPM || isQwenClone || isOmniClone || isDotsTts;
+    const isBreeze = normalizedEngine === 'breezetts2' || normalizedEngine === 'breezeapi';
+    const usesVoicePrompts = isChatterbox || isVoxCPM || isQwenClone || isOmniClone || isDotsTts
+        || (isBreeze && libraryVoiceMap.get(voiceValue)?.isPrompt !== false);
 
     // Build voice payload based on engine type
     const voiceData = libraryVoiceMap.get(voiceValue || '');
@@ -3988,7 +4223,7 @@ async function triggerBulkSpeakerRegen(
         voicePayload = {
             voice: voiceValue,
             lang_code: voiceData?.langCode || (
-                normalizedEngine.includes('edgetts') || normalizedEngine.includes('elevenlabs') || normalizedEngine.includes('openaitts') ? '' : 'a'
+                isBreeze || normalizedEngine.includes('edgetts') || normalizedEngine.includes('elevenlabs') || normalizedEngine.includes('openaitts') ? '' : 'a'
             ),
             ...(isAzureSpeech ? { extra: { locale: voiceData?.langCode || '' } } : {}),
         };
@@ -5199,6 +5434,8 @@ function _ensureLibraryAwrEntryModal() {
                                     <option value="azure_speech">Microsoft Azure Speech</option>
                                     <option value="edge_tts">Microsoft Edge TTS</option>
                                     <option value="elevenlabs">ElevenLabs</option>
+                                    <option value="gemini_tts">Gemini 3.8 Flash TTS · Cloud</option>
+                                    <option value="gemini_tts_lite">Gemini 3.8 Flash-Lite TTS · Cloud</option>
                                     <option value="openai_tts">OpenAI-compatible TTS</option>
                                     <option value="localai_tts">LocalAI TTS</option>
                                 </select>
@@ -5298,7 +5535,7 @@ async function _libAwrPopulateVoices(engineName) {
     const isAzureSpeech = norm.includes('azurespeech');
     const isEdgeTts = norm.includes('edgetts');
     const isElevenLabs = norm.includes('elevenlabs');
-    const isOpenAITts = norm.includes('openaitts');
+    const isOpenAITts = norm.includes('openaitts') || norm.startsWith('geminitts');
     const isLocalAITts = norm.includes('localaitts');
 
     try {

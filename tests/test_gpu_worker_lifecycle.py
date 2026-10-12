@@ -44,6 +44,38 @@ def test_narration_waits_for_casting_then_releases_workers(monkeypatch):
     assert app_module.breeze_voice_design_process is None
 
 
+def test_regeneration_releases_casting_once_and_retains_narration(monkeypatch):
+    calls = []
+    narration = object()
+    monkeypatch.setattr(app_module, 'tts_engine_instances', {'breeze_tts_2': narration})
+    monkeypatch.setattr(app_module, 'qwen3_voice_design_process', None)
+    monkeypatch.setattr(app_module, 'breeze_voice_design_process', object())
+    monkeypatch.setattr(app_module, 'qwen3_voice_design_model', None)
+    def cleanup():
+        calls.append('cleanup')
+        app_module.breeze_voice_design_process = None
+    monkeypatch.setattr(app_module, '_release_voice_design_memory', cleanup)
+    for _ in range(3):
+        with app_module._regeneration_model_lifecycle('breeze_tts_2'):
+            assert calls == ['cleanup']
+            assert app_module.tts_engine_instances['breeze_tts_2'] is narration
+    monkeypatch.setattr(app_module, 'breeze_voice_design_process', object())
+    with app_module._regeneration_model_lifecycle('breeze_tts_2'):
+        assert calls == ['cleanup', 'cleanup']
+
+
+def test_cloud_regeneration_leaves_casting_alone(monkeypatch):
+    monkeypatch.setattr(app_module, '_release_voice_design_memory', lambda: pytest.fail('Unexpected cleanup'))
+    with app_module._regeneration_model_lifecycle('breeze_api'):
+        pass
+
+
+def test_voice_design_acquires_lifecycle_before_inference():
+    # Both entry points are guarded before they can enter gpu_inference_lock.
+    assert hasattr(app_module._generate_voice_design_preview, '__wrapped__')
+    assert hasattr(app_module._generate_breeze_voice_design_preview, '__wrapped__')
+
+
 def test_cloud_job_does_not_release_another_jobs_gpu(monkeypatch):
     monkeypatch.setattr(app_module, "_release_voice_design_memory", lambda: pytest.fail("GPU cleanup for cloud job"))
     monkeypatch.setattr(app_module, "_process_audio_job", lambda _job: "done")

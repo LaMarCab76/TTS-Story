@@ -13,6 +13,20 @@ _TITLE_PREFIX_RE = re.compile(
 )
 
 
+def resolve_new_collection_title(payload: Mapping[str, Any]) -> Optional[str]:
+    """Prefer explicit book identity, then the saved project, then a Title line."""
+    for key in ("book_title", "project_name"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return " ".join(value.split())[:240]
+    text = payload.get("text")
+    if isinstance(text, str):
+        opening = re.sub(r"\[direction\].*?\[/direction\]", "", text[:8000], flags=re.I | re.S)
+        opening = re.sub(r"\[/?[^\]\r\n]+\]", "", opening)
+        return infer_collection_title_from_chunks([{"text": line} for line in opening.splitlines() if line.strip()][:10])
+    return None
+
+
 def infer_collection_title_from_chunks(chunks: Any) -> Optional[str]:
     """Recover a collection title from an explicit title chunk.
 

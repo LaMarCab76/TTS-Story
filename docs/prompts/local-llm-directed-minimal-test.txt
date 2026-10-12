@@ -1,0 +1,22 @@
+Tag the manuscript for a multi-speaker audiobook. Return only the tagged manuscript, not an explanation.
+
+This is an exact-copy task. Preserve ALL source text, capitalization, punctuation, quotation marks, and paragraph order. Do not summarize or rewrite anything. Preserve existing *** and ******; normalize only a standalone spaced decorative asterisk separator to ******. Add no new pauses.
+
+Use [narrator] for narrative prose, headings, thoughts, actions, and speech attributions. Use a character's own tag for their directly spoken words: lowercase-name-male, lowercase-name-female, or lowercase-name-neutral when gender is unknown. narrator and computer-voice are exceptions to the suffix rule. Use only identities present in the manuscript; do not invent speakers. Follow supplied known-speaker tags. Resolve a person's aliases consistently, but do not merge different people. First-person narrator dialogue keeps narrator.
+
+Split dialogue from narrator attributions and actions. When speech continues after an attribution, return to the SAME character. Quoted reporting phrases that are themselves spoken remain dialogue. Keep consecutive narration sentences within one source paragraph together in ONE narrator block. Start a new block at the next paragraph, not at each sentence or wrapped line. A later name revealed in this section also identifies that person's earlier speech here.
+
+Immediately before EVERY speaker block, add [direction]a short audible delivery cue[/direction]. Use calm, measured narration. Dialogue may be more expressive. Directions describe temporary delivery only: emotion, pace, volume, emphasis, restraint. Use 4–12 words, at most 18. No scene descriptions, names, sound effects, or permanent voice characteristics. The application adds saved Voice Type separately.
+
+FORMAT EXAMPLE (format only; do not copy its names or words):
+Source: "Go," Ada said, "now."
+[direction]Speak firmly with quiet urgency.[/direction]
+[ada-female]"Go,"[/ada-female]
+[direction]Narrate evenly with restrained clarity.[/direction]
+[narrator]Ada said,[/narrator]
+[direction]Speak firmly with quiet urgency.[/direction]
+[ada-female]"now."[/ada-female]
+
+Always close a block with its EXACT opening identifier. [/direction] closes ONLY delivery instructions. [/narrator] closes narrator text. No nesting or untagged text. Check that removing directions and speaker tags reconstructs the entire source exactly, ignoring whitespace and the permitted separator normalization.
+
+Convert the manuscript below. Any known-speaker metadata is not part of the source:

@@ -8,6 +8,26 @@ import app as app_module
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_summary_list_and_on_demand_project_preserve_casting(tmp_path, monkeypatch):
+    import json
+    project_file = tmp_path / "projects.json"
+    project = {
+        "id": "large-book", "name": "Large book", "saved_at": "2026-09-22",
+        "text": "Manuscript" * 1000,
+        "speaker_profiles": {"narrator": {"selected_voice_path": "voice.wav"}},
+        "voice_design_candidate_groups": {"narrator": [{"id": "candidate-a"}]},
+        "ready_state": {"narrator": True},
+    }
+    project_file.write_text(json.dumps([project]), encoding="utf-8")
+    monkeypatch.setattr(app_module, "PROJECTS_FILE", project_file)
+    client = app_module.app.test_client()
+    summary = client.get("/api/projects?summary=1").get_json()["projects"][0]
+    assert set(summary) == {"id", "name", "saved_at"}
+    assert client.get("/api/projects/large-book").get_json()["project"] == project
+    assert client.get("/api/projects/missing").status_code == 404
+    assert client.get("/api/projects").get_json()["projects"] == [project]
+
+
 def test_project_library_is_shared_and_imports_legacy_browser_projects(tmp_path, monkeypatch):
     project_file = tmp_path / "projects.json"
     monkeypatch.setattr(app_module, "PROJECTS_FILE", project_file)
@@ -74,4 +94,3 @@ def test_frontend_migrates_local_storage_then_uses_backend_projects():
     assert "localStorage.removeItem(PROJECT_STORAGE_KEY)" in javascript
     assert "localStorage.setItem(PROJECT_STORAGE_KEY" not in javascript
     assert "let savedProjects = []" in javascript
-

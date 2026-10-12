@@ -23,6 +23,7 @@ from .engines.elevenlabs_engine import ElevenLabsEngine
 from .engines.openai_tts_engine import OpenAITTSEngine
 from .engines.localai_tts_engine import LocalAITTSEngine
 from .engines.breeze_api_engine import BreezeAPIEngine
+from .engines.gemini_tts_engine import GeminiTTSEngine, GEMINI_TTS_MODELS
 from .engines.isolated_proxy import ENGINE_DIRS, IsolatedEngineProxy
 from .engines.kokoro_engine import (
     DEFAULT_SAMPLE_RATE,
@@ -52,6 +53,7 @@ EngineRegistry: Dict[str, Type[TtsEngineBase]] = {
     "openai_tts": OpenAITTSEngine,
     "localai_tts": LocalAITTSEngine,
     "breeze_api": BreezeAPIEngine,
+    **{name: GeminiTTSEngine for name in GEMINI_TTS_MODELS},
     "audio8_tts": IsolatedEngineProxy,
     "breeze_tts_2": IsolatedEngineProxy,
 }
@@ -79,6 +81,8 @@ def get_engine(engine_name: str = "kokoro", **kwargs) -> TtsEngineBase:
     engine_cls = EngineRegistry.get(engine_name)
     if not engine_cls:
         raise ValueError(f"Unknown TTS engine: {engine_name}")
+    if engine_name in GEMINI_TTS_MODELS:
+        return engine_cls(engine_name=engine_name, **kwargs)
     return engine_cls(**kwargs)
 
 

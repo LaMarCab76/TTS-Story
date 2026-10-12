@@ -127,6 +127,23 @@ def test_qwen_instruction_removes_conflicting_negative_phrases():
     assert "not theatrical" not in instruction.lower()
 
 
+def test_breeze_instruction_preserves_full_500_character_capacity_and_suffix():
+    base = (
+        "MIDDLE-AGED FEMALE VOICE. Age 48; mature booming contralto with strong chest resonance; "
+        "commanding pace; refined English accent; fury, imperious command, suspicion, explosive threat, "
+        "controlled dramatic range, grounded resonance, deliberate articulation"
+    )
+    instruction, language = _build_qwen_voice_design_instruction(
+        {"instruct": f"{base}; clean, very clear", "language": "English"},
+        max_chars=app_module.MAX_BREEZE_VOICE_DESIGN_INSTRUCTION_CHARS,
+    )
+
+    assert len(instruction) > app_module.MAX_QWEN_VOICE_DESIGN_INSTRUCTION_CHARS
+    assert len(instruction) <= app_module.MAX_BREEZE_VOICE_DESIGN_INSTRUCTION_CHARS
+    assert instruction.endswith("clean, very clear")
+    assert language == "English"
+
+
 def test_qwen_instruction_blocks_missing_explicit_gender():
     with pytest.raises(ValueError, match="explicit Male, Female, or Neutral"):
         _build_qwen_voice_design_instruction({
@@ -254,6 +271,14 @@ def test_speaker_properties_offers_single_profile_generation():
     assert "const instruct = description" not in javascript
     assert "function buildLocalVoiceDesignPrompt" in javascript
     assert "voice_design_prompt: buildLocalVoiceDesignPrompt(name, voice" in javascript
+
+
+def test_quality_first_curated_voice_design_prompt_is_preserved_verbatim():
+    javascript = (PROJECT_ROOT / "static" / "js" / "main.js").read_text(encoding="utf-8")
+
+    assert "const curatedQualityLead = 'Dry close-mic podcast studio clarity.';" in javascript
+    assert "if (supplied.startsWith(curatedQualityLead))" in javascript
+    assert "curatedGenderPattern" not in javascript
 
 
 def test_main_bundle_cache_key_includes_latest_speaker_voice_routing_release():

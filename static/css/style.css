@@ -5752,3 +5752,12 @@ audio {
 .library-speaker-profile label { display: block; margin-top: .75rem; }
 .library-speaker-profile textarea { display: block; width: 100%; box-sizing: border-box; padding: .6rem; color: inherit; background: var(--bg-primary, #101827); border: 1px solid #475569; border-radius: .5rem; }
 .library-speaker-profile p, .speaker-profile-save-status { font-size: .85rem; opacity: .85; }
+
+/* One lazy audio player per Gemini view, compact audition/library rows. */
+.gemini-voice-row { display: flex; align-items: center; gap: .6rem; padding: .5rem 0; border-bottom: 1px solid var(--border-color, #475569); }
+.gemini-voice-row .gemini-voice-identity { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .9rem; }
+.gemini-voice-identity small { display: block; opacity: .65; font-size: .75rem; }
+.gemini-voice-row .btn, .gemini-voice-toolbar .btn { padding: .35rem .65rem; font-size: .8rem; min-height: 32px; width: auto; margin: 0; white-space: nowrap; }
+.gemini-voice-row input[type="checkbox"] { flex: 0 0 auto; width: 16px; height: 16px; margin: 0; }
+.gemini-voice-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; padding: .5rem 0; }
+.gemini-preview-player, #gemini-voices-manager-player { width: min(100%, 400px); height: 34px; margin: .5rem 0; }

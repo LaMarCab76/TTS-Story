@@ -7,6 +7,11 @@ window.breezeVoiceDesignAvailable = false;
 window.breezeVoiceDesignAvailabilityKnown = false;
 
 const VOICE_DESIGN_ENGINES = {
+    gemini: {
+        label: 'Gemini TTS · Cloud',
+        installMessage: 'Save your dedicated Gemini TTS API key under Settings → Engine Settings → Gemini TTS.',
+        settingsTab: 'gemini-tts'
+    },
     qwen3: {
         label: 'Qwen3-TTS',
         previewUrl: '/api/qwen3/voice-design/preview',
@@ -26,16 +31,19 @@ const VOICE_DESIGN_ENGINES = {
 };
 
 function normalizeVoiceDesignEngine(value) {
-    return value === 'breeze' ? 'breeze' : 'qwen3';
+    return ['breeze', 'gemini'].includes(value) ? value : 'qwen3';
 }
 
 function voiceDesignEngineAvailable(engine) {
+    // Hosted design needs no local installation; the designer validates the saved key.
+    if (engine === 'gemini') return true;
     return normalizeVoiceDesignEngine(engine) === 'breeze'
         ? window.breezeVoiceDesignAvailable === true
         : window.qwenVoiceDesignAvailable === true;
 }
 
 function voiceDesignEngineAvailabilityKnown(engine) {
+    if (engine === 'gemini') return true;
     return normalizeVoiceDesignEngine(engine) === 'breeze'
         ? window.breezeVoiceDesignAvailabilityKnown === true
         : window.qwenVoiceDesignAvailabilityKnown === true;
@@ -62,7 +70,7 @@ function openBreezeEngineSettings() {
 window.openBreezeEngineSettings = openBreezeEngineSettings;
 
 function refreshQwenVoiceDesignControls() {
-    const anyAvailable = window.qwenVoiceDesignAvailable === true || window.breezeVoiceDesignAvailable === true;
+    const anyAvailable = voiceDesignEngineAvailable('gemini') || window.qwenVoiceDesignAvailable === true || window.breezeVoiceDesignAvailable === true;
     const anyKnown = window.qwenVoiceDesignAvailabilityKnown === true && window.breezeVoiceDesignAvailabilityKnown === true;
     const hasDetectedSpeakers = Array.isArray(currentStats?.speakers) && currentStats.speakers.length > 0;
 
@@ -489,6 +497,7 @@ async function generateAndSaveVoiceCandidates(speaker, displayName, statusEl, en
     const payload = buildSpeakerVoiceDesignPayload(speaker, displayName);
     const { profile } = findSpeakerProfile(speaker);
     const designEngine = normalizeVoiceDesignEngine(engineOverride || profile?.voice_design_engine);
+    if (designEngine === 'gemini') throw new Error('Use Generate Voice in Speaker Properties to audition and select hosted Gemini voices. Local sample batch creation does not support hosted IDs.');
     await requireVoiceDesignBackend(designEngine);
     const engineConfig = getVoiceDesignEngineConfig(designEngine);
     const requestedCount = Number.parseInt(profile?.voice_candidate_count, 10);
@@ -564,6 +573,14 @@ async function generateAndSaveVoiceCandidates(speaker, displayName, statusEl, en
 
 async function generateSpeakerVoicePromptBatch(speaker, displayName, statusEl, designEngine) {
     if (!speaker) return { success: false, error: 'Missing speaker name' };
+    if (normalizeVoiceDesignEngine(designEngine) === 'gemini') {
+        try {
+            const result = await generateGeminiSpeakerBatch(speaker, displayName, statusEl);
+            return {success: true, error: '', reused: !!result?.reused};
+        } catch (error) {
+            return {success: false, error: error.message || 'Gemini voice generation failed'};
+        }
+    }
     const speakerKey = normalizeSpeakerKey(speaker);
     // Remove stale review cards before attempting this speaker. A failure must
     // show as a failure, not as an apparently successful set of old candidates.
@@ -580,7 +597,7 @@ async function generateSpeakerVoicePromptBatch(speaker, displayName, statusEl, d
                 turboSelectionState[speaker] = promptValue;
                 document.querySelectorAll('#inline-voice-assignment-list [data-role="turbo-control"] .reference-select, #speaker-edit-modal-body [data-role="turbo-control"] .reference-select')
                     .forEach(select => {
-                        if (select?.dataset?.speaker === speaker) select.value = promptValue;
+                        if (select?.dataset?.speaker === speaker) setReferenceSelectValue(select, promptValue);
                     });
             }
             updateSpeakerProfileEntry(speaker, {
@@ -597,6 +614,47 @@ async function generateSpeakerVoicePromptBatch(speaker, displayName, statusEl, d
             statusEl.textContent = `Failed ${speaker}: ${error.message || 'Error'}`;
         }
         return { success: false, error: error.message || 'Unknown generation error' };
+    }
+}
+
+async function generateGeminiSpeakerBatch(speaker, displayName, statusEl) {
+    const {profile} = findSpeakerProfile(speaker);
+    const scope = JSON.stringify([activeProjectId || geminiAuditionDraftKey(document.getElementById('input-text')?.value || 'unsaved'), normalizeSpeakerKey(speaker)]);
+    const existing = restoreGeminiAudition(profile?.gemini_voice_audition, scope);
+    // Pending auditions survive resume without rebilling. A selected audition
+    // is finished, however: an explicit new batch must create new choices while
+    // leaving the speaker's current voice assignment untouched.
+    if (existing.candidates.length && !existing.selected_id) {
+        updateSpeakerProfileEntry(speaker, {voice_design_engine: 'gemini', gemini_voice_audition: existing});
+        if (statusEl) statusEl.textContent = `Keeping existing Gemini candidates for ${speaker}; no new requests made.`;
+        return {reused: true};
+    }
+    const description = profile?.voice_design_prompt?.trim() || profile?.voice?.trim();
+    if (!description) throw new Error(`Add a Voice Type or Voice Design Prompt for ${speaker} first.`);
+    const count = Math.max(1, Math.min(4, Number.parseInt(profile?.voice_candidate_count, 10) || 1));
+    const state = {group_id: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`,
+        engine: bulkVoiceGenerationState?.gemini_model || 'gemini_tts', candidates: [], selected_id: ''};
+    const completed = [];
+    const persistAudition = () => {
+        state.updated_at = Date.now();
+        const copy = JSON.parse(JSON.stringify(state));
+        updateSpeakerProfileEntry(speaker, {voice_design_engine: 'gemini', gemini_voice_audition: copy});
+        try { localStorage.setItem(geminiAuditionDraftKey(scope), JSON.stringify({scope, state: copy})); } catch { /* Project checkpoint also retains candidates. */ }
+    };
+    const outcomes = await createGeminiCandidates(count, {name: displayName || speaker, description, engine: state.engine}, (candidate, index) => {
+        completed[index] = candidate;
+        state.candidates = completed.filter(Boolean);
+        geminiAuditionGroups[state.group_id] = state.candidates;
+        saveGeminiAuditionGroups();
+        persistAudition();
+        window.geminiTtsVoices.push({short_name: candidate.id, display_name: candidate.name, designed: true, locale: ''});
+        if (statusEl) statusEl.textContent = `${speaker}: ${state.candidates.length}/${count} Gemini candidates saved…`;
+    });
+    const failed = outcomes.filter(result => result.status === 'rejected');
+    if (failed.length) {
+        state.last_error = `${state.candidates.length}/${count} candidates saved for review. ${failed.map(result => result.reason.message).join('; ')}. No automatic retries.`;
+        persistAudition();
+        throw new Error(state.last_error);
     }
 }
 
@@ -655,6 +713,7 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
             : { speaker: item.speaker || '', error: item.error || 'Unknown generation error' })
         : [];
     let successCount = resume ? Math.max(0, Number(bulkVoiceGenerationState.success_count || 0)) : 0;
+    let reusedCount = resume ? Math.max(0, Number(bulkVoiceGenerationState.reused_count || 0)) : 0;
     bulkVoiceGenerationState = {
         version: 1,
         status: 'running',
@@ -662,14 +721,23 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
         total_speakers: speakers.length,
         next_index: startIndex,
         success_count: successCount,
+        reused_count: reusedCount,
         failures,
         prefix,
         candidate_count: Math.max(1, Math.min(Number.parseInt(document.getElementById('speaker-batch-candidate-count')?.value, 10) || 1, 10)),
         design_engine: normalizeVoiceDesignEngine(options.designEngine || bulkVoiceGenerationState?.design_engine),
+        gemini_model: resume ? bulkVoiceGenerationState.gemini_model : (document.getElementById('speaker-batch-gemini-model')?.value || 'gemini_tts'),
         started_at: resume ? bulkVoiceGenerationState.started_at : new Date().toISOString(),
         updated_at: new Date().toISOString()
     };
     await persistBulkVoiceGenerationState();
+    // One checkpoint write at a time, overlapping cloud requests rather than
+    // stopping between every speaker to serialize/save the entire project.
+    let pendingCheckpoint = Promise.resolve(null);
+    const flushCheckpoint = async () => {
+        const error = await pendingCheckpoint;
+        if (error) throw error;
+    };
     for (let index = startIndex; index < speakers.length; index += 1) {
         const speaker = speakers[index];
         const displayName = buildBatchVoiceName(prefix, speaker);
@@ -685,17 +753,24 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
         const result = await generateSpeakerVoicePromptBatch(speaker, displayName, statusEl, bulkVoiceGenerationState.design_engine);
         if (result.success) {
             successCount += 1;
+            if (result.reused) reusedCount += 1;
         } else {
             failures.push({ speaker, error: result.error });
         }
         bulkVoiceGenerationState.next_index = index + 1;
         bulkVoiceGenerationState.success_count = successCount;
+        bulkVoiceGenerationState.reused_count = reusedCount;
         bulkVoiceGenerationState.failures = failures;
         bulkVoiceGenerationState.updated_at = new Date().toISOString();
         if (options.shouldPause?.()) {
             bulkVoiceGenerationState.status = 'paused';
         }
-        await persistBulkVoiceGenerationState();
+        if (bulkVoiceGenerationState.design_engine === 'gemini') {
+            if (statusEl) statusEl.textContent = `Saving casting progress after ${speaker}…`;
+            await flushCheckpoint();
+            pendingCheckpoint = persistBulkVoiceGenerationState().then(() => null, error => error);
+            if (bulkVoiceGenerationState.status === 'paused') await flushCheckpoint();
+        } else await persistBulkVoiceGenerationState();
         if (label) {
             label.textContent = `${index + 1} / ${speakers.length} complete`;
         }
@@ -703,14 +778,15 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
             fill.style.width = `${Math.round(((index + 1) / speakers.length) * 100)}%`;
         }
         if (bulkVoiceGenerationState.status === 'paused') {
-            await refreshChatterboxVoices();
-            populateReferenceSelects();
+            if (bulkVoiceGenerationState.design_engine === 'gemini') await window.loadGeminiTtsCatalog(true);
+            else { await refreshChatterboxVoices(); populateReferenceSelects(); }
             if (statusEl) statusEl.textContent = `Paused after ${index + 1} of ${speakers.length}. Reopen this window to resume.`;
             return { paused: true, successCount, failures };
         }
     }
-    await refreshChatterboxVoices();
-    populateReferenceSelects();
+    await flushCheckpoint();
+    if (bulkVoiceGenerationState.design_engine === 'gemini') await window.loadGeminiTtsCatalog(true);
+    else { await refreshChatterboxVoices(); populateReferenceSelects(); }
     bulkVoiceGenerationState.status = 'completed';
     bulkVoiceGenerationState.completed_at = new Date().toISOString();
     bulkVoiceGenerationState.updated_at = bulkVoiceGenerationState.completed_at;
@@ -719,15 +795,17 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
         statusEl.textContent = '';
     }
     if (completeSummary) {
-        completeSummary.textContent = failures.length
+        completeSummary.textContent = bulkVoiceGenerationState.design_engine === 'gemini'
+            ? `New auditions created for ${successCount - reusedCount} speakers; ${reusedCount} pending auditions retained without new requests. Open Speaker Properties to review them; current voice assignments are unchanged.${failures.length ? ` Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}` : ''}`
+            : failures.length
             ? `Generated ${getVoiceDesignEngineConfig(bulkVoiceGenerationState.design_engine).label} voices for ${successCount} of ${speakers.length} speakers. Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}`
-            : `Generated ${getVoiceDesignEngineConfig(bulkVoiceGenerationState.design_engine).label} voices for all ${speakers.length} speakers. Speakers configured for multiple candidates still require a final selection.`;
+            : `Voices ready for all ${speakers.length} speakers. ${bulkVoiceGenerationState.design_engine === 'gemini' ? 'Existing Gemini auditions were preserved. Open each speaker to preview and select a hosted voice, including single candidates.' : 'Speakers configured for multiple candidates still require a final selection.'}`;
     }
     if (completeCard) {
         completeCard.classList.remove('hidden');
     }
     if (label) {
-        label.textContent = `Done: ${successCount}/${speakers.length} generated.`;
+        label.textContent = `Done: ${successCount}/${speakers.length} ready${reusedCount ? ` (${reusedCount} retained)` : ''}.`;
     }
     if (fill) {
         fill.style.width = '100%';
@@ -738,7 +816,7 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
     showNotification(
         failures.length
             ? `Voice generation completed with ${failures.length} failed speaker${failures.length === 1 ? '' : 's'}. Review the batch results for details.`
-            : `${getVoiceDesignEngineConfig(bulkVoiceGenerationState.design_engine).label} voice generation complete. Select final voices for any speakers configured with multiple candidates.`,
+            : `${getVoiceDesignEngineConfig(bulkVoiceGenerationState.design_engine).label} voice generation complete. ${bulkVoiceGenerationState.design_engine === 'gemini' ? 'Open each speaker to select a hosted voice.' : 'Select final voices for any speakers configured with multiple candidates.'}`,
         failures.length ? 'warning' : 'success'
     );
     return { paused: false, successCount, failures };
@@ -1153,7 +1231,7 @@ async function initializeProjectLibrary() {
     if (projectLibraryPromise) return projectLibraryPromise;
     projectLibraryPromise = (async () => {
         const legacyProjects = readLegacyBrowserProjects();
-        const response = await fetch(legacyProjects.length ? '/api/projects/import' : '/api/projects', {
+        const response = await fetch(legacyProjects.length ? '/api/projects/import' : '/api/projects?summary=1', {
             method: legacyProjects.length ? 'POST' : 'GET',
             headers: legacyProjects.length ? { 'Content-Type': 'application/json' } : undefined,
             body: legacyProjects.length ? JSON.stringify({ projects: legacyProjects }) : undefined
@@ -1180,13 +1258,32 @@ async function initializeProjectLibrary() {
 
 async function refreshProjectLibrary() {
     await initializeProjectLibrary();
-    const response = await fetch('/api/projects');
+    const response = await fetch('/api/projects?summary=1');
     const data = await response.json();
     if (!response.ok || !data.success) {
         throw new Error(data.error || 'Unable to refresh the shared project library.');
     }
     savedProjects = Array.isArray(data.projects) ? data.projects : [];
     return savedProjects;
+}
+
+async function fetchSavedProject(projectId) {
+    const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
+    // A still-running pre-update backend supports the collection endpoint only.
+    // Do not parse its HTML 404/405 page as JSON or prevent existing projects loading.
+    if (response.status === 404 || response.status === 405) {
+        const legacyResponse = await fetch('/api/projects');
+        const legacyData = await legacyResponse.json();
+        if (!legacyResponse.ok || !legacyData.success) {
+            throw new Error(legacyData.error || 'Unable to load project.');
+        }
+        const project = (legacyData.projects || []).find(item => String(item.id) === String(projectId));
+        if (!project) throw new Error('Project not found.');
+        return project;
+    }
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error || 'Unable to load project.');
+    return data.project;
 }
 
 async function saveProject(project, { render = true } = {}) {
@@ -1731,6 +1828,7 @@ function isLocalAITtsEngine(engineName) {
 }
 
 function isCatalogCloudEngine(engineName) {
+    if (window.isGeminiTtsEngine?.(engineName)) return true;
     if (engineName === 'breeze_api') return true;
     return isAzureSpeechEngine(engineName) || isEdgeTtsEngine(engineName) || isElevenLabsEngine(engineName) || isOpenAITtsEngine(engineName) || isLocalAITtsEngine(engineName);
 }
@@ -1740,6 +1838,7 @@ function isQwenCloneEngine(engineName) {
 }
 
 function updateEngineUI(engineName) {
+    if (window.isGeminiTtsEngine?.(engineName)) window.loadGeminiTtsCatalog?.();
     updateJobEngineOptionVisibility(engineName);
     const kokoroCard = document.getElementById('kokoro-default-voice-card');
     const turboCard = document.getElementById('chatterbox-turbo-voice-card');
@@ -1810,7 +1909,7 @@ function getAssignmentRows() {
     ));
 }
 
-function updateAssignmentModes(engineName) {
+function updateAssignmentModes(engineName, rows = getAssignmentRows()) {
     const usesReferenceSamples = isPromptEngine(engineName);
     const isQwen = isQwenEngine(engineName);
     const isQwenClone = isQwenCloneEngine(engineName);
@@ -1821,7 +1920,7 @@ function updateAssignmentModes(engineName) {
     const isElevenLabs = isElevenLabsEngine(engineName);
     const isOpenAITts = isOpenAITtsEngine(engineName);
     const isLocalAITts = isLocalAITtsEngine(engineName);
-    getAssignmentRows().forEach(row => {
+    rows.forEach(row => {
         const kokoroControl = row.querySelector('[data-role="kokoro-control"]');
         const turboControl = row.querySelector('[data-role="turbo-control"]');
         const qwenControl = row.querySelector('[data-role="qwen3-control"]');
@@ -1911,9 +2010,21 @@ function getMinDurationForEngine(engineName) {
     return ENGINE_MIN_DURATION[normalized] ?? 0;
 }
 
+function setReferenceSelectValue(selectEl, value) {
+    if (!selectEl) return;
+    if (value && selectEl.closest('#inline-voice-assignment-list')
+        && !Array.from(selectEl.options).some(option => option.value === value)) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        selectEl.appendChild(option);
+    }
+    selectEl.value = value || '';
+}
+
 function populateReferenceDropdown(selectEl, placeholderText = 'Use preset voice', engineName = null, filters = null) {
     if (!selectEl) return;
-    const previousValue = selectEl.value;
+    const previousValue = turboSelectionState[selectEl.dataset.speaker] || selectEl.value;
     selectEl.innerHTML = '';
     if (placeholderText) {
         const option = document.createElement('option');
@@ -1922,6 +2033,13 @@ function populateReferenceDropdown(selectEl, placeholderText = 'Use preset voice
         selectEl.appendChild(option);
     }
     
+    // Speaker rows live in a hidden holding list until opened in the modal.
+    // Keep only their assignment, not a copy of the entire sample library.
+    if (selectEl.closest('#inline-voice-assignment-list')) {
+        setReferenceSelectValue(selectEl, previousValue);
+        return;
+    }
+
     // Get current engine if not provided
     const currentEngine = engineName || getSelectedJobEngine() || window.runtimeSettings?.tts_engine || 'kokoro';
     const minDuration = getMinDurationForEngine(currentEngine);
@@ -2107,7 +2225,7 @@ function syncSpeakerReferenceAssignment(speaker, promptValue = '') {
         || findSpeakerProfile(speaker).profile?.selected_voice_path || '').trim();
     if (selectedValue) turboSelectionState[speaker] = selectedValue;
     const engineName = getSelectedJobEngine() || runtimeSettings?.tts_engine || 'kokoro';
-    updateAssignmentModes(engineName);
+    updateAssignmentModes(engineName, getAssignmentRows().filter(row => row.dataset.speaker === speaker));
     let matched = false;
     document.querySelectorAll(
         `#inline-voice-assignment-list .reference-select[data-speaker="${CSS.escape(speaker)}"],` +
@@ -3959,6 +4077,17 @@ function setupEventListeners() {
     const batchPrefixInput = document.getElementById('speaker-batch-prefix');
     const batchCandidateCountInput = document.getElementById('speaker-batch-candidate-count');
     const batchDesignEngineSelect = document.getElementById('speaker-batch-design-engine');
+    const updateBatchGeminiControls = () => {
+        const cloud = batchDesignEngineSelect?.value === 'gemini';
+        const options = document.getElementById('speaker-batch-gemini-options');
+        if (options) options.hidden = !cloud;
+        const model = document.getElementById('speaker-batch-gemini-model');
+        if (model) model.disabled = !cloud;
+        const count = document.getElementById('speaker-batch-candidate-count');
+        if (count) { count.max = cloud ? '4' : '10'; count.value = String(Math.max(1, Math.min(Number(count.value) || 1, cloud ? 4 : 10))); }
+    };
+    batchDesignEngineSelect?.addEventListener('change', updateBatchGeminiControls);
+    updateBatchGeminiControls();
     const batchStatus = document.getElementById('speaker-batch-status');
     const batchProgress = document.getElementById('speaker-batch-progress');
     const batchProgressFill = document.getElementById('speaker-batch-progress-fill');
@@ -4241,10 +4370,13 @@ function setupEventListeners() {
                 if (batchPrefixInput) batchPrefixInput.value = bulkVoiceGenerationState.prefix || '';
                 if (batchCandidateCountInput) batchCandidateCountInput.value = String(bulkVoiceGenerationState.candidate_count || 1);
                 if (batchDesignEngineSelect) batchDesignEngineSelect.value = normalizeVoiceDesignEngine(bulkVoiceGenerationState.design_engine);
+                const geminiModel = document.getElementById('speaker-batch-gemini-model');
+                if (geminiModel) geminiModel.value = bulkVoiceGenerationState.gemini_model || 'gemini_tts';
                 batchStartOver?.classList.remove('hidden');
             } else {
                 delete batchModalConfirm.dataset.resume;
             }
+            updateBatchGeminiControls();
             batchPrefixInput?.focus();
         });
     }
@@ -4303,12 +4435,13 @@ function setupEventListeners() {
             batchModalConfirm.disabled = true;
             batchModalConfirm.textContent = 'Generating...';
             try {
+                const batchDesignEngine = normalizeVoiceDesignEngine(resumeRequested ? bulkVoiceGenerationState.design_engine : batchDesignEngineSelect?.value);
                 const batchCandidateCount = Math.max(
                     1,
-                    Math.min(Number.parseInt(batchCandidateCountInput?.value, 10) || 1, 10)
+                    Math.min(Number.parseInt(resumeRequested ? bulkVoiceGenerationState.candidate_count : batchCandidateCountInput?.value, 10) || 1, batchDesignEngine === 'gemini' ? 4 : 10)
                 );
                 if (batchCandidateCountInput) batchCandidateCountInput.value = String(batchCandidateCount);
-                const batchDesignEngine = normalizeVoiceDesignEngine(batchDesignEngineSelect?.value);
+                if (batchDesignEngine === 'gemini' && !window.confirm(`Generate Gemini hosted voice candidates for this cast? Up to ${batchCandidateCount} candidates per remaining speaker will be billed by Google. Pending auditions will be kept without new requests. Previously selected auditions will receive new candidates without changing the assigned voice.\n\nKeep this page open while generation runs. Pause stops after the current speaker. Select voices afterward in Speaker Properties.`)) return;
                 await requireVoiceDesignBackend(batchDesignEngine);
                 (currentStats?.speakers || []).forEach(speaker => {
                     updateSpeakerProfileEntry(speaker, {
@@ -4513,7 +4646,7 @@ function setupEventListeners() {
                 `#inline-voice-assignment-list .reference-select[data-speaker="${speaker}"],` +
                 `#speaker-edit-modal-body .reference-select[data-speaker="${speaker}"]`
             ).forEach(refSelect => {
-                refSelect.value = promptValue || '';
+                setReferenceSelectValue(refSelect, promptValue);
                 const row = refSelect.closest('.voice-assignment-row');
                 if (row) updateInlineSampleButtonState(row, { stopPlayback: false });
             });
@@ -4587,8 +4720,18 @@ function setupEventListeners() {
             const projectId = button.dataset.projectId;
             const project = savedProjects.find(item => String(item.id) === String(projectId));
             if (action === 'load' && project) {
-                closeProjectModal();
-                applyProjectState(project);
+                button.disabled = true;
+                button.textContent = 'Loading...';
+                try {
+                    const loadedProject = await fetchSavedProject(projectId);
+                    closeProjectModal();
+                    await applyProjectState(loadedProject);
+                } catch (error) {
+                    showNotification(error.message || 'Unable to load project.', 'warning');
+                } finally {
+                    button.disabled = false;
+                    button.textContent = 'Load';
+                }
             }
             if (action === 'delete' && projectId) {
                 try {
@@ -4715,6 +4858,8 @@ const engineDisplayNames = {
     'edge_tts': 'Microsoft Edge TTS · Experimental Cloud',
     'elevenlabs': 'ElevenLabs · Cloud',
     'openai_tts': 'OpenAI-compatible TTS · Cloud',
+    'gemini_tts': 'Gemini 3.8 Flash TTS · Cloud',
+    'gemini_tts_lite': 'Gemini 3.8 Flash-Lite TTS · Cloud',
     'localai_tts': 'LocalAI TTS · Self-hosted',
     'breeze_api': 'Breeze API · Hosted'
 };
@@ -4871,6 +5016,14 @@ function buildLocalVoiceDesignPrompt(speaker, voiceType, suppliedPrompt = '') {
     const supplied = (suppliedPrompt || '').toString().replace(/\s+/g, ' ').trim();
     const voice = (voiceType || '').toString().replace(/\s+/g, ' ').trim();
     if (!voice && !supplied) return '';
+    const curatedQualityLead = 'Dry close-mic podcast studio clarity.';
+    // Producer-authored Breeze prompts are contract data. Preserve their
+    // quality-first ordering and complete wording instead of rebuilding or
+    // truncating them. Generated/legacy prompts still use the normalization
+    // path below so they retain explicit age and gender guidance.
+    if (supplied.startsWith(curatedQualityLead)) {
+        return supplied;
+    }
     const source = `${speaker || ''} ${voice} ${supplied}`.toLowerCase();
     let gender = 'neutral';
     if (/\bfemale\b|\bwoman\b|\bgirl\b|\bsoprano\b|\balto\b/.test(source)) {
@@ -4895,9 +5048,9 @@ function buildLocalVoiceDesignPrompt(speaker, voiceType, suppliedPrompt = '') {
         positiveVoice = `${positiveVoice}. Neutral English accent`;
     }
     let prompt = `${genderPhrase}. ${positiveVoice}`.replace(/\s+/g, ' ').trim().replace(/\.+$/, '');
-    if (prompt.length > 150) {
-        const shortened = prompt.slice(0, 150);
-        prompt = shortened.slice(0, shortened.lastIndexOf(' ') > 100 ? shortened.lastIndexOf(' ') : 150);
+    if (prompt.length > 500) {
+        const shortened = prompt.slice(0, 500);
+        prompt = shortened.slice(0, shortened.lastIndexOf(' ') > 400 ? shortened.lastIndexOf(' ') : 500);
     }
     return `${prompt}.`;
 }
@@ -4918,6 +5071,7 @@ function setSpeakerProfiles(profiles) {
             voice_preview_text: profile?.voice_preview_text || '',
             voice_candidate_count: Math.max(1, Math.min(Number.parseInt(profile?.voice_candidate_count, 10) || 1, 10)),
             voice_design_engine: normalizeVoiceDesignEngine(profile?.voice_design_engine),
+            gemini_voice_audition: profile?.gemini_voice_audition || null,
             selected_voice_id: profile?.selected_voice_id || '',
             selected_voice_name: profile?.selected_voice_name || '',
             selected_voice_path: profile?.selected_voice_path || ''
@@ -4955,6 +5109,7 @@ function updateSpeakerProfileEntry(speaker, updates = {}) {
         voice_preview_text: profile?.voice_preview_text || '',
         voice_candidate_count: profile?.voice_candidate_count || 1,
         voice_design_engine: normalizeVoiceDesignEngine(profile?.voice_design_engine),
+        gemini_voice_audition: profile?.gemini_voice_audition || null,
         selected_voice_id: profile?.selected_voice_id || '',
         selected_voice_name: profile?.selected_voice_name || '',
         selected_voice_path: profile?.selected_voice_path || '',
@@ -5076,6 +5231,11 @@ async function parseVoiceDesignApiResponse(response, operation = 'complete the v
 
 async function requireVoiceDesignBackend(engine = 'qwen3') {
     const normalizedEngine = normalizeVoiceDesignEngine(engine);
+    if (normalizedEngine === 'gemini') {
+        const data = await window.loadGeminiTtsCatalog(true);
+        if (!data.success || !data.design_available || data.warning) throw new Error(data.warning || 'Save a working dedicated Gemini TTS API key in Settings first.');
+        return;
+    }
     const engineConfig = getVoiceDesignEngineConfig(normalizedEngine);
     let response;
     const controller = new AbortController();
@@ -5264,7 +5424,7 @@ async function generateSpeakerVoicePrompt(speaker) {
             document.querySelectorAll('#inline-voice-assignment-list [data-role="turbo-control"] .reference-select, #speaker-edit-modal-body [data-role="turbo-control"] .reference-select')
                 .forEach(select => {
                     if (select?.dataset?.speaker === speaker) {
-                        select.value = promptValue;
+                        setReferenceSelectValue(select, promptValue);
                     }
                 });
             updateInlineSampleButtonState(activeSpeakerRow, { stopPlayback: true });
@@ -5353,11 +5513,9 @@ async function approveSpeakerVoiceCandidate(speaker, candidateId, groupId) {
         const data = await parseVoiceDesignApiResponse(response, 'approve the selected voice candidate');
         if (!response.ok || !data.success) throw new Error(data.error || 'Unable to approve candidate.');
         await refreshChatterboxVoices();
-        populateReferenceSelects();
         const promptValue = (data.voice?.prompt_path || data.voice?.file_name || '').trim();
         if (promptValue) {
             turboSelectionState[speaker] = promptValue;
-            syncSpeakerReferenceAssignment(speaker, promptValue);
         }
         updateSpeakerProfileEntry(speaker, {
             selected_voice_id: data.voice?.id || candidateId,
@@ -5374,9 +5532,43 @@ async function approveSpeakerVoiceCandidate(speaker, candidateId, groupId) {
     }
 }
 
+async function assignGeminiSpeakerVoice(speaker, id, label, designEngine = 'gemini_tts') {
+    if (!window.isGeminiTtsEngine?.(getSelectedJobEngine())) {
+        const target = designEngine === 'gemini_tts_lite' ? 'gemini_tts_lite' : 'gemini_tts';
+        const engineSelect = document.getElementById('job-tts-engine');
+        if (!engineSelect) throw new Error('Narration engine selector is unavailable. Reopen the project; candidates remain saved.');
+        if (!window.confirm(`This voice is hosted by Google and cannot be used by the current narration engine. Switch this project's narration engine to Gemini ${target === 'gemini_tts_lite' ? 'Flash-Lite' : 'Flash'} TTS and select this voice?\n\nThis changes the engine for all speakers. Review their voice assignments before generating. Cancelling keeps every candidate.`)) return false;
+        captureCompatibleVoiceSamples();
+        await window.loadGeminiTtsCatalog?.();
+        engineSelect.value = target;
+        if (engineSelect.value !== target) throw new Error('Gemini narration is not available in the engine menu. Your candidates remain saved.');
+        // Do not dispatch the normal change event: its asynchronous Analyze Text
+        // rebuild would race the assignment and replace the open speaker controls.
+        updateEngineUI(target);
+        updateModeIndicator(target);
+        populateDefaultVoiceSelect();
+    }
+    if (!(window.geminiTtsVoices || []).some(v => v.short_name === id)) {
+        window.geminiTtsVoices.push({short_name: id, display_name: label, designed: true, locale: ''});
+    }
+    const selects = Array.from(document.querySelectorAll('#inline-voice-assignment-list .voice-select, #speaker-edit-modal-body .voice-select'))
+        .filter(select => (select.dataset.speaker || select.closest('.voice-assignment-row')?.dataset.speaker) === speaker);
+    if (!selects.length) throw new Error('Speaker voice dropdown is no longer available. Reopen Speaker Properties; your candidates remain saved.');
+    for (const select of selects) {
+        if (!Array.from(select.options).some(option => option.value === id)) select.add(new Option(label, id));
+        select.value = id;
+        select.dispatchEvent(new Event('change', {bubbles: true}));
+        if (select.value !== id) throw new Error('Could not retain the selected voice. Candidates have not been discarded.');
+    }
+    return true;
+}
+
 function renderSpeakerProfileSummary(speaker) {
     const summary = document.getElementById('speaker-profile-summary');
     if (!summary) return;
+    const inlineGemini = summary.querySelector('[data-gemini-inline-designer]');
+    if (inlineGemini?.dataset.busy === 'true') return;
+    inlineGemini?.geminiDispose?.();
     if (!speaker) {
         summary.classList.add('hidden');
         summary.innerHTML = '';
@@ -5392,7 +5584,8 @@ function renderSpeakerProfileSummary(speaker) {
     const candidateCount = Math.max(1, Math.min(Number.parseInt(profile?.voice_candidate_count, 10) || 1, 10));
     const selectedVoiceName = profile?.selected_voice_name || '';
     const selectedVoicePath = profile?.selected_voice_path || '';
-    const candidates = speakerVoiceDesignCandidates[normalizeSpeakerKey(speaker)] || [];
+    // Don't mix earlier local auditions with the current hosted audition.
+    const candidates = voiceDesignEngine === 'gemini' ? [] : (speakerVoiceDesignCandidates[normalizeSpeakerKey(speaker)] || []);
     const emptyMessage = hasProfiles
         ? 'No profile matched this speaker yet.'
         : 'No speaker profile data yet. Build this profile or run Prep Text.';
@@ -5417,22 +5610,28 @@ function renderSpeakerProfileSummary(speaker) {
                     <select class="speaker-profile-input" data-role="speaker-voice-design-engine">
                         <option value="qwen3" data-voice-design-option ${voiceDesignEngine === 'qwen3' ? 'selected' : ''}>Qwen3-TTS</option>
                         <option value="breeze" data-voice-design-option ${voiceDesignEngine === 'breeze' ? 'selected' : ''}>Breeze TTS 2</option>
+                        <option value="gemini" data-voice-design-option ${voiceDesignEngine === 'gemini' ? 'selected' : ''}>Gemini TTS · Cloud Voice Design</option>
                     </select>
                 </label>
+                ${voiceDesignEngine === 'gemini' ? `<label><strong>Gemini model:</strong>
+                    <select class="speaker-profile-input" data-role="speaker-gemini-model">
+                        <option value="gemini_tts" ${profile?.gemini_voice_audition?.engine !== 'gemini_tts_lite' ? 'selected' : ''}>Gemini Flash TTS</option>
+                        <option value="gemini_tts_lite" ${profile?.gemini_voice_audition?.engine === 'gemini_tts_lite' ? 'selected' : ''}>Gemini Flash-Lite TTS</option>
+                    </select></label>` : ''}
                 <label>
                     <strong>Preview Text:</strong>
                     <textarea class="speaker-profile-input" data-role="speaker-voice-preview-text" rows="2" readonly>${escapeHtml(previewText)}</textarea>
-                    <small>The same standardized inflection passage is used for every candidate.</small>
+                    <small>${voiceDesignEngine === 'gemini' ? 'Google chooses the preview passage for hosted voices; this text is not sent to voice design.' : 'The same standardized inflection passage is used for every candidate.'}</small>
                 </label>
                 <label>
                     <strong>Voice Candidates:</strong>
-                    <input class="speaker-profile-input speaker-candidate-count" data-role="speaker-voice-candidate-count" type="number" min="1" max="10" step="1" value="${candidateCount}" />
+                    <input class="speaker-profile-input speaker-candidate-count" data-role="speaker-voice-candidate-count" type="number" min="1" max="${voiceDesignEngine === 'gemini' ? 4 : 10}" step="1" value="${Math.min(candidateCount, voiceDesignEngine === 'gemini' ? 4 : 10)}" />
                     <small>Generate one voice by default, or increase this to audition multiple alternatives.</small>
                 </label>
             </div>
             <div class="speaker-profile-actions">
                 <button type="button" class="btn btn-secondary btn-sm" data-role="speaker-build-profile">Build Profile</button>
-                <button type="button" class="btn btn-secondary btn-sm" data-role="speaker-generate-voice" disabled title="Checking voice-design engine availability…">Generate Voice</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-role="speaker-generate-voice" disabled title="Checking voice-design engine availability…">${voiceDesignEngine === 'gemini' ? 'Generate Voice (billable)' : 'Generate Voice'}</button>
             </div>
             <div class="engine-action-notice hidden" data-role="voice-design-unavailable">
                 <span data-role="voice-design-unavailable-message">Install the selected voice-design engine before generating.</span>
@@ -5446,7 +5645,7 @@ function renderSpeakerProfileSummary(speaker) {
                     ${candidates.map(candidate => `
                         <article class="voice-design-candidate">
                             <strong>Candidate ${escapeHtml(candidate.label)}</strong>
-                            <audio controls preload="metadata" src="${candidate.audio_base64
+                            <audio controls preload="none" src="${candidate.audio_base64
                                 ? `data:${escapeHtml(candidate.mime_type || 'audio/wav')};base64,${candidate.audio_base64}`
                                 : `/api/chatterbox-voices/${encodeURIComponent(candidate.id)}/preview`}"></audio>
                             <button type="button" class="btn btn-secondary btn-sm" data-role="approve-voice-candidate" data-candidate-id="${escapeHtml(candidate.id)}" data-group-id="${escapeHtml(candidate.candidate_group_id)}">Use Candidate ${escapeHtml(candidate.label)}</button>
@@ -5467,6 +5666,31 @@ function renderSpeakerProfileSummary(speaker) {
     const candidateCountInput = summary.querySelector('[data-role="speaker-voice-candidate-count"]');
     const buildBtn = summary.querySelector('[data-role="speaker-build-profile"]');
     const generateBtn = summary.querySelector('[data-role="speaker-generate-voice"]');
+    const currentGeminiScope = () => JSON.stringify([activeProjectId || (typeof geminiAuditionDraftKey === 'function'
+        ? geminiAuditionDraftKey(document.getElementById('input-text')?.value || 'unsaved') : 'unsaved'), normalizeSpeakerKey(speaker)]);
+    const geminiScope = currentGeminiScope();
+    const openGeminiDesigner = (reveal = true) => window.openGeminiVoiceDesigner({
+            container: summary,
+            candidateCount: candidateCountInput?.value || 1,
+            audition: findSpeakerProfile(speaker).profile?.gemini_voice_audition,
+            lastGenerationError: bulkVoiceGenerationState?.failures?.find(item => normalizeSpeakerKey(item.speaker) === normalizeSpeakerKey(speaker))?.error,
+            compact: true,
+            getGenerationInputs: () => ({name: speaker,
+                description: voiceDesignInput?.value || voiceInput?.value || '',
+                count: candidateCountInput?.value || 1,
+                engine: summary.querySelector('[data-role="speaker-gemini-model"]')?.value || 'gemini_tts'}),
+            onAuditionChange: audition => {
+                if (currentGeminiScope() === geminiScope) updateSpeakerProfileEntry(speaker, {gemini_voice_audition: audition});
+            },
+            storageScope: geminiScope,
+            reveal,
+            name: speaker,
+            description: voiceDesignInput?.value || voiceInput?.value || '',
+            onSelect: (id, label, engine) => {
+                if (currentGeminiScope() !== geminiScope) throw new Error('Reopen this speaker in its original project before selecting a candidate.');
+                return assignGeminiSpeakerVoice(speaker, id, label, engine);
+            }
+        });
     refreshQwenVoiceDesignControls();
     if (descriptionInput) {
         descriptionInput.addEventListener('input', event => {
@@ -5488,6 +5712,7 @@ function renderSpeakerProfileSummary(speaker) {
             const engine = normalizeVoiceDesignEngine(event.currentTarget.value);
             updateSpeakerProfileEntry(speaker, { voice_design_engine: engine });
             refreshQwenVoiceDesignControls();
+            renderSpeakerProfileSummary(speaker);
         });
     }
     if (candidateCountInput) {
@@ -5501,7 +5726,10 @@ function renderSpeakerProfileSummary(speaker) {
         buildBtn.addEventListener('click', () => buildSingleSpeakerProfile(speaker));
     }
     if (generateBtn) {
-        generateBtn.addEventListener('click', () => generateSpeakerVoiceCandidatesForSpeaker(speaker));
+        generateBtn.addEventListener('click', () => {
+            if (voiceDesignEngineSelect?.value === 'gemini') openGeminiDesigner(false)?.geminiGenerate();
+            else generateSpeakerVoiceCandidatesForSpeaker(speaker);
+        });
     }
     summary.querySelector('[data-role="open-voice-design-settings"]')?.addEventListener('click', () => {
         const engine = normalizeVoiceDesignEngine(voiceDesignEngineSelect?.value);
@@ -5514,6 +5742,9 @@ function renderSpeakerProfileSummary(speaker) {
         ));
     });
     summary.classList.remove('hidden');
+    if (voiceDesignEngineSelect?.value === 'gemini') {
+        openGeminiDesigner(false);
+    }
 }
 
 function levenshteinDistance(a, b) {
@@ -5696,6 +5927,50 @@ function setSpeakerReadyState(speaker, ready) {
     }
 }
 
+function selectedVoicePreviewUrl(select) {
+    const value = select?.value?.trim() || '';
+    if (!value) return '';
+    const path = localAIVoiceReferenceToPromptPath(value) || value;
+    const local = findChatterboxVoiceByPath(path)
+        || availableChatterboxVoices.find(v => v.id === value);
+    if (local?.id) return `/api/chatterbox-voices/${encodeURIComponent(local.id)}/preview`;
+    const supplied = select.selectedOptions?.[0]?.dataset?.previewUrl || '';
+    if (/^https?:\/\//i.test(supplied) || /^\/(?!\/)/.test(supplied)) return supplied;
+    if (/^voice_[A-Za-z0-9_-]+$/.test(value)
+        && (window.geminiTtsVoices || []).some(v => v.short_name === value && v.designed)) {
+        return `/api/gemini-tts/voices/${encodeURIComponent(value)}/preview`;
+    }
+    return '';
+}
+
+function updateGeminiSelectedVoicePreview(row) {
+    const button = row?.querySelector('[data-role="gemini-selected-preview"]');
+    const select = row?.querySelector('.voice-select');
+    if (!button || !select) return;
+    button.hidden = false;
+    button.disabled = !selectedVoicePreviewUrl(select);
+    button.title = button.disabled ? 'No saved audio preview is available for this voice. Use Quick Test to synthesize a sample.' : 'Play the selected voice sample (no new synthesis).';
+    button.onclick = async () => {
+        if (currentFxPreviewButton === button) { stopSpeakerPreviewAudio(); return; }
+        const url = selectedVoicePreviewUrl(select);
+        if (!url) return;
+        stopSpeakerPreviewAudio();
+        const audio = new Audio(url);
+        currentFxPreviewAudio = audio;
+        currentFxPreviewButton = button;
+        button.textContent = 'Stop';
+        const finish = () => { if (currentFxPreviewAudio === audio) stopSpeakerPreviewAudio(); };
+        const failed = () => {
+            if (currentFxPreviewAudio !== audio) return;
+            finish();
+            showNotification('Could not load the selected voice sample. It may have been deleted or its provider may be unavailable.', 'error');
+        };
+        audio.onended = finish;
+        audio.onerror = failed;
+        try { await audio.play(); } catch { failed(); }
+    };
+}
+
 function openSpeakerEditModal(speaker) {
     const overlay = document.getElementById('speaker-edit-modal-overlay');
     const modal = document.getElementById('speaker-edit-modal');
@@ -5708,6 +5983,7 @@ function openSpeakerEditModal(speaker) {
 
     if (activeSpeakerRow && activeSpeakerRowOrigin) {
         activeSpeakerRowOrigin.appendChild(activeSpeakerRow);
+        populateReferenceDropdown(activeSpeakerRow.querySelector('.reference-select'), 'Select Voice Sample...');
     }
 
     const row = list.querySelector(`.voice-assignment-row[data-speaker="${speaker}"]`);
@@ -5732,14 +6008,20 @@ function openSpeakerEditModal(speaker) {
         readyCheckbox.dataset.speaker = speaker;
     }
     renderSpeakerProfileSummary(speaker);
-    populateReferenceSelects();
     syncSpeakerReferenceAssignment(speaker);
+    updateGeminiSelectedVoicePreview(row);
 
     overlay.classList.remove('hidden');
     modal.classList.remove('hidden');
 }
 
 function closeSpeakerEditModal() {
+    const geminiDesigner = document.querySelector('#speaker-profile-summary [data-gemini-inline-designer]');
+    if (geminiDesigner?.dataset.busy === 'true') {
+        showNotification('Please wait for Gemini voice creation or cleanup to finish before closing Speaker Properties.', 'info');
+        return;
+    }
+    geminiDesigner?.geminiDispose?.();
     const overlay = document.getElementById('speaker-edit-modal-overlay');
     const modal = document.getElementById('speaker-edit-modal');
     const body = document.getElementById('speaker-edit-modal-body');
@@ -5748,6 +6030,7 @@ function closeSpeakerEditModal() {
     const modalAnchor = document.getElementById('speaker-edit-modal-body');
     if (activeSpeakerRow && activeSpeakerRowOrigin) {
         activeSpeakerRowOrigin.appendChild(activeSpeakerRow);
+        populateReferenceDropdown(activeSpeakerRow.querySelector('.reference-select'), 'Select Voice Sample...');
     }
     if (profileSummary && modalBody && modalAnchor) {
         modalBody.insertBefore(profileSummary, modalAnchor);
@@ -6038,6 +6321,7 @@ function applyProjectAssignments(project) {
         const localAIVoice = row.querySelector('.localai-voice-input');
         const localAILanguage = row.querySelector('.localai-language-input');
         if (voiceSelect && assignments[speaker]?.voice) {
+            if (window.isGeminiTtsEngine?.(project.engine)) window.ensureGeminiVoiceOption?.(voiceSelect, assignments[speaker].voice);
             if (project.engine === 'breeze_api') window.ensureBreezeVoiceOption?.(voiceSelect, assignments[speaker].voice);
             voiceSelect.value = assignments[speaker].voice;
         }
@@ -6053,9 +6337,7 @@ function applyProjectAssignments(project) {
         }
         if (refSelect) {
             const selection = turboSelectionState[speaker] || turboSelections[speaker]?.reference || '';
-            if (selection) {
-                refSelect.value = selection;
-            }
+            setReferenceSelectValue(refSelect, selection);
         }
         if (qwenLang && qwenLangs[speaker]) {
             qwenLang.value = qwenLangs[speaker];
@@ -6232,9 +6514,12 @@ function displayInlineVoiceAssignments(speakers, speakerEmotions = {}) {
                     <div class="assignment-select voice-select-inline" data-role="kokoro-control">
                         <label>${speaker}</label>
                         <input type="search" class="localai-sample-filter" placeholder="Filter LocalAI voices and TTS-Story samples…" hidden />
+                        <div class="voice-sample-row">
                         <select class="voice-select" data-speaker="${speaker}">
                             <option value="">Select Voice...</option>
                         </select>
+                        <button type="button" class="btn btn-sm" data-role="gemini-selected-preview" data-label-play="Play" hidden disabled>Play</button>
+                        </div>
                         <small class="help-text localai-sample-info" hidden></small>
                     </div>
                     <div class="assignment-select turbo-inline-control" data-role="turbo-control">
@@ -6322,6 +6607,8 @@ function displayInlineVoiceAssignments(speakers, speakerEmotions = {}) {
             });
         }
         row.querySelector('.voice-select')?.addEventListener('change', event => {
+            if (currentFxPreviewButton === row.querySelector('[data-role="gemini-selected-preview"]')) stopSpeakerPreviewAudio();
+            updateGeminiSelectedVoicePreview(row);
             const selectedVoice = event.currentTarget?.value?.trim() || '';
             if (isLocalAITtsEngine(getSelectedJobEngine())) {
                 const input = row.querySelector('.localai-voice-input');
@@ -6392,7 +6679,8 @@ function updateInlineSampleButtonState(row, options = {}) {
     if (!row) return;
     const button = row.querySelector('[data-role="voice-sample-preview-btn"]');
     if (!button) return;
-    const selection = row.querySelector('.reference-select')?.value?.trim() || '';
+    const selection = row.querySelector('.reference-select')?.value?.trim()
+        || (getSelectedJobEngine() !== 'breeze_api' ? getGlobalReferenceSelection() : '') || '';
     if (!selection) {
         button.disabled = true;
         button.classList.remove('is-playing', 'is-loading');
@@ -6436,7 +6724,8 @@ function initInlineSampleHandlers() {
             const button = target?.closest('[data-role="voice-sample-preview-btn"]');
             if (!button) return;
             const row = button.closest('.voice-assignment-row');
-            const selection = row?.querySelector('.reference-select')?.value?.trim();
+            const selection = row?.querySelector('.reference-select')?.value?.trim()
+                || (getSelectedJobEngine() !== 'breeze_api' ? getGlobalReferenceSelection() : '');
             if (!selection) {
                 showNotification('Select a voice sample first.', 'warning');
                 return;
@@ -6531,7 +6820,10 @@ function populateVoiceSelects() {
         }
         select.disabled = false;
         select.innerHTML = '<option value="">Select Voice...</option>';
-        if (engineName === 'breeze_api') {
+        if (window.isGeminiTtsEngine?.(engineName)) {
+            appendProviderVoiceOptions(select, window.geminiTtsVoices || [], 'Google voices');
+            window.ensureGeminiVoiceOption?.(select, previousValue);
+        } else if (engineName === 'breeze_api') {
             appendProviderVoiceOptions(select, window.breezeApiVoices || [], 'Breeze saved voices');
             window.ensureBreezeVoiceOption?.(select, previousValue || runtimeSettings?.breeze_api_default_voice);
         } else if (isQwen) {
@@ -6565,6 +6857,7 @@ function populateVoiceSelects() {
             }
         }
         if (isAzureSpeech) updateAzureVoiceControls(select.closest('.voice-assignment-row'));
+        updateGeminiSelectedVoicePreview(select.closest('.voice-assignment-row'));
     });
     if (isLocalAITts) {
         const sharedDatalist = document.getElementById('localai-tts-voice-options');
@@ -6673,6 +6966,8 @@ async function generateAudio() {
     const payload = {
         text,
         split_by_chapter: splitByChapter,
+        book_title: latestGeminiBookTitle || '',
+        project_name: savedProjects.find(project => String(project.id) === String(activeProjectId))?.name || '',
         generate_full_story: generateFullStory,
         voice_assignments: voiceAssignments,
         // Profile storage keys strip punctuation; send the actual assignment IDs.
@@ -7300,7 +7595,10 @@ function populateDefaultVoiceSelect() {
                     : (isLocalAITtsEngine(engineName) ? runtimeSettings?.localai_tts_default_voice : ''))));
     const previousValue = select.value;
     select.innerHTML = '<option value="">Select Default Voice...</option>';
-    if (engineName === 'breeze_api') {
+    if (window.isGeminiTtsEngine?.(engineName)) {
+        appendProviderVoiceOptions(select, window.geminiTtsVoices || [], 'Google voices');
+        select.value = runtimeSettings?.gemini_tts_default_voice || 'Kore';
+    } else if (engineName === 'breeze_api') {
         appendProviderVoiceOptions(select, window.breezeApiVoices || [], 'Breeze saved voices');
         window.ensureBreezeVoiceOption?.(select, runtimeSettings?.breeze_api_default_voice);
         select.value = runtimeSettings?.breeze_api_default_voice || '';
@@ -7340,6 +7638,7 @@ function appendAzureSpeechVoiceOptions(selectElement) {
             option.value = voice.short_name;
             option.textContent = `${voice.display_name || voice.short_name} · ${voice.gender || 'Unknown'} (${voice.short_name})`;
             option.dataset.locale = voice.locale || '';
+            option.dataset.previewUrl = voice.preview_url || voice.sample_url || '';
             group.appendChild(option);
         });
         selectElement.appendChild(group);
@@ -7515,6 +7814,15 @@ function getVoiceAssignments() {
     const assignments = {};
     const selects = document.querySelectorAll('#inline-voice-assignment-list .voice-select, #speaker-edit-modal-body .voice-select');
     const engineName = getSelectedJobEngine() || runtimeSettings?.tts_engine || 'kokoro';
+    if (window.isGeminiTtsEngine?.(engineName)) {
+        getAssignmentRows().forEach(row => {
+            const speaker = row.dataset.speaker;
+            assignments[speaker] = {voice: row.querySelector('.voice-select')?.value || runtimeSettings?.gemini_tts_default_voice || 'Kore',
+                fx: getFxPayload(speaker), speed: Number(getFxState(speaker)?.speed) || 1};
+        });
+        if (!Object.keys(assignments).length) assignments.default = {voice: document.getElementById('default-voice-select')?.value || runtimeSettings?.gemini_tts_default_voice || 'Kore'};
+        return assignments;
+    }
     if (engineName === 'breeze_api') {
         const selections = buildTurboSelectionMap();
         const globalReference = getGlobalReferenceSelection();

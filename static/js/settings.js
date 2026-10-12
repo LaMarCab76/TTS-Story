@@ -1203,6 +1203,8 @@ function toggleEngineSettingsSections(engineName) {
         'edge_tts': 'edge-tts',
         'elevenlabs': 'elevenlabs',
         'openai_tts': 'openai-tts',
+        'gemini_tts': 'gemini-tts',
+        'gemini_tts_lite': 'gemini-tts',
         'localai_tts': 'localai-tts'
     };
     
@@ -2093,6 +2095,7 @@ function applySettings(settings) {
     );
     setElementValue('elevenlabs-api-key', settings.elevenlabs_api_key || '');
     window.loadBreezeApiSettings?.(settings);
+    window.loadGeminiTtsSettings?.(settings);
     setElementValue('elevenlabs-base-url', settings.elevenlabs_base_url || ELEVENLABS_BASE_URL, ELEVENLABS_BASE_URL);
     setElementValue('elevenlabs-output-format', settings.elevenlabs_output_format || 'mp3_44100_128');
     setElementValue('elevenlabs-timeout', settings.elevenlabs_timeout ?? 120, 120);
@@ -2699,6 +2702,7 @@ async function saveSettings() {
         edge_tts_default_volume: Math.max(-100, Math.min(100, parseInt(document.getElementById('edge-tts-default-volume')?.value, 10) || 0)),
         elevenlabs_api_key: document.getElementById('elevenlabs-api-key')?.value || '',
         ...window.collectBreezeApiSettings?.(),
+        ...window.collectGeminiTtsSettings?.(),
         elevenlabs_base_url: document.getElementById('elevenlabs-base-url')?.value?.trim() || ELEVENLABS_BASE_URL,
         elevenlabs_model: document.getElementById('elevenlabs-model')?.value || 'eleven_multilingual_v2',
         elevenlabs_default_voice: document.getElementById('elevenlabs-default-voice')?.value || 'JBFqnCBsd6RMkjVDRZzb',

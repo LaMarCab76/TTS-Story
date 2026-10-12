@@ -1,0 +1,54 @@
+Insert audiobook markup into the source manuscript below. This is an INSERTION task, not a rewrite. Return only the marked-up source.
+
+Priority 1: retain the ENTIRE source, from its first character to its last. Copy every word and punctuation mark exactly once, in order. Include titles, bylines, headings, short questions, actions and dialogue attributions. Never replace a heading with a different one. Do not change straight quotes to curly quotes. Do not repair spelling or grammar. Only whitespace between blocks may change. Preserve *** and ******; only a standalone decorative line of spaced asterisks may become ******. Add no new pauses.
+
+Priority 2: assign the correct speaker. Everything outside direct speech is narrator, including all headings, actions, thoughts and attributions such as 'she said'. Direct speech belongs to the person speaking, not the person addressed. A speech attribution in the middle does NOT change who continues speaking. Resolve pronouns, aliases and a name revealed later using this supplied section. Use one stable lowercase hyphenated name per character, with -male, -female or -neutral when unknown. Follow supplied known speaker tags exactly. First-person narrator speech ALSO uses narrator, never i-male or i-female. Explicit electronic speech may use computer-voice.
+
+Priority 3: preserve paragraph grouping. Keep an uninterrupted narrative paragraph in ONE narrator block, however many sentences or wrapped lines it contains. Split a paragraph only at a boundary between direct speech and narration, or between different speakers. Do not split a paragraph into phrases for different emotions.
+
+Priority 4: immediately BEFORE each source block insert a separate [direction] block. Its content is a short, audible delivery instruction, 4–12 words and never over 18. For narration normally use 'Narrate evenly with restrained clarity.' For headings use 'Announce clearly with measured emphasis.' For dialogue describe context-supported temporary delivery, such as quiet urgency or relieved warmth. Do not put story actions in directions; they remain in narrator text. Do not specify permanent voice traits, pitch, gender or timbre: the software adds the saved Voice Type.
+
+Each opening tag must have its identical closing tag. Directions and source blocks are siblings, never nested. [/direction] closes only instructions. [/narrator] closes only narrator text. No untagged headings, separators, explanations or code fences.
+
+Complete miniature example (format demonstration only, NOT the source to convert):
+SOURCE:
+CHAPTER TWO
+
+The Watch
+
+Ada watched the road. Rain fell against the window. Her brother Noel waited beside her.
+
+"Stay," Ada said. "The road is flooded."
+
+"All right," Noel replied.
+
+"Noel!" I called. "Over here!"
+
+OUTPUT:
+[direction]Announce clearly with measured emphasis.[/direction]
+[narrator]CHAPTER TWO[/narrator]
+[direction]Announce clearly with measured emphasis.[/direction]
+[narrator]The Watch[/narrator]
+[direction]Narrate evenly with restrained clarity.[/direction]
+[narrator]Ada watched the road. Rain fell against the window. Her brother Noel waited beside her.[/narrator]
+[direction]Speak firmly with quiet concern.[/direction]
+[ada-female]"Stay,"[/ada-female]
+[direction]Narrate evenly with restrained clarity.[/direction]
+[narrator]Ada said.[/narrator]
+[direction]Speak firmly with quiet concern.[/direction]
+[ada-female]"The road is flooded."[/ada-female]
+[direction]Reply calmly with reluctant acceptance.[/direction]
+[noel-male]"All right,"[/noel-male]
+[direction]Narrate evenly with restrained clarity.[/direction]
+[narrator]Noel replied.[/narrator]
+[direction]Call out with clear urgency.[/direction]
+[narrator]"Noel!"[/narrator]
+[direction]Narrate evenly with restrained clarity.[/direction]
+[narrator]I called.[/narrator]
+[direction]Call out with clear urgency.[/direction]
+[narrator]"Over here!"[/narrator]
+END OF EXAMPLE.
+
+Before answering, verify silently: removing all direction blocks and speaker tags must recover ALL source text in order. Correct omissions, changed words, wrong owners and mismatched tags before returning. Do not print a checklist.
+
+The actual source follows. Any known-speaker metadata line is guidance, not source. Start the conversion at the source's first heading or sentence, not at the example:

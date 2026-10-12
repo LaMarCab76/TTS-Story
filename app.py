@@ -62,6 +62,7 @@ from src.library_metadata import (
     get_custom_chapter_title,
     infer_collection_title_from_chunks,
     merge_generated_library_metadata,
+    resolve_new_collection_title,
 )
 from src.library_cleanup import remove_directory_with_retries
 from src.json_storage import write_json_atomic
@@ -157,6 +158,8 @@ from src.engines.openai_tts_engine import (
 )
 from src.engines.localai_tts_engine import DEFAULT_LOCALAI_TTS_BASE_URL, LocalAITTSEngine
 from src.engines.breeze_api_engine import BreezeAPIEngine, BreezeAPIError
+from src.engines.gemini_tts_engine import GeminiTTSEngine, GEMINI_TTS_MODELS, GEMINI_TTS_VOICES
+from src.engines.gemini_tts_engine import GeminiVoiceLibrary, is_gemini_voice
 from src.breeze_productions import BreezeProductions, ProductionError
 from src.localai_tts_client import LocalAITTSDiscoveryError, discover_localai_tts_catalog
 from src.localai_voice_profiles import (
@@ -249,6 +252,8 @@ MIN_CHATTERBOX_PROMPT_SECONDS = 5.0
 MIN_VOICE_DESIGN_PREVIEW_SECONDS = 10.0
 MIN_VOICE_DESIGN_PREVIEW_WORDS = 40
 MAX_VOICE_DESIGN_PREVIEW_SECONDS = 45.0
+MAX_QWEN_VOICE_DESIGN_INSTRUCTION_CHARS = 150
+MAX_BREEZE_VOICE_DESIGN_INSTRUCTION_CHARS = 500
 # Qwen's bundled generation config permits 8,192 codec frames. At 12 Hz that
 # can represent more than eleven minutes of audio when a sampled generation
 # misses its normal end token. Casting previews are only 12-20 seconds, so a
@@ -342,6 +347,12 @@ DEFAULT_CONFIG = {
     "openai_tts_chunk_size": 4000,
     "localai_tts_api_key": "",
     "breeze_api_key": "",
+    "gemini_tts_api_key": "",
+    "gemini_tts_default_voice": "Kore",
+    "gemini_tts_instructions": "",
+    "gemini_tts_timeout": 180,
+    "gemini_tts_max_parallel": 1,
+    "gemini_tts_chunk_size": 1000,
     "breeze_api_model": "breeze-tts-2",
     "breeze_api_default_voice": "",
     "breeze_api_instructions": "",
@@ -526,6 +537,7 @@ SECRET_CONFIG_KEYS = {
     "openai_tts_api_key",
     "localai_tts_api_key",
     "breeze_api_key",
+    "gemini_tts_api_key",
     "huggingface_token",
     "remote_engine_management_token",
 }
@@ -1430,6 +1442,7 @@ cloud_job_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="cloud
 cloud_job_condition = threading.Condition()
 active_cloud_jobs = 0
 CLOUD_TTS_ENGINES = {
+    "gemini_tts", "gemini_tts_lite",
     "breeze_api",
     "kokoro_replicate",
     "chatterbox_turbo_replicate",
@@ -1454,6 +1467,7 @@ voice_transcript_generator = VoiceTranscriptGenerator(device="cpu")
 # Use max_workers=1 to prevent parallel GPU inference which causes contention
 # and "badcase" retry loops with VoxCPM and other GPU-based engines
 chunk_regen_executor = ThreadPoolExecutor(max_workers=1)
+chunk_regen_controls = {}
 qwen3_voice_design_model = None
 qwen3_voice_design_signature = None
 qwen3_voice_design_generation_count = 0
@@ -1621,6 +1635,11 @@ def _validate_voice_assignments_for_engine(
         voice = (assignment.get("voice") or "").strip()
         prompt = (assignment.get("audio_prompt_path") or "").strip()
 
+        if engine_name in GEMINI_TTS_MODELS:
+            chosen = voice or config.get('gemini_tts_default_voice') or 'Kore'
+            if not is_gemini_voice(chosen):
+                raise ValueError(f"Select a Google preset or designed voice for {speaker}; local voice samples are not supported by Gemini TTS.")
+
         if engine_name in {"kokoro", "qwen3_custom"} and not voice:
             missing_voices.append(speaker)
 
@@ -1760,6 +1779,27 @@ def _chunk_delivery_instruction(chunk: Dict[str, Any]) -> str:
     return (value if value is not None else chunk.get("emotion")) or ""
 
 
+@contextmanager
+def _regeneration_model_lifecycle(engine_name):
+    """Release casting models before local regeneration, retaining narration caches.
+
+    Use the same lock order as full narration: lifecycle, then inference.
+    Holding the lifecycle lock through inference prevents a new casting worker
+    from loading midway through a chunk. Cleanup is skipped between chunks when
+    no voice-design model remains loaded.
+    """
+    if engine_name in CLOUD_TTS_ENGINES:
+        yield
+        return
+    with gpu_generation_lifecycle_lock:
+        if (qwen3_voice_design_process is not None
+                or breeze_voice_design_process is not None
+                or qwen3_voice_design_model is not None):
+            logger.info("Chunk regeneration: releasing voice-design models before local synthesis")
+            _release_voice_design_memory()
+        yield
+
+
 def _perform_chunk_regeneration(
     job_id: str,
     chunk_id: str,
@@ -1857,7 +1897,7 @@ def _perform_chunk_regeneration(
         if spoken_parts:
             # Acquire GPU lock to prevent concurrent inference which causes
             # GPU contention and "badcase" retry loops with VoxCPM.
-            with gpu_inference_lock:
+            with _regeneration_model_lifecycle(engine_name), gpu_inference_lock:
                 engine = get_tts_engine(engine_name, config=config_snapshot)
                 generated_files = engine.generate_batch(
                     segments=segments,
@@ -2041,9 +2081,24 @@ def _schedule_chunk_regeneration(
             "engine": normalized_engine,
             "delivery_instruction": delivery_instruction,
         }
+        control = chunk_regen_controls.setdefault(job_id, {"paused": False, "epoch": 0})
+        epoch = control["epoch"]
 
     def task():
         try:
+            while True:
+                with queue_lock:
+                    control = chunk_regen_controls.get(job_id, {})
+                    cancelled = control.get("epoch", 0) != epoch
+                    paused = control.get("paused", False)
+                    if not cancelled and not paused:
+                        jobs[job_id]["regen_tasks"][chunk_id]["status"] = "running"
+                if cancelled:
+                    # Cancelled queued chunks retain their previous audio.
+                    return
+                if not paused:
+                    break
+                time.sleep(0.2)
             _update_regen_status(job_id, chunk_id, status="running", started_at=datetime.now().isoformat(), error=None)
             _perform_chunk_regeneration(job_id, chunk_id, text_to_render, voice_override=normalized_voice,
                                        engine_override=normalized_engine, delivery_instruction=delivery_instruction,
@@ -2060,6 +2115,31 @@ def _schedule_chunk_regeneration(
             )
 
     chunk_regen_executor.submit(task)
+
+
+@app.route('/api/library/<job_id>/regeneration-control', methods=['GET', 'POST'])
+def control_library_regeneration(job_id: str):
+    """Cooperative controls: an in-flight synthesis finishes before pausing."""
+    with queue_lock:
+        job = jobs.get(job_id)
+        if not job:
+            return jsonify(success=False, error="Job not found."), 404
+        control = chunk_regen_controls.setdefault(job_id, {"paused": False, "epoch": 0})
+        if request.method == 'POST':
+            action = (request.get_json(silent=True) or {}).get("action")
+            if action not in {"pause", "resume", "cancel"}:
+                return jsonify(success=False, error="Unknown regeneration action."), 400
+            control["paused"] = action == "pause"
+            if action == "cancel":
+                control["epoch"] += 1
+                for task in job.get("regen_tasks", {}).values():
+                    if task.get("status") == "queued":
+                        task.update(status="failed", error="Cancelled by user; existing audio retained.",
+                                    completed_at=datetime.now().isoformat())
+        return jsonify(success=True, paused=control["paused"],
+                       message="Paused after the current chunk." if control["paused"] else
+                       "Queue stopped; an already-running chunk may finish." if request.method == 'POST' and action == 'cancel' else
+                       "Regeneration queue active.")
 
 
 @contextmanager
@@ -2660,6 +2740,8 @@ def _run_isolated_breeze_voice_design(request_payload: Dict[str, Any]) -> Dict[s
 
 
 def _engine_signature(engine_name: str, config: Dict) -> str:
+    if engine_name in GEMINI_TTS_MODELS:
+        return engine_name + '::' + hashlib.sha256(json.dumps({k: v for k, v in config.items() if k.startswith('gemini_tts_')}, sort_keys=True).encode()).hexdigest()
     if engine_name == "breeze_api":
         return "breeze_api::" + hashlib.sha256(json.dumps({k: v for k, v in config.items() if k.startswith("breeze_api_")}, sort_keys=True).encode()).hexdigest()
     """Generate a signature capturing settings that require a fresh engine."""
@@ -2872,6 +2954,12 @@ def _engine_signature(engine_name: str, config: Dict) -> str:
 
 
 def _create_engine(engine_name: str, config: Dict) -> TtsEngineBase:
+    if engine_name in GEMINI_TTS_MODELS:
+        return GeminiTTSEngine(config.get('gemini_tts_api_key', ''), engine_name=engine_name,
+            default_voice=config.get('gemini_tts_default_voice') or 'Kore',
+            instructions=config.get('gemini_tts_instructions') or '',
+            timeout=config.get('gemini_tts_timeout', 180),
+            max_parallel=config.get('gemini_tts_max_parallel', 1), max_retries=2)
     if engine_name == "breeze_api":
         return BreezeAPIEngine(
             config.get("breeze_api_key", ""), model_id=config.get("breeze_api_model") or "breeze-tts-2",
@@ -4608,6 +4696,10 @@ def _is_chatterbox_engine(engine_name: str) -> bool:
 
 
 def _create_text_processor_for_engine(engine_name: str, chunk_size: int, config: Optional[Dict] = None) -> TextProcessor:
+    if _normalize_engine_name(engine_name) in GEMINI_TTS_MODELS:
+        limit = max(120, min(3000, int((config or {}).get('gemini_tts_chunk_size', 1000))))
+        return TextProcessor(chunk_strategy='characters', char_soft_limit=limit,
+                             char_hard_limit=limit + 150, allow_sentence_overflow=True)
     if _normalize_engine_name(engine_name) == "breeze_api":
         limit = max(120, min(4000, int((config or {}).get("breeze_api_chunk_size", 1000))))
         return TextProcessor(chunk_strategy="characters", char_soft_limit=limit,
@@ -5707,6 +5799,8 @@ def _process_audio_job(job_data):
                     "openai_tts": "openai_tts_max_parallel",
                     "localai_tts": "localai_tts_max_parallel",
                     "breeze_api": "breeze_api_max_parallel",
+                    "gemini_tts": "gemini_tts_max_parallel",
+                    "gemini_tts_lite": "gemini_tts_max_parallel",
                 }.get(engine_name, "parallel_chunks")
                 engine_kwargs["parallel_workers"] = max(
                     1,
@@ -6321,6 +6415,7 @@ def _process_audio_job(job_data):
             "acx_compliance": bool(config.get('acx_compliance', False)),
             "word_replacements": word_replacements,
         }
+        metadata = merge_generated_library_metadata(load_job_metadata(job_dir), metadata)
         save_job_metadata(job_dir, metadata)
         
         job_end_time = datetime.now()
@@ -7120,6 +7215,84 @@ def get_edge_tts_voices():
     })
 
 
+@app.route('/api/gemini-tts/catalog')
+def gemini_tts_catalog():
+    voices = [{'short_name': v, 'display_name': v, 'locale': ''} for v in GEMINI_TTS_VOICES]
+    key = load_config().get('gemini_tts_api_key')
+    warning = None
+    if key:
+        try:
+            for voice in GeminiVoiceLibrary(key).list():
+                voice_id = voice.get('id')
+                if is_gemini_voice(voice_id) and str(voice_id).startswith('voice_'):
+                    voices.append({'short_name': voice_id, 'display_name': 'Designed: ' + str(voice.get('display_name') or voice.get('displayName') or voice_id), 'locale': '', 'designed': True})
+        except Exception as exc:
+            warning = str(exc)
+    return jsonify(success=True, voices=voices, warning=warning, design_available=bool(key))
+
+
+@app.route('/api/gemini-tts/voices', methods=['POST'])
+def gemini_tts_design_voice():
+    data = request.get_json(silent=True) or {}
+    try:
+        voice = GeminiVoiceLibrary(load_config().get('gemini_tts_api_key')).create(
+            data.get('name'), data.get('description'), data.get('engine', 'gemini_tts'))
+        voice_id = voice.get('id')
+        if not is_gemini_voice(voice_id) or not str(voice_id).startswith('voice_'):
+            raise ValueError('Google did not return a valid voice ID. Refresh the voice list before retrying.')
+        return jsonify(success=True, id=voice_id, name=data.get('name'))
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+    except Exception as exc:
+        return jsonify(success=False, error=str(exc)), 502
+
+
+@app.route('/api/gemini-tts/voices/<voice_id>/preview')
+def gemini_tts_voice_preview(voice_id):
+    try:
+        voice = GeminiVoiceLibrary(load_config().get('gemini_tts_api_key')).get(voice_id)
+        sample = voice.get('sample_audio') or voice.get('sampleAudio') or {}
+        raw = base64.b64decode(sample.get('data') or '', validate=True)
+        if raw[:4] != b'RIFF' or raw[8:12] != b'WAVE':
+            raise ValueError('Google did not return a WAV preview for this voice.')
+        return send_file(io.BytesIO(raw), mimetype='audio/wav')
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+    except Exception as exc:
+        return jsonify(success=False, error=str(exc)), 502
+
+
+@app.route('/api/gemini-tts/voices/<voice_id>', methods=['DELETE'])
+def gemini_tts_delete_voice(voice_id):
+    if (request.get_json(silent=True) or {}).get('confirm') is not True:
+        return jsonify(success=False, error='Confirm deletion of this hosted voice.'), 400
+    try:
+        GeminiVoiceLibrary(load_config().get('gemini_tts_api_key')).delete(voice_id)
+        return jsonify(success=True, deleted=voice_id)
+    except ValueError as exc:
+        return jsonify(success=False, error=str(exc)), 400
+    except Exception as exc:
+        return jsonify(success=False, error=str(exc)), 502
+
+
+@app.route('/api/gemini-tts/test', methods=['POST'])
+def gemini_tts_test():
+    """Read model metadata only; never submit billable speech as a key test."""
+    import requests as http
+    key = str((request.get_json(silent=True) or {}).get('api_key') or '').strip()
+    if not key:
+        return jsonify(success=False, error='Enter the dedicated Gemini TTS API key.'), 400
+    try:
+        for model in GEMINI_TTS_MODELS.values():
+            result = http.get(f'https://generativelanguage.googleapis.com/v1beta/models/{model}',
+                              headers={'x-goog-api-key': key}, timeout=(5, 15), allow_redirects=False)
+            if result.status_code != 200:
+                return jsonify(success=False, error=f'Google model check returned HTTP {result.status_code}. Check key, project access, and model availability.'), 400
+        return jsonify(success=True, message='Both TTS models are visible. Save Settings, then use Quick Test to verify synthesis and quota (billable).')
+    except http.RequestException:
+        return jsonify(success=False, error='Could not reach Google. Check network access and try again.'), 502
+
+
 @app.route('/api/breeze-api/catalog', methods=['GET', 'POST'])
 def breeze_api_catalog():
     config = load_config()
@@ -7547,7 +7720,10 @@ def _apply_voice_design_cleanup(audio_data, sample_rate: int):
             output_path.unlink(missing_ok=True)
 
 
-def _clean_voice_design_instruction(value: str) -> str:
+def _clean_voice_design_instruction(
+    value: str,
+    max_chars: int = MAX_QWEN_VOICE_DESIGN_INSTRUCTION_CHARS,
+) -> str:
     """Keep VoiceDesign instructions compact, positive, and synthesis-focused."""
     text = re.sub(r"\s+", " ", (value or "").strip())
     negative_patterns = (
@@ -7574,19 +7750,22 @@ def _clean_voice_design_instruction(value: str) -> str:
     )
     text = re.sub(r"\s*[,;]\s*[,;]+", ", ", text)
     text = re.sub(r"\s+([,.;])", r"\1", text).strip(" ,;")
-    if len(text) > 150:
-        text = text[:150].rsplit(" ", 1)[0].rstrip(" ,;")
+    if max_chars > 0 and len(text) > max_chars:
+        text = text[:max_chars].rsplit(" ", 1)[0].rstrip(" ,;")
     return text
 
 
-def _build_qwen_voice_design_instruction(payload: Dict[str, Any]) -> tuple[str, str]:
+def _build_qwen_voice_design_instruction(
+    payload: Dict[str, Any],
+    max_chars: int = MAX_QWEN_VOICE_DESIGN_INSTRUCTION_CHARS,
+) -> tuple[str, str]:
     """Build an instruction from voice traits, never from the narrative profile."""
     structured = any(
         key in payload for key in ("voice_type", "voice_design_prompt", "required_gender")
     )
     if not structured:
         # Voice Manager supplies a complete manual instruction and remains supported.
-        instruct = _clean_voice_design_instruction(payload.get("instruct") or "")
+        instruct = _clean_voice_design_instruction(payload.get("instruct") or "", max_chars)
         language = (payload.get("language") or "English").strip() or "English"
         return instruct, language
 
@@ -7601,7 +7780,7 @@ def _build_qwen_voice_design_instruction(payload: Dict[str, Any]) -> tuple[str, 
 
     source = payload.get("voice_design_prompt") or payload.get("voice_type") or ""
     gender_phrase = _voice_age_gender_prefix(gender, str(source))
-    traits = _clean_voice_design_instruction(source)
+    traits = _clean_voice_design_instruction(source, max_chars)
     traits = re.sub(
         VOICE_DESIGN_PREFIX_PATTERN,
         " ",
@@ -7617,12 +7796,12 @@ def _build_qwen_voice_design_instruction(payload: Dict[str, Any]) -> tuple[str, 
     traits = re.sub(r"\bchild[- ]like\b", " ", traits, flags=re.IGNORECASE)
     traits = re.sub(r"\s+", " ", traits).strip(" ,;.")
     if not traits and payload.get("voice_type"):
-        traits = _clean_voice_design_instruction(str(payload.get("voice_type"))).strip(" ,;.")
+        traits = _clean_voice_design_instruction(str(payload.get("voice_type")), max_chars).strip(" ,;.")
     if not traits:
         raise ValueError("Voice Type or Voice Design Prompt is required.")
     expected = re.compile(rf"\b{re.escape(gender_phrase)}\b", re.IGNORECASE)
     instruct = f"{gender_phrase}. {traits}"
-    instruct = _clean_voice_design_instruction(instruct)
+    instruct = _clean_voice_design_instruction(instruct, max_chars)
     if not expected.search(instruct):
         raise ValueError(f'Final VoiceDesign instruction must contain "{gender_phrase}".')
     return instruct, "English"
@@ -7658,6 +7837,7 @@ def _cleanup_qwen_voice_design_generation(*, force_cuda: bool = False) -> None:
         logger.debug("Qwen3 VoiceDesign cleanup skipped: %s", exc)
 
 
+@_serialize_gpu_generation
 def _generate_voice_design_preview(payload: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     text = _ensure_voice_design_preview_length(payload.get("text") or "")
     instruct, language = _build_qwen_voice_design_instruction(payload)
@@ -7753,10 +7933,14 @@ def _generate_voice_design_preview(payload: Dict[str, Any], config: Dict[str, An
     }
 
 
+@_serialize_gpu_generation
 def _generate_breeze_voice_design_preview(payload: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Generate a reference-free Breeze casting sample in the persistent Breeze worker."""
     text = _ensure_voice_design_preview_length(payload.get("text") or "")
-    instruct, language = _build_qwen_voice_design_instruction(payload)
+    instruct, language = _build_qwen_voice_design_instruction(
+        payload,
+        max_chars=MAX_BREEZE_VOICE_DESIGN_INSTRUCTION_CHARS,
+    )
     if not text:
         raise ValueError("Text is required to generate a preview.")
     if str(language or "English").lower() not in {"english", "chinese", "auto"}:
@@ -10941,6 +11125,9 @@ def generate_audio():
                 except Exception:
                     pass
             _existing_meta["word_replacements"] = word_replacements
+            collection_title = resolve_new_collection_title(data)
+            if collection_title:
+                _existing_meta.setdefault("collection_title", collection_title)
             _existing_meta.setdefault("job_id", job_id)
             _existing_meta.setdefault("created_at", jobs[job_id]["created_at"])
             with _meta_path.open("w", encoding="utf-8") as _f:
@@ -13210,7 +13397,20 @@ def list_saved_projects():
     with PROJECTS_LOCK:
         projects = _load_saved_projects()
     projects.sort(key=_project_timestamp, reverse=True)
+    if request.args.get("summary") == "1":
+        projects = [{key: project.get(key) for key in ("id", "name", "saved_at")} for project in projects]
     return jsonify({"success": True, "projects": projects})
+
+
+@app.route('/api/projects/<project_id>', methods=['GET'])
+def get_saved_project(project_id: str):
+    """Load manuscript and casting data only when a project is opened."""
+    with PROJECTS_LOCK:
+        project = next((item for item in _load_saved_projects()
+                        if str(item.get("id")) == project_id), None)
+    if project is None:
+        return jsonify({"success": False, "error": "Project not found."}), 404
+    return jsonify({"success": True, "project": project})
 
 
 @app.route('/api/projects', methods=['POST'])
@@ -13346,6 +13546,8 @@ def _engine_setup_catalog(config: Optional[Dict[str, Any]] = None) -> List[Dict[
             (config.get("elevenlabs_api_key") or "").strip()
         ), "elevenlabs"),
         ("openai_tts", "OpenAI-compatible TTS", "cloud", openai_ready, "openai-tts"),
+        ("gemini_tts", "Gemini 3.8 Flash TTS", "cloud", bool((config.get('gemini_tts_api_key') or '').strip()), "gemini-tts"),
+        ("gemini_tts_lite", "Gemini 3.8 Flash-Lite TTS", "cloud", bool((config.get('gemini_tts_api_key') or '').strip()), "gemini-tts"),
         ("breeze_api", "Breeze API · Hosted", "cloud", bool(
             (config.get("breeze_api_key") or "").strip() and (config.get("breeze_api_model") or "").strip()
         ), "breeze-api"),
@@ -13721,11 +13923,13 @@ def health_check():
         "qwen3_available": isolated_engine_available("qwen3_custom"),
         "qwen3_voice_design_available": isolated_engine_available("qwen3_custom"),
         "qwen3_voice_design_api_version": 2,
+        "qwen3_voice_design_instruction_max_chars": MAX_QWEN_VOICE_DESIGN_INSTRUCTION_CHARS,
         "breeze_voice_design_available": (
             _breeze_runtime_ready(config)
             and (Path(__file__).resolve().parent / "engines" / "breeze_tts_2" / ".license_accepted").is_file()
         ),
         "breeze_voice_design_api_version": 1,
+        "breeze_voice_design_instruction_max_chars": MAX_BREEZE_VOICE_DESIGN_INSTRUCTION_CHARS,
         "omnivoice_available": omnivoice_available(),
         "pocket_tts_available": isolated_engine_available("pocket_tts"),
         "kitten_tts_available": isolated_engine_available("kitten_tts"),

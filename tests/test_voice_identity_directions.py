@@ -10,6 +10,17 @@ import pytest
 import app as app_module
 from src.directed_prompt_presets import PROMPT_DIR, with_directed_presets
 from src.voice_directions import attach_speaker_profiles, compose_voice_direction
+
+
+def test_saved_project_punctuation_keys_match_speaker_ids():
+    result = attach_speaker_profiles({'alexander-holder-male': {'voice': 'sample'}},
+                                    {'alexanderholdermale': {'voice': 'Warm baritone'}})
+    assert result['alexander-holder-male']['extra']['speaker_profile']['voice'] == 'Warm baritone'
+
+
+def test_ambiguous_normalized_profiles_are_not_guessed():
+    result = attach_speaker_profiles({'a-b-c': {}}, {'ab-c': {'voice': 'A'}, 'a-bc': {'voice': 'B'}})
+    assert result == {'a-b-c': {}}
 from src.engines.base import VoiceAssignment
 from src.engines.breeze_tts_2_engine import BreezeTTS2Engine
 from src.engines.breeze_api_engine import BreezeAPIEngine

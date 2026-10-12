@@ -41,6 +41,22 @@ class BreezeAPIEngine(OpenAITTSEngine):
     def headers(self):
         return {"xi-api-key": self.api_key, "Accept": "application/json"}
 
+    def _safe_error_detail(self, response):
+        """Return a bounded provider error hint without echoing credentials."""
+        try:
+            payload = response.json()
+        except (TypeError, ValueError):
+            return ""
+        if not isinstance(payload, dict):
+            return ""
+        value = payload.get("detail") or payload.get("message") or payload.get("error")
+        if isinstance(value, dict):
+            value = value.get("message") or value.get("detail") or value.get("code")
+        if not isinstance(value, (str, int, float)):
+            return ""
+        detail = str(value).replace(self.api_key, "[redacted]").replace("\r", " ").replace("\n", " ").strip()
+        return detail[:300]
+
     def request(self, method, path, *, retry=False, **kwargs):
         # Do not retry uncertain writes/timeouts: a paid request may already exist.
         timeout = kwargs.pop("timeout", (10, self.timeout))
@@ -78,7 +94,9 @@ class BreezeAPIEngine(OpenAITTSEngine):
                     delay = 2 ** attempt
                 self._sleep(max(0, min(delay, 120)))
                 continue
-            raise BreezeAPIError(f"Breeze API request failed (HTTP {response.status_code}). Check API access, credits, voice permissions and plan concurrency.", response.status_code)
+            detail = self._safe_error_detail(response)
+            suffix = f" Provider detail: {detail}" if detail else ""
+            raise BreezeAPIError(f"Breeze API request failed (HTTP {response.status_code}). Check API access, credits, voice permissions and plan concurrency.{suffix}", response.status_code)
 
     def _check_disconnected_speech(self, path, payload, started):
         """Read-only, conservative reconciliation; never adopt ambiguous audio."""
@@ -204,7 +222,9 @@ class BreezeAPIEngine(OpenAITTSEngine):
                                 # requests uses the connect timeout during socket writes too.
                                 # Give multipart audio uploads the full generation allowance.
                                 timeout=(max(180, self.timeout), max(180, self.timeout)),
-                                data={"name": name[:80], "language_code": language},
+                                # Breeze detects the clone sample language at preview time.
+                                # language_code is accepted only by the later save call.
+                                data={"name": name[:80]},
                                 files={"files": (path.name, stream, "audio/wav" if path.suffix.lower() == ".wav" else "audio/mpeg")}).json()
 
     def save_preview(self, preview_id, name, language):
