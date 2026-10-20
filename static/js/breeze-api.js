@@ -109,7 +109,7 @@ window.openBreezeProductions = async (jobId = null) => {
     document.getElementById('breeze-productions-dialog')?.remove();
     const dialog = document.createElement('dialog');
     dialog.id = 'breeze-productions-dialog';
-    dialog.style.cssText = 'background:#111827;color:#e5e7eb;border:1px solid #64748b;border-radius:12px;padding:24px;width:min(850px,90vw);max-height:85vh;overflow:auto';
+    dialog.style.cssText = 'background:var(--st-panel);color:var(--st-text);border:1px solid var(--st-border-control);border-radius:10px;padding:24px;width:min(850px,90vw);max-height:85vh;overflow:auto';
     dialog.innerHTML = '<h2>Breeze Production Voices</h2><p>Remote voices belong to one production. Local samples and finished audio are preserved. Release only after delivery, approval and payment, or when deliberately abandoning a production. Releasing closes the production: further generation requires a new job.</p><button type="button" data-refresh>Refresh status</button> <button type="button" data-close>Close</button><p data-status role="status"></p><div data-productions></div>';
     document.body.appendChild(dialog);
     dialog.showModal();
@@ -127,7 +127,7 @@ window.openBreezeProductions = async (jobId = null) => {
             if (!items.length) status.textContent = 'No managed sample uploads for this production. Catalog voices are shared and are never deleted here.';
             for (const production of items) {
                 const card = document.createElement('section');
-                card.style.cssText = 'border-top:1px solid #475569;padding:16px 0';
+                card.style.cssText = 'border-top:1px solid var(--st-border);padding:16px 0';
                 const heading = document.createElement('h3');
                 heading.textContent = production.title || production.production_id;
                 const info = document.createElement('p');

@@ -34,7 +34,9 @@
     }
 
     function tabLabel(tabName) {
-        return document.querySelector(`.tab-button[data-tab="${tabName}"]`)?.textContent?.trim() || 'application';
+        const button = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+        const label = button?.querySelector('.tab-label')?.textContent ?? button?.textContent;
+        return label?.trim() || 'application';
     }
 
     function switchToTab(tabName) {

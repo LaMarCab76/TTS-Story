@@ -4,33 +4,46 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TTS-Story - Multi-Voice TTS</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2326324a'/%3E%3Cpath d='M18 22h6v20h-6zM28 22h6v20h-6zM38 22h6v20h-6z' fill='%23a78bfa'/%3E%3Ccircle cx='32' cy='16' r='4' fill='%23fcd34d'/%3E%3Ccircle cx='32' cy='48' r='4' fill='%23fcd34d'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231b1916'/%3E%3Cpath d='M18 22h6v20h-6zM28 22h6v20h-6zM38 22h6v20h-6z' fill='%23e2a04f'/%3E%3Ccircle cx='32' cy='16' r='4' fill='%23ece6dc'/%3E%3Ccircle cx='32' cy='48' r='4' fill='%23ece6dc'/%3E%3C/svg%3E">
     <link rel="stylesheet" href="/static/css/style.css?v=46">
     <link rel="stylesheet" href="/static/css/help.css?v=3">
+    <link rel="stylesheet" href="/static/css/studio.css?v=1">
+    <link rel="stylesheet" href="/static/css/studio-generate.css?v=1">
+    <link rel="stylesheet" href="/static/css/studio-cast.css?v=1">
+    <link rel="stylesheet" href="/static/css/studio-queue.css?v=1">
+    <link rel="stylesheet" href="/static/css/studio-library.css?v=1">
+    <link rel="stylesheet" href="/static/css/studio-voices.css?v=1">
+    <link rel="stylesheet" href="/static/css/studio-settings.css?v=1">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎭 TTS-Story</h1>
-            <p>Multi-Voice Text-to-Speech for Stories and Audiobooks</p>
-            <div class="status-bar">
-                <span id="mode-indicator">Mode: <strong id="current-mode">Loading...</strong></span>
-                <span id="cuda-indicator">CUDA: <strong id="cuda-status">Checking...</strong></span>
+    <div class="app-shell">
+        <aside class="app-sidebar">
+            <div class="app-brand">TTS-Story</div>
+            <button type="button" id="project-manage-btn" class="project-switcher" title="Manage projects">
+                <span class="project-switcher-text">
+                    <span class="project-switcher-kicker">Project</span>
+                    <span id="project-current-name" class="project-switcher-name">Untitled project</span>
+                </span>
+                <span class="ms" aria-hidden="true">unfold_more</span>
+            </button>
+            <div class="tabs">
+                <button class="tab-button active" data-tab="generate"><span class="ms" aria-hidden="true">edit_note</span><span class="tab-label">Generate</span></button>
+                <button class="tab-button" data-tab="queue"><span class="ms" aria-hidden="true">queue_music</span><span class="tab-label">Job Queue</span><span class="nav-badge" hidden></span></button>
+                <button class="tab-button" data-tab="library"><span class="ms" aria-hidden="true">library_music</span><span class="tab-label">Library</span></button>
+                <button class="tab-button" data-tab="voices"><span class="ms" aria-hidden="true">record_voice_over</span><span class="tab-label">Voices</span></button>
+                <button class="tab-button" data-tab="settings"><span class="ms" aria-hidden="true">tune</span><span class="tab-label">Settings</span></button>
+                <button class="tab-button tab-button-help" data-tab="help"><span class="ms" aria-hidden="true">help</span><span class="tab-label">Help Center</span></button>
             </div>
+            <div class="sidebar-status" role="status" aria-label="Engine status">
+                <span id="mode-indicator"><span class="dot" aria-hidden="true"></span><strong id="current-mode">Loading…</strong></span>
+                <span id="cuda-indicator">CUDA <strong id="cuda-status">Checking…</strong></span>
+            </div>
+        </aside>
 
-        </header>
-
-        <div class="tabs">
-            <button class="tab-button active" data-tab="generate">Generate</button>
-            <button class="tab-button" data-tab="queue">Job Queue</button>
-            <button class="tab-button" data-tab="library">Library</button>
-            <button class="tab-button" data-tab="voices">Available Voices</button>
-            <button class="tab-button" data-tab="settings">Settings</button>
-            <button class="tab-button" data-tab="help">Help</button>
-        </div>
-
+        <main class="app-main">
         <!-- Generate Tab -->
-        <div id="generate-tab" class="tab-content active">
+        <div id="generate-tab" class="tab-content screen active">
+            <div class="screen-body">
             <div class="section">
                 <div class="section-title-row">
                     <div class="section-title-inline">
@@ -38,13 +51,7 @@
                         <button type="button" class="help-icon" data-help-id="input-text" aria-label="Help: Input Text">?</button>
                     </div>
                     <div class="project-controls project-controls-inline">
-                        <div class="project-controls-label">
-                            Project
-                            <button type="button" class="help-icon" data-help-id="projects" aria-label="Help: Projects">?</button>
-                        </div>
-
                         <div class="project-controls-actions">
-                            <button type="button" id="project-manage-btn" class="btn btn-secondary btn-sm">Manage Projects</button>
                             <span id="project-status" class="help-text"></span>
                         </div>
                     </div>
@@ -304,7 +311,7 @@
                                             </div>
                                             <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
                                                 <input type="text" id="custom-heading-input" placeholder="Add custom heading (e.g., Episode, Volume)" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border-color, #4a5568); border-radius: 4px; background: var(--bg-color, #1a202c); color: var(--text-color, #e2e8f0);">
-                                                <button type="button" id="add-custom-heading-btn" style="padding: 6px 12px; border: 1px solid var(--primary-color, #6366f1); background: var(--primary-color, #6366f1); color: white; border-radius: 4px; cursor: pointer;">Add</button>
+                                                <button type="button" id="add-custom-heading-btn" style="padding: 6px 12px; border: 1px solid var(--primary-color, #6366f1); background: var(--primary-color, #6366f1); color: var(--st-accent-ink); border-radius: 4px; cursor: pointer;">Add</button>
                                             </div>
                                             <div id="custom-heading-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
                                                 <!-- Custom heading chips will be generated by JavaScript -->
@@ -334,7 +341,7 @@
                 </div>
             </div>
 
-            <div class="section" style="margin-top: 20px; padding: 15px; background: rgba(99, 102, 241, 0.05); border-radius: 8px;">
+            <div class="section" style="margin-top: 20px; padding: 15px; background: rgba(236, 230, 220, 0.03); border-radius: 8px;">
                 <p style="margin: 0; color: var(--text-muted); text-align: center;">
                     💡 <strong>Tip:</strong> You can submit multiple jobs! Check the <strong>Job Queue</strong> tab to monitor all your generations.
                 </p>
@@ -347,25 +354,17 @@
                 </p>
                 <audio id="latest-audio-player" controls style="width: 100%; max-width: 600px;"></audio>
             </div>
-        </div>
-
-        <!-- Job Detail Modal -->
-        <div id="job-detail-modal-overlay" class="modal-overlay hidden"></div>
-        <div id="job-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="job-detail-modal-title">
-            <div class="modal-header">
-                <h3 id="job-detail-modal-title">Job Details</h3>
-                <button type="button" class="modal-close" id="job-detail-modal-close">×</button>
-            </div>
-            <div class="modal-body" id="job-detail-modal-body">
-                <div class="chunk-review-loading">Loading job details...</div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="job-detail-modal-close-btn">Close</button>
             </div>
         </div>
 
         <!-- Job Queue Tab -->
-        <div id="queue-tab" class="tab-content">
+        <div id="queue-tab" class="tab-content screen">
+            <div class="screen-header">
+                <div class="screen-title-group">
+                    <h1 class="screen-title">Job Queue</h1>
+                </div>
+            </div>
+            <div class="screen-body">
             <div class="queue-header">
                 <div>
                     <div class="section-title-inline">
@@ -382,10 +381,17 @@
             <div id="queue-list">
                 <p><em>Loading queue...</em></p>
             </div>
+            </div>
         </div>
 
         <!-- Library Tab -->
-        <div id="library-tab" class="tab-content">
+        <div id="library-tab" class="tab-content screen">
+            <div class="screen-header">
+                <div class="screen-title-group">
+                    <h1 class="screen-title">Library</h1>
+                </div>
+            </div>
+            <div class="screen-body">
             <div class="section">
                 <div class="library-section-header">
                     <div class="library-section-title">
@@ -406,10 +412,18 @@
                     No audio files in library yet. Generate some audio to get started!
                 </p>
             </div>
+            </div>
         </div>
 
         <!-- Available Voices Tab -->
-        <div id="voices-tab" class="tab-content">
+        <div id="voices-tab" class="tab-content screen">
+            <div class="screen-header">
+                <div class="screen-title-group">
+                    <h1 class="screen-title">Voices</h1>
+                    <span class="screen-subtitle">Built-in, reference and designed voices</span>
+                </div>
+            </div>
+            <div class="screen-body">
             <div class="section">
                 <div class="section-title-inline">
                     <h2>Available Voices</h2>
@@ -755,10 +769,18 @@
                     </div>
                 </div>
             </div>
+            </div>
         </div>
 
         <!-- Settings Tab -->
-        <div id="settings-tab" class="tab-content">
+        <div id="settings-tab" class="tab-content screen">
+            <div class="screen-header">
+                <div class="screen-title-group">
+                    <h1 class="screen-title">Settings</h1>
+                    <span class="screen-subtitle">Stored locally in config.json</span>
+                </div>
+            </div>
+            <div class="screen-body">
             <div class="section">
                 <div class="section-title-inline">
                     <h2>Settings</h2>
@@ -2355,6 +2377,116 @@
                 <button id="save-settings-btn" class="btn btn-primary">Save Settings</button>
                 <button id="reset-settings-btn" class="btn btn-secondary">Reset to Defaults</button>
             </div>
+            </div>
+        </div>
+
+        <!-- Help Tab -->
+        <div id="help-tab" class="tab-content screen help-center">
+            <div class="screen-header help-center-header">
+                <div class="screen-title-group">
+                    <h1 class="screen-title">Help Center</h1>
+                    <span id="help-center-version" class="screen-subtitle">Loading guide…</span>
+                </div>
+                <div class="screen-actions">
+                    <div class="help-center-search-wrap" role="search">
+                        <label for="help-center-search" class="sr-only">Search the guide</label>
+                        <div class="help-center-search-control">
+                            <span class="ms help-center-search-icon" aria-hidden="true">search</span>
+                            <input
+                                id="help-center-search"
+                                type="search"
+                                autocomplete="off"
+                                placeholder="Search the guide"
+                                title="Try “first audio”, “429”, “voice clone”, or an engine name"
+                                aria-controls="help-center-search-results"
+                                aria-expanded="false"
+                            >
+                            <button id="help-center-search-clear" class="help-center-search-clear hidden" type="button">Clear</button>
+                            <kbd>/</kbd>
+                        </div>
+                        <div id="help-center-search-results" class="help-center-search-results hidden" aria-live="polite"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="screen-body help-center-body">
+            <div id="help-center-status" class="help-center-status hidden" role="status" aria-live="polite"></div>
+
+            <div id="help-center-home" class="help-center-home">
+                <section class="help-center-hero" aria-labelledby="help-center-title">
+                    <span class="kicker help-center-eyebrow">Bundled user guide</span>
+                    <h2 id="help-center-title">Make your first line—and your whole audiobook—with confidence.</h2>
+                    <p>Follow complete workflows, compare every engine, configure optional online services, and learn how to review or repair audio without starting over.</p>
+                </section>
+                <section class="help-start-panel" aria-labelledby="help-start-title">
+                    <div>
+                        <span class="help-start-kicker">New to TTS-Story?</span>
+                        <h3 id="help-start-title">Take the guided path</h3>
+                        <p>These five guides take you from the opening screen to reviewed audio while preserving safe defaults.</p>
+                    </div>
+                    <div class="help-start-steps">
+                        <button type="button" data-help-article="first-run"><span>1</span>First-run checklist</button>
+                        <button type="button" data-help-article="choose-engine"><span>2</span>Choose an engine</button>
+                        <button type="button" data-help-article="online-services"><span>3</span>Optional online setup</button>
+                        <button type="button" data-help-article="quick-start"><span>4</span>Generate first audio</button>
+                        <button type="button" data-help-article="job-review"><span>5</span>Review and correct</button>
+                    </div>
+                </section>
+                <div id="help-center-categories" class="help-center-categories"></div>
+            </div>
+
+            <div id="help-center-reader" class="help-center-reader hidden">
+                <aside class="help-center-sidebar" aria-label="User guide topics">
+                    <button id="help-center-home-button" class="help-center-all-topics" type="button" data-icon="arrow_back">All topics</button>
+                    <nav id="help-center-sidebar-nav"></nav>
+                </aside>
+
+                <div class="help-center-article-panel">
+                    <div class="help-center-toolbar">
+                        <span id="help-center-breadcrumb">User Guide</span>
+                        <button id="help-center-back-to-app" class="btn btn-secondary btn-sm" type="button">Back to Generate</button>
+                    </div>
+                    <header class="help-center-article-header">
+                        <h1 id="help-center-article-title">Guide</h1>
+                        <p id="help-center-article-summary"></p>
+                        <span id="help-center-article-meta"></span>
+                    </header>
+                    <nav id="help-center-toc" class="help-center-toc hidden" aria-label="On this page"></nav>
+                    <article id="help-center-article-body" class="help-center-article"></article>
+
+                    <section id="help-center-related" class="help-center-related hidden">
+                        <h2>Keep going</h2>
+                        <div id="help-center-related-links"></div>
+                    </section>
+
+                    <nav class="help-center-article-nav" aria-label="Previous and next guides">
+                        <button id="help-center-previous" class="help-article-nav-button hidden" type="button">
+                            <span>← Previous</span>
+                            <span></span>
+                        </button>
+                        <button id="help-center-next" class="help-article-nav-button help-article-nav-next hidden" type="button">
+                            <span>Next →</span>
+                            <span></span>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+            </div>
+        </div>
+        </main>
+    </div>
+
+    <!-- Job Detail Modal -->
+    <div id="job-detail-modal-overlay" class="modal-overlay hidden"></div>
+    <div id="job-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="job-detail-modal-title">
+        <div class="modal-header">
+            <h3 id="job-detail-modal-title">Job Details</h3>
+            <button type="button" class="modal-close" id="job-detail-modal-close">×</button>
+        </div>
+        <div class="modal-body" id="job-detail-modal-body">
+            <div class="chunk-review-loading">Loading job details...</div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" id="job-detail-modal-close-btn">Close</button>
         </div>
     </div>
 
@@ -2519,96 +2651,6 @@
         </div>
     </div>
 
-    <!-- Help Tab -->
-    <div id="help-tab" class="tab-content">
-        <div class="help-center" aria-labelledby="help-center-title">
-            <header class="help-center-hero">
-                <div class="help-center-hero-copy">
-                    <div class="help-center-eyebrow">
-                        <span>Bundled user guide</span>
-                        <span id="help-center-version">Loading guide…</span>
-                    </div>
-                    <h2 id="help-center-title">Make your first line—and your whole audiobook—with confidence.</h2>
-                    <p>Follow complete workflows, compare every engine, configure optional online services, and learn how to review or repair audio without starting over.</p>
-                </div>
-                <div class="help-center-search-wrap" role="search">
-                    <label for="help-center-search">Search the guide</label>
-                    <div class="help-center-search-control">
-                        <span class="help-center-search-icon" aria-hidden="true">⌕</span>
-                        <input
-                            id="help-center-search"
-                            type="search"
-                            autocomplete="off"
-                            placeholder="Try “first audio”, “429”, “voice clone”, or an engine name"
-                            aria-controls="help-center-search-results"
-                            aria-expanded="false"
-                        >
-                        <button id="help-center-search-clear" class="help-center-search-clear hidden" type="button">Clear</button>
-                        <kbd>/</kbd>
-                    </div>
-                    <div id="help-center-search-results" class="help-center-search-results hidden" aria-live="polite"></div>
-                </div>
-            </header>
-
-            <div id="help-center-status" class="help-center-status hidden" role="status" aria-live="polite"></div>
-
-            <div id="help-center-home" class="help-center-home">
-                <section class="help-start-panel" aria-labelledby="help-start-title">
-                    <div>
-                        <span class="help-start-kicker">New to TTS-Story?</span>
-                        <h3 id="help-start-title">Take the guided path</h3>
-                        <p>These five guides take you from the opening screen to reviewed audio while preserving safe defaults.</p>
-                    </div>
-                    <div class="help-start-steps">
-                        <button type="button" data-help-article="first-run"><span>1</span>First-run checklist</button>
-                        <button type="button" data-help-article="choose-engine"><span>2</span>Choose an engine</button>
-                        <button type="button" data-help-article="online-services"><span>3</span>Optional online setup</button>
-                        <button type="button" data-help-article="quick-start"><span>4</span>Generate first audio</button>
-                        <button type="button" data-help-article="job-review"><span>5</span>Review and correct</button>
-                    </div>
-                </section>
-                <div id="help-center-categories" class="help-center-categories"></div>
-            </div>
-
-            <div id="help-center-reader" class="help-center-reader hidden">
-                <aside class="help-center-sidebar" aria-label="User guide topics">
-                    <button id="help-center-home-button" class="help-center-all-topics" type="button">← All topics</button>
-                    <nav id="help-center-sidebar-nav"></nav>
-                </aside>
-
-                <main class="help-center-article-panel">
-                    <div class="help-center-toolbar">
-                        <span id="help-center-breadcrumb">User Guide</span>
-                        <button id="help-center-back-to-app" class="btn btn-secondary btn-sm" type="button">Back to Generate</button>
-                    </div>
-                    <header class="help-center-article-header">
-                        <h1 id="help-center-article-title">Guide</h1>
-                        <p id="help-center-article-summary"></p>
-                        <span id="help-center-article-meta"></span>
-                    </header>
-                    <nav id="help-center-toc" class="help-center-toc hidden" aria-label="On this page"></nav>
-                    <article id="help-center-article-body" class="help-center-article"></article>
-
-                    <section id="help-center-related" class="help-center-related hidden">
-                        <h2>Keep going</h2>
-                        <div id="help-center-related-links"></div>
-                    </section>
-
-                    <nav class="help-center-article-nav" aria-label="Previous and next guides">
-                        <button id="help-center-previous" class="help-article-nav-button hidden" type="button">
-                            <span>← Previous</span>
-                            <span></span>
-                        </button>
-                        <button id="help-center-next" class="help-article-nav-button help-article-nav-next hidden" type="button">
-                            <span>Next →</span>
-                            <span></span>
-                        </button>
-                    </nav>
-                </main>
-            </div>
-        </div>
-    </div>
-
     <div class="modal-overlay hidden" id="speaker-edit-modal-overlay">
         <div class="modal hidden" id="speaker-edit-modal" style="max-width: 720px; width: 95%;">
             <div class="modal-header">
@@ -2636,8 +2678,11 @@
     <div class="modal-overlay hidden" id="project-modal-overlay">
         <div class="modal hidden" id="project-modal" style="max-width: 720px; width: 95%;">
             <div class="modal-header">
-                <h3>Manage Projects</h3>
-                <button class="modal-close" id="project-modal-close">&times;</button>
+                <div class="section-title-inline">
+                    <h3>Projects</h3>
+                    <button type="button" class="help-icon" data-help-id="projects" aria-label="Help: Projects">?</button>
+                </div>
+                <button class="modal-close" id="project-modal-close" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="project-save-row">
@@ -2933,5 +2978,8 @@
 <script src="/static/js/library.js?v=62"></script>
     <script src="/static/js/voice-manager.js?v=18"></script>
 <script src="/static/js/settings.js?v=36"></script>
+    <script src="/static/js/studio.js?v=1"></script>
+    <script src="/static/js/manuscript-view.js?v=1"></script>
+    <script src="/static/js/cast-view.js?v=1"></script>
 </body>
 </html>

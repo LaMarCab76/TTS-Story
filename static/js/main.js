@@ -1286,6 +1286,14 @@ async function fetchSavedProject(projectId) {
     return data.project;
 }
 
+function setCurrentProjectLabel(name) {
+    const label = document.getElementById('project-current-name');
+    if (!label) return;
+    const text = String(name || '').trim() || 'Untitled project';
+    label.textContent = text;
+    label.title = text;
+}
+
 async function saveProject(project, { render = true } = {}) {
     if (!project) return null;
     const response = await fetch('/api/projects', {
@@ -1312,6 +1320,10 @@ async function deleteProject(projectId) {
         throw new Error(data.error || 'Unable to delete the project.');
     }
     savedProjects = savedProjects.filter(item => String(item.id) !== String(projectId));
+    if (activeProjectId !== null && String(activeProjectId) === String(projectId)) {
+        activeProjectId = null;
+        setCurrentProjectLabel('');
+    }
     renderProjectList();
 }
 
@@ -3732,7 +3744,7 @@ function renderDefaultHeadingChips() {
             border-radius: 16px;
             border: 1px solid ${isEnabled ? 'var(--primary-color, #6366f1)' : 'var(--border-color, #4a5568)'};
             background: ${isEnabled ? 'var(--primary-color, #6366f1)' : 'transparent'};
-            color: ${isEnabled ? 'white' : 'var(--text-color, #e2e8f0)'};
+            color: ${isEnabled ? 'var(--st-accent-ink, #1b1916)' : 'var(--text-color, #e2e8f0)'};
             cursor: pointer;
             font-size: 0.85rem;
             user-select: none;
@@ -3758,7 +3770,7 @@ function renderCustomHeadingChips() {
             padding: 6px 12px;
             border-radius: 16px;
             border: 1px solid var(--success-color, #10b981);
-            background: rgba(16, 185, 129, 0.1);
+            background: var(--st-green-soft, rgba(148, 184, 158, 0.14));
             color: var(--success-color, #10b981);
             cursor: pointer;
             font-size: 0.85rem;
@@ -4703,6 +4715,7 @@ function setupEventListeners() {
             try {
                 const saved = await saveProject(project);
                 activeProjectId = saved?.id || project.id;
+                setCurrentProjectLabel(saved?.name || name);
                 if (projectStatus) {
                     projectStatus.textContent = `Saved ${name}`;
                 }
@@ -4874,7 +4887,10 @@ function updateModeIndicator(engineName) {
         .includes(normalizedEngine);
 
     modeEl.textContent = engineDisplayNames[normalizedEngine] || normalizedEngine;
-    modeEl.style.color = isLocal ? '#10b981' : '#f59e0b';
+    const modeIndicator = document.getElementById('mode-indicator');
+    if (modeIndicator) {
+        modeIndicator.dataset.kind = isLocal ? 'local' : 'cloud';
+    }
 }
 
 // Load health status
@@ -6187,6 +6203,7 @@ async function applyProjectState(project) {
     if (!project) return;
     pendingProjectLoad = project;
     activeProjectId = project.id || null;
+    setCurrentProjectLabel(project.name);
     const input = document.getElementById('input-text');
     if (input) {
         input.value = project.text || '';
@@ -7410,8 +7427,16 @@ document.addEventListener('DOMContentLoaded', _initTagErrorBanner);
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
+    notification.setAttribute('role', type === 'error' || type === 'warning' ? 'alert' : 'status');
     notification.textContent = message;
-    document.body.appendChild(notification);
+    let toastStack = document.getElementById('toast-stack');
+    if (!toastStack) {
+        toastStack = document.createElement('div');
+        toastStack.id = 'toast-stack';
+        toastStack.className = 'toast-stack';
+        document.body.appendChild(toastStack);
+    }
+    toastStack.appendChild(notification);
     
     setTimeout(() => {
         notification.classList.add('show');
@@ -7441,11 +7466,27 @@ async function updateQueueIndicator() {
                 updateLatestAudioFromQueue(data.jobs);
             }
             
-            if (queueSize > 0 || processingJobs > 0) {
-                indicator.style.display = 'inline-block';
-                indicator.textContent = `${processingJobs} processing, ${queueSize} queued`;
-            } else {
-                indicator.style.display = 'none';
+            if (indicator) {
+                if (queueSize > 0 || processingJobs > 0) {
+                    indicator.style.display = 'inline-block';
+                    indicator.textContent = `${processingJobs} processing, ${queueSize} queued`;
+                } else {
+                    indicator.style.display = 'none';
+                }
+            }
+
+            const activeCount = (Number(processingJobs) || 0) + (Number(queueSize) || 0);
+            const queueBadge = typeof document.querySelector === 'function'
+                ? document.querySelector('.tab-button[data-tab="queue"] .nav-badge')
+                : null;
+            if (queueBadge) {
+                queueBadge.textContent = activeCount > 0 ? String(activeCount) : '';
+                queueBadge.hidden = activeCount === 0;
+            }
+            if (typeof CustomEvent === 'function' && typeof document.dispatchEvent === 'function') {
+                document.dispatchEvent(new CustomEvent('queue:status', {
+                    detail: { running: processingJobs, queued: queueSize, jobs: data.jobs }
+                }));
             }
         }
     } catch (error) {
