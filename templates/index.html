@@ -47,132 +47,156 @@
                 <div class="manuscript-header">
                     <div class="manuscript-title-group">
                         <h1 class="screen-title manuscript-title">Manuscript</h1>
-                        <button type="button" class="help-icon" data-help-id="input-text" aria-label="Help: Input Text">?</button>
-                        <div class="manuscript-subtitle">
-                            <span id="project-status" class="help-text"></span>
+                        <div class="manuscript-subtitle" aria-live="polite">
+                            <span id="project-status">Not saved</span>
                             <span id="document-upload-status" class="upload-status"></span>
                         </div>
                     </div>
                     <div class="manuscript-actions">
-                        <div class="manuscript-upload" title="Load document · Supports: TXT, PDF, Word (.doc/.docx), RTF, EPUB, ODT, Markdown, HTML">
-                            <button type="button" id="browse-document-btn" class="btn btn-secondary btn-sm">
-                                📁 Load Document
+                        <div class="manuscript-upload">
+                            <button type="button" id="browse-document-btn" class="btn btn-ghost btn-icon" title="Load document&#10;TXT, PDF, Word (.doc/.docx), RTF, EPUB, ODT, Markdown or HTML. Several files are appended in order; you can also drop them on the manuscript." aria-label="Load document">
+                                <span class="ms" aria-hidden="true">upload_file</span>
                             </button>
                             <input type="file" id="document-file-input" accept=".txt,.pdf,.doc,.docx,.rtf,.epub,.odt,.md,.html,.htm" style="display: none;">
                         </div>
-                        <button type="button" id="alt-word-registry-btn" class="btn btn-secondary btn-sm">
-                            🔤 Alt Word Registry
+                        <button type="button" id="alt-word-registry-btn" class="btn btn-ghost btn-icon" title="Alt word registry" aria-label="Alt word registry">
+                            <span class="ms" aria-hidden="true">spellcheck</span>
                         </button>
                         <span class="manuscript-header-divider" aria-hidden="true"></span>
-                        <div class="manuscript-prep" title="Prep with your selected prompt before generating audio.">
-                            <select id="gemini-preset-select" class="select-compact">
-                                <option value="">Use default prompt</option>
-                            </select>
-                            <button id="gemini-process-btn" class="btn btn-secondary">Prep Text</button>
+                        <div class="manuscript-prep" title="Prep text tags speakers, directions and headings with the selected LLM prompt before you generate audio.">
+                            <div class="manuscript-prep-select">
+                                <select id="gemini-preset-select" class="select-compact" aria-label="Prep prompt">
+                                    <option value="">Default prompt</option>
+                                </select>
+                            </div>
+                            <button id="gemini-process-btn" class="btn manuscript-prep-btn" data-icon="auto_fix_high">Prep text</button>
                         </div>
-                        <button type="button" class="help-icon" data-help-id="prep-text" aria-label="Help: Prep Text">?</button>
                     </div>
                 </div>
                 <div class="manuscript-toolbar">
-                    <div class="manuscript-view-toggle"></div>
-                    <div class="manuscript-insert-tag">
-                        <div class="paralinguistic-tags-bar" id="paralinguistic-tags-bar">
-                            <span class="tags-label">
-                                Insert paralinguistic tag:
-                                <button type="button" class="help-icon" data-help-id="paralinguistic-tags" aria-label="Help: Paralinguistic Tags">?</button>
-                            </span>
-                            <div class="tags-buttons" id="paralinguistic-tags-kokoro">
-                                <button type="button" class="btn btn-tag" data-tag="[clear throat]">[clear throat]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[sush]">[sush]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[cough]">[cough]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[groan]">[groan]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[sniff]">[sniff]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[gasp]">[gasp]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[chuckle]">[chuckle]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[laugh]">[laugh]</button>
-                            </div>
-                            <div class="tags-buttons" id="paralinguistic-tags-omnivoice" style="display:none">
-                                <button type="button" class="btn btn-tag" data-tag="[laughter]">[laughter]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[confirmation-en]">[confirmation-en]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[question-en]">[question-en]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[question-ah]">[question-ah]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[question-oh]">[question-oh]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[question-ei]">[question-ei]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[question-yi]">[question-yi]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[surprise-ah]">[surprise-ah]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[surprise-oh]">[surprise-oh]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[surprise-wa]">[surprise-wa]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[surprise-yo]">[surprise-yo]</button>
-                                <button type="button" class="btn btn-tag" data-tag="[dissatisfaction-hnn]">[dissatisfaction-hnn]</button>
+                    <div class="seg manuscript-view-toggle" role="group" aria-label="Manuscript view">
+                        <button type="button" class="seg-item" data-manuscript-view="script" aria-pressed="false" title="Read the manuscript as a script, one paragraph per speaker">Script</button>
+                        <button type="button" class="seg-item" data-manuscript-view="raw" aria-pressed="true" title="Edit the manuscript with its speaker tags">Raw tags</button>
+                    </div>
+                    <div class="manuscript-insert-tag" id="manuscript-insert-tag">
+                        <button type="button" class="manuscript-tool-btn manuscript-insert-trigger" id="manuscript-insert-trigger" aria-haspopup="true" aria-expanded="false" aria-controls="manuscript-tag-menu">Insert tag<span class="ms ms-16" aria-hidden="true">expand_more</span></button>
+                        <div class="manuscript-tag-menu" id="manuscript-tag-menu" role="group" aria-label="Paralinguistic tags" hidden>
+                            <span class="manuscript-tag-menu-label" id="manuscript-tag-menu-label">Paralinguistic tags</span>
+                            <div class="paralinguistic-tags-bar" id="paralinguistic-tags-bar">
+                                <span class="tags-label">
+                                    Insert paralinguistic tag:
+                                    <button type="button" class="help-icon" data-help-id="paralinguistic-tags" aria-label="Help: Paralinguistic Tags">?</button>
+                                </span>
+                                <div class="tags-buttons" id="paralinguistic-tags-kokoro">
+                                    <button type="button" class="btn btn-tag" data-tag="[clear throat]">[clear throat]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[sush]">[sush]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[cough]">[cough]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[groan]">[groan]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[sniff]">[sniff]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[gasp]">[gasp]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[chuckle]">[chuckle]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[laugh]">[laugh]</button>
+                                </div>
+                                <div class="tags-buttons" id="paralinguistic-tags-omnivoice" style="display:none">
+                                    <button type="button" class="btn btn-tag" data-tag="[laughter]">[laughter]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[confirmation-en]">[confirmation-en]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[question-en]">[question-en]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[question-ah]">[question-ah]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[question-oh]">[question-oh]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[question-ei]">[question-ei]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[question-yi]">[question-yi]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[surprise-ah]">[surprise-ah]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[surprise-oh]">[surprise-oh]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[surprise-wa]">[surprise-wa]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[surprise-yo]">[surprise-yo]</button>
+                                    <button type="button" class="btn btn-tag" data-tag="[dissatisfaction-hnn]">[dissatisfaction-hnn]</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                     <span class="manuscript-toolbar-spacer"></span>
-                    <div class="manuscript-tag-status"></div>
-                    <button type="button" id="clear-text-btn" class="clear-text-btn" title="Clear text">C</button>
+                    <button type="button" class="manuscript-tag-status" id="manuscript-tag-status" data-state="empty" hidden>
+                        <span class="ms ms-16" aria-hidden="true">check_circle</span><span class="manuscript-tag-status-label">Speaker tags valid</span>
+                    </button>
+                    <span class="manuscript-toolbar-divider" aria-hidden="true"></span>
+                    <button type="button" id="clear-text-btn" class="manuscript-tool-btn manuscript-clear-btn" title="Clear the manuscript"><span class="ms ms-16" aria-hidden="true">backspace</span>Clear</button>
                 </div>
                 <div class="manuscript-strips">
-                    <div id="tag-error-banner" class="tag-error-banner hidden">
+                    <div id="tag-error-banner" class="tag-error-banner hidden" role="alert">
                         <div class="tag-error-banner-left">
-                            <span class="tag-error-icon">⚠</span>
+                            <span class="ms ms-16 tag-error-icon" aria-hidden="true">error</span>
                             <span id="tag-error-summary"></span>
                         </div>
                         <div class="tag-error-banner-actions">
-                            <button type="button" id="tag-error-prev-btn" class="btn btn-sm btn-ghost" title="Jump to previous issue">&#8593; Prev</button>
-                            <button type="button" id="tag-error-next-btn" class="btn btn-sm btn-ghost" title="Jump to next issue">Next &#8595;</button>
-                            <button type="button" id="tag-error-fix-btn" class="btn btn-sm btn-primary">Auto-Fix</button>
+                            <button type="button" id="tag-error-prev-btn" class="btn btn-xs btn-ghost" title="Jump to previous issue" aria-label="Previous issue"><span class="ms ms-16" aria-hidden="true">keyboard_arrow_up</span></button>
+                            <button type="button" id="tag-error-next-btn" class="btn btn-xs btn-ghost" title="Jump to next issue" aria-label="Next issue"><span class="ms ms-16" aria-hidden="true">keyboard_arrow_down</span></button>
+                            <button type="button" id="tag-error-fix-btn" class="btn btn-xs btn-primary" title="Close or repair unbalanced tags automatically">Auto-fix</button>
                         </div>
                     </div>
                     <div id="gemini-progress" class="gemini-progress" style="display: none;">
                         <div class="progress-label">
+                            <span class="ms ms-16 prep-strip-icon" aria-hidden="true">auto_fix_high</span>
                             <span id="gemini-progress-text">Preparing LLM request…</span>
                             <span id="gemini-progress-count"></span>
-                            <button id="gemini-pause-btn" class="btn btn-secondary btn-sm" style="margin-left:auto;padding:2px 10px;font-size:0.8rem;">Pause</button>
-                            <button id="gemini-abort-btn" class="btn btn-danger btn-sm" style="display:none;padding:2px 10px;font-size:0.8rem;">Abort</button>
+                            <span class="prep-strip-spacer"></span>
+                            <button id="gemini-pause-btn" class="btn btn-ghost btn-xs">Pause</button>
+                            <button id="gemini-abort-btn" class="btn btn-danger btn-xs" style="display:none;">Abort</button>
                         </div>
                         <div class="progress-bar">
                             <div id="gemini-progress-fill" class="progress-bar-fill"></div>
                         </div>
                     </div>
-                    <div id="gemini-resume-panel" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.4);border-radius:6px;">
-                        <span id="gemini-resume-label" style="font-size:0.88rem;margin-right:10px;"></span>
-                        <button id="gemini-resume-btn" class="btn btn-primary btn-sm">Resume</button>
-                        <button id="gemini-restart-btn" class="btn btn-secondary btn-sm" style="margin-left:6px;">Restart</button>
-                        <button id="gemini-abort-panel-btn" class="btn btn-danger btn-sm" style="margin-left:6px;">Abort</button>
+                    <div id="gemini-resume-panel" style="display:none;">
+                        <div class="prep-resume-inner">
+                            <span class="ms ms-16 prep-strip-icon" aria-hidden="true">pause_circle</span>
+                            <span id="gemini-resume-label"></span>
+                            <button id="gemini-resume-btn" class="btn btn-primary btn-xs">Resume</button>
+                            <button id="gemini-restart-btn" class="btn btn-ghost btn-xs">Restart</button>
+                            <button id="gemini-abort-panel-btn" class="btn btn-danger btn-xs">Abort</button>
+                        </div>
                     </div>
                 </div>
-                <div class="text-input-wrapper manuscript-editor" id="text-input-wrapper">
-                    <div class="manuscript-help" hidden>
-                        <p class="help-text">
-                            Enter your text below. Use speaker tags like <code>[narrator]text[/narrator]</code> or
-                            <code>[speaker1]text[/speaker1]</code> for multi-voice stories, or plain text for single voice.
-                            You can use any name: <code>[alice]</code>, <code>[bob]</code>, <code>[narrator]</code>, etc.
-                        </p>
-                    </div>
+                <div class="text-input-wrapper manuscript-editor" id="text-input-wrapper" data-view="raw">
+                    <div class="manuscript-script" id="manuscript-script-view" tabindex="-1" aria-label="Script view"></div>
                     <textarea
                         id="input-text"
-                        placeholder="[narrator]Once upon a time...[/narrator]&#10;[alice]Hello, I'm Alice![/alice]&#10;[bob]And I'm Bob![/bob]&#10;&#10;Or drag & drop documents here (Word, PDF, TXT, RTF, EPUB)"
+                        placeholder="Paste or type your manuscript…&#10;&#10;[narrator]Once upon a time…[/narrator]&#10;[alice]Hello, I'm Alice![/alice]"
                         rows="15"
+                        aria-label="Manuscript text"
                     ></textarea>
+                    <div class="manuscript-help">
+                        <p>
+                            Wrap each speaker's lines in tags such as <code>[narrator]…[/narrator]</code> or <code>[alice]…[/alice]</code>; any name works.
+                            Plain text without tags is read by a single voice.
+                        </p>
+                        <p>
+                            Drop Word, PDF, EPUB, RTF or text files here to load them, or use Prep text to tag a manuscript for you.
+                        </p>
+                        <p class="manuscript-help-links">
+                            <button type="button" class="btn-link" data-help-id="speaker-tags">Speaker tags guide</button>
+                            <button type="button" class="btn-link" data-help-id="input-text">Writing your manuscript</button>
+                            <button type="button" class="btn-link" data-help-id="prep-text">Prep text</button>
+                        </p>
+                    </div>
                     <div class="drop-overlay" id="drop-overlay">
                         <div class="drop-overlay-content">
-                            <span class="drop-icon">📄</span>
-                            <span>Drop document(s) to extract text</span>
+                            <span class="ms drop-icon" aria-hidden="true">upload_file</span>
+                            <span>Drop documents to append their text</span>
                         </div>
                     </div>
                 </div>
                 <div class="manuscript-footer">
                     <div class="manuscript-stats">
-                        <span class="manuscript-stat"><span class="stat-value" id="stat-speakers">0</span> speakers</span>
-                        <span class="manuscript-stat"><span class="stat-value" id="stat-chunks">0</span> chunks</span>
-                        <span class="manuscript-stat"><span class="stat-value" id="stat-words">0</span> words</span>
-                        <span class="manuscript-stat">≈ <span class="stat-value" id="stat-duration">0:00</span></span>
+                        <span class="manuscript-stat"><span class="stat-value" id="stat-speakers">0</span> <span class="stat-unit" data-unit="speaker">speakers</span></span>
+                        <span class="manuscript-stat"><span class="stat-value" id="stat-chunks">0</span> <span class="stat-unit" data-unit="chunk">chunks</span></span>
+                        <span class="manuscript-stat"><span class="stat-value" id="stat-words">0</span> <span class="stat-unit" data-unit="word">words</span></span>
+                        <span class="manuscript-stat" title="Estimated narration time">≈ <span class="stat-value" id="stat-duration">0:00</span></span>
                         <button type="button" class="help-icon" data-help-id="text-statistics" aria-label="Help: Text Statistics">?</button>
                     </div>
                     <span class="manuscript-footer-spacer"></span>
-                    <div id="chapter-detection-info" class="help-text" style="display: none; margin-top: 10px;"></div>
+                    <div id="chapter-detection-info" class="manuscript-sections-info" style="display: none;"></div>
                 </div>
             </section>
 
@@ -204,14 +228,14 @@
                         </div>
                     </section>
 
-                    <section class="output-section">
+                    <section class="output-section" aria-labelledby="output-section-title">
                         <div class="aside-section-header">
-                            <h3 class="panel-title">Output</h3>
+                            <h3 class="panel-title" id="output-section-title">Output</h3>
                             <button type="button" class="help-icon" data-help-id="generation-options" aria-label="Help: Generation Options">?</button>
                         </div>
-                        <div class="form-group">
-                            <label for="job-tts-engine">Engine</label>
-                            <select id="job-tts-engine">
+                        <div class="output-grid">
+                            <label class="output-label" for="job-tts-engine">Engine</label>
+                            <select id="job-tts-engine" class="output-select">
                                 <option value="kokoro">Kokoro · Local GPU</option>
                                 <option value="kokoro_replicate">Kokoro · Replicate</option>
                                 <option value="chatterbox_turbo_local">Chatterbox · Local GPU</option>
@@ -236,95 +260,89 @@
                                 <option value="localai_tts">LocalAI TTS · Self-hosted</option>
                                 <option value="breeze_api">Breeze API · Hosted</option>
                             </select>
-                        </div>
-                        <div class="format-controls-row">
-                            <div class="compact-field" id="job-output-format-wrapper">
-                                <label for="job-output-format">Format</label>
-                                <select id="job-output-format" class="select-compact">
-                                    <option value="mp3">MP3</option>
-                                    <option value="wav">WAV</option>
-                                    <option value="ogg">OGG</option>
-                                </select>
+                            <span class="output-label">Format</span>
+                            <div class="format-controls-row">
+                                <div class="compact-field" id="job-output-format-wrapper">
+                                    <select id="job-output-format" class="output-select" aria-label="Output format">
+                                        <option value="mp3">MP3</option>
+                                        <option value="wav">WAV</option>
+                                        <option value="ogg">OGG</option>
+                                    </select>
+                                </div>
+                                <div class="compact-field bitrate-field" id="job-output-bitrate-wrapper" title="MP3 bitrate">
+                                    <select id="job-output-bitrate" class="output-select" aria-label="MP3 bitrate">
+                                        <option value="64">64 kbps</option>
+                                        <option value="96">96 kbps</option>
+                                        <option value="128">128 kbps</option>
+                                        <option value="160">160 kbps</option>
+                                        <option value="192">192 kbps</option>
+                                        <option value="224">224 kbps</option>
+                                        <option value="256">256 kbps</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="compact-field bitrate-field" id="job-output-bitrate-wrapper">
-                                <label for="job-output-bitrate">MP3 Bitrate</label>
-                                <select id="job-output-bitrate" class="select-compact">
-                                    <option value="64">64 kbps</option>
-                                    <option value="96">96 kbps</option>
-                                    <option value="128">128 kbps</option>
-                                    <option value="160">160 kbps</option>
-                                    <option value="192">192 kbps</option>
-                                    <option value="224">224 kbps</option>
-                                    <option value="256">256 kbps</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="acx-compliance-row" style="margin-top: 8px;">
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;" title="Enforces ACX audiobook standards on export: MP3 192kbps CBR, 44.1kHz, loudness normalized to -19dB integrated (ACX range: -23 to -18dB), true peak ≤ -3dBTP">
-                                <input type="checkbox" id="acx-compliance-checkbox">
-                                ACX Compliant Output
+                            <span class="output-label">ACX</span>
+                            <label class="acx-toggle" title="ACX compliant output: enforces ACX audiobook standards on export (MP3 192 kbps CBR, 44.1 kHz, loudness normalized to −19 LUFS integrated within the ACX range of −23 to −18, true peak ≤ −3 dBTP).">
+                                <input type="checkbox" id="acx-compliance-checkbox" class="switch" aria-label="ACX compliant output">
+                                <span class="acx-caption">192&nbsp;kbps&nbsp;· −19&nbsp;LUFS&nbsp;· peak&nbsp;−3&nbsp;dBTP</span>
                             </label>
-                            <p class="help-text" style="margin: 3px 0 0 24px; font-size: 11px;">MP3 192kbps · 44.1kHz · loudnorm -19dB · peak ≤ -3dBTP</p>
                         </div>
                     </section>
 
-                    <section class="chapters-section">
+                    <section class="chapters-section" aria-labelledby="chapters-section-title">
                         <div class="aside-section-header">
-                            <h3 class="panel-title">Chapters</h3>
-                            <button type="button" id="review-sections-btn" class="btn btn-secondary btn-sm" disabled>
-                                Review detected sections
-                            </button>
+                            <h3 class="panel-title" id="chapters-section-title">Chapters</h3>
+                            <button type="button" class="help-icon" data-help-id="chapters-and-sections" aria-label="Help: Chapters and Sections">?</button>
+                            <span class="aside-section-spacer"></span>
+                            <button type="button" id="review-sections-btn" class="btn-link review-sections-link" disabled>Review sections</button>
                         </div>
-                        <label style="display: flex; align-items: center; gap: 10px; font-size: 15px;">
-                            <input type="checkbox" id="split-chapters-checkbox" checked>
-                            Intelligently create separate audio files for each book, chapter, or section
+                        <label class="toggle-row chapters-switch-row">
+                            <span>Separate file per chapter</span>
+                            <input type="checkbox" id="split-chapters-checkbox" class="switch" checked>
                         </label>
                         <div id="full-story-option" class="chapter-sub-option" style="display: none;">
-                            <label>
-                                <input type="checkbox" id="full-story-checkbox" checked>
-                                Also create a single full-length audiobook after section exports
+                            <label class="toggle-row chapters-switch-row" title="Keeps the per-chapter files and adds one combined, full-length audiobook to the library.">
+                                <span>Also build full story</span>
+                                <input type="checkbox" id="full-story-checkbox" class="switch" checked>
                             </label>
-                            <p class="help-text" style="margin-top: 6px;">
-                                When enabled, TTS-Story keeps the per-chapter files and adds one combined file to the library.
-                            </p>
                         </div>
-                        <p id="chapter-detection-hint" class="help-text" style="margin-top: 8px; margin-bottom: 0;">
-                            Sections not analyzed yet.
-                        </p>
-                        <div class="chapter-custom-heading" style="margin-top: 10px;">
-                            <label>Section headings to detect</label>
-                            <div id="default-heading-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
-                                <!-- Default heading chips will be generated by JavaScript -->
-                            </div>
-                            <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
-                                <input type="text" id="custom-heading-input" placeholder="Add custom heading (e.g., Episode, Volume)" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border-color, #4a5568); border-radius: 4px; background: var(--bg-color, #1a202c); color: var(--text-color, #e2e8f0);">
-                                <button type="button" id="add-custom-heading-btn" style="padding: 6px 12px; border: 1px solid var(--primary-color, #6366f1); background: var(--primary-color, #6366f1); color: var(--st-accent-ink); border-radius: 4px; cursor: pointer;">Add</button>
-                            </div>
-                            <div id="custom-heading-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
-                                <!-- Custom heading chips will be generated by JavaScript -->
-                            </div>
-                            <p class="help-text" style="margin-top: 6px;">
-                                Toggle default headings on/off. Add custom headings to detect additional section markers.
-                            </p>
+                        <p id="chapter-detection-hint" class="chapter-hint">Sections not analyzed yet.</p>
+                        <div class="heading-chips-row" title="Lines that start with an enabled heading word begin a new section. Click a heading to turn it on or off.">
+                            <span class="heading-chips-label">Headings</span>
+                            <div id="default-heading-chips" class="heading-chips"></div>
+                            <div id="custom-heading-chips" class="heading-chips"></div>
+                            <button type="button" class="heading-chip heading-chip-add" id="heading-chip-add-btn" aria-expanded="false" aria-controls="custom-heading-form">+ Add</button>
                         </div>
-                        <p class="help-text" style="margin-top: 6px;">
-                            Need a deliberate pause? Use <code>***</code> for 0.25 seconds of silence or <code>******</code> for 0.5 seconds. Put the marker on its own line or directly after punctuation, such as <code>The room fell silent.***</code>
+                        <div class="custom-heading-form" id="custom-heading-form" hidden>
+                            <input type="text" id="custom-heading-input" class="input-sm" placeholder="Custom heading, e.g. Episode" aria-label="Custom section heading">
+                            <button type="button" id="add-custom-heading-btn" class="btn btn-secondary btn-sm">Add</button>
+                        </div>
+                        <p class="pause-hint" title="Put a marker on its own line or directly after punctuation, for example: The room fell silent.***">
+                            Pause markers: <code>***</code> 0.25 s · <code>******</code> 0.5 s
                         </p>
                     </section>
                 </div>
 
                 <div class="generate-aside-footer">
-                    <div id="generate-pending-review" class="generate-pending-review" hidden></div>
-                    <button id="generate-btn" class="btn btn-primary btn-large">🎙️ Generate Audio</button>
-                    <div id="queue-indicator" class="queue-indicator" style="display: none;">
-                        0 processing, 0 queued
+                    <button type="button" id="generate-pending-review" class="generate-pending-review" hidden>
+                        <span class="ms ms-16" aria-hidden="true">info</span><span class="generate-pending-text"></span>
+                    </button>
+                    <button id="generate-btn" class="btn btn-primary btn-large generate-audio-btn"><span class="ms" aria-hidden="true">graphic_eq</span>Generate audio</button>
+                    <div class="generate-queue-line" data-state="idle">
+                        <span id="queue-indicator" class="queue-summary" role="status">Queue is empty</span>
+                        <button type="button" class="generate-view-queue" id="generate-view-queue-btn">View queue</button>
                     </div>
-                    <div id="latest-audio-container" class="section" style="margin-top: 20px; display: none;">
-                        <h2>Latest Audio</h2>
-                        <p id="latest-audio-label" class="help-text">
-                            Most recently completed job.
-                        </p>
-                        <audio id="latest-audio-player" controls style="width: 100%; max-width: 600px;"></audio>
+                    <div id="latest-audio-container" class="latest-audio" style="display: none;">
+                        <div class="latest-audio-row">
+                            <button type="button" class="btn-circle latest-audio-play" id="latest-audio-play-btn" aria-label="Play the latest audio"><span class="ms" aria-hidden="true">play_arrow</span></button>
+                            <div class="latest-audio-text">
+                                <span class="latest-audio-kicker">Latest audio</span>
+                                <span id="latest-audio-label" class="latest-audio-label">Most recently completed job.</span>
+                            </div>
+                            <span class="latest-audio-time" id="latest-audio-time"></span>
+                        </div>
+                        <input type="range" class="latest-audio-seek" id="latest-audio-seek" min="0" max="1000" value="0" step="1" aria-label="Seek in the latest audio">
+                        <audio id="latest-audio-player" preload="metadata"></audio>
                     </div>
                 </div>
             </aside>
@@ -2676,8 +2694,8 @@
     <div class="modal-overlay hidden" id="section-review-modal-overlay">
         <div class="modal hidden" id="section-review-modal" style="max-width: 900px; width: 95%;">
             <div class="modal-header">
-                <h3 id="section-review-modal-title">Detected Sections</h3>
-                <button class="modal-close" id="section-review-modal-close">&times;</button>
+                <h3 id="section-review-modal-title">Detected sections</h3>
+                <button class="modal-close" id="section-review-modal-close" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body" id="section-review-modal-body">
                 <div class="section-review-loading">Loading sections...</div>
@@ -2691,8 +2709,8 @@
     <div class="modal-overlay hidden" id="section-edit-modal-overlay">
         <div class="modal hidden" id="section-edit-modal" style="max-width: 520px; width: 95%;">
             <div class="modal-header">
-                <h3 id="section-edit-modal-title">Edit Section Heading</h3>
-                <button class="modal-close" id="section-edit-modal-close">&times;</button>
+                <h3 id="section-edit-modal-title">Edit section heading</h3>
+                <button class="modal-close" id="section-edit-modal-close" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="section-edit-note" id="section-edit-original"></div>
@@ -2834,34 +2852,34 @@
         <div class="modal hidden" id="alt-word-registry-modal" style="max-width: 760px; width: 95%;">
             <div class="modal-header">
                 <div class="section-title-inline">
-                    <h3>🔤 Alt Word Registry</h3>
+                    <h3>Alt word registry</h3>
                     <button type="button" class="help-icon" data-help-id="alt-word-registry" aria-label="Help: Alternate Word Registry">?</button>
                 </div>
-                <button class="modal-close" id="alt-word-registry-close">&times;</button>
+                <button class="modal-close" id="alt-word-registry-close" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="awr-description">
-                    Words listed here will be substituted in each text chunk before it is sent to the TTS engine.
-                    Use this to replace words the engine mispronounces with phonetic alternatives.
+                    Words listed here are substituted in each text chunk before it is sent to the TTS engine.
+                    Use it to replace words the engine mispronounces with phonetic spellings.
                 </p>
                 <div class="awr-toolbar">
-                    <button class="btn btn-primary btn-sm" id="awr-add-btn">＋ Add Entry</button>
-                    <button class="btn btn-secondary btn-sm" id="awr-clear-btn">🗑 Clear All</button>
+                    <button class="btn btn-primary btn-sm" id="awr-add-btn" data-icon="add">Add entry</button>
+                    <button class="btn btn-ghost btn-sm" id="awr-clear-btn">Clear all</button>
                     <span class="awr-count-label" id="awr-count-label"></span>
                 </div>
                 <div class="awr-table-wrapper">
                     <table class="awr-table" id="awr-table">
                         <thead>
                             <tr>
-                                <th>Original Word / Phrase</th>
+                                <th>Original word or phrase</th>
                                 <th>Replacement</th>
-                                <th>Instances in Text</th>
+                                <th>In text</th>
                                 <th></th>
                             </tr>
                         </thead>
                         <tbody id="awr-table-body">
                             <tr id="awr-empty-row">
-                                <td colspan="4" class="awr-empty">No entries yet. Click <strong>＋ Add Entry</strong> to get started.</td>
+                                <td colspan="4" class="awr-empty">No entries yet. Click <strong>Add entry</strong> to get started.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -2877,8 +2895,8 @@
     <div class="modal-overlay hidden" id="awr-entry-overlay" style="z-index: 1500;">
         <div class="modal hidden" id="awr-entry-modal" style="max-width: 520px; width: 95%; z-index: 1501;">
             <div class="modal-header">
-                <h3 id="awr-entry-title">Add Alt Word Entry</h3>
-                <button class="modal-close" id="awr-entry-close">&times;</button>
+                <h3 id="awr-entry-title">Add alt word entry</h3>
+                <button class="modal-close" id="awr-entry-close" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="awr-entry-fields">
@@ -2893,7 +2911,7 @@
                     <div class="awr-preview-section">
                         <div class="awr-preview-row">
                             <div class="awr-preview-field">
-                                <label class="awr-label" for="awr-preview-engine">TTS Engine</label>
+                                <label class="awr-label" for="awr-preview-engine">TTS engine</label>
                                 <select id="awr-preview-engine" class="awr-select">
                                     <option value="kokoro">Kokoro · Local</option>
                                     <option value="kokoro_replicate">Kokoro · Replicate</option>
@@ -2928,8 +2946,8 @@
                             </div>
                         </div>
                         <div class="awr-preview-buttons">
-                            <button class="btn btn-sm btn-secondary" id="awr-play-original" disabled>▶ Play Original</button>
-                            <button class="btn btn-sm btn-secondary" id="awr-play-replacement" disabled>▶ Play Replacement</button>
+                            <button class="btn btn-sm btn-secondary" id="awr-play-original" data-icon="play_arrow" disabled>Play original</button>
+                            <button class="btn btn-sm btn-secondary" id="awr-play-replacement" data-icon="play_arrow" disabled>Play replacement</button>
                             <span class="awr-preview-status" id="awr-preview-status"></span>
                         </div>
                     </div>
