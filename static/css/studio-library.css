@@ -632,9 +632,15 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    min-height: 46px;
-    padding: 10px 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--st-border);
+}
+
+/* Header buttons keep their 26-28px hit area without making the row taller than the
+   design's 12px + text + 12px. */
+#chunk-review-modal .library-review-head > button {
+    margin-top: -5px;
+    margin-bottom: -5px;
 }
 
 #chunk-review-modal .library-review-title {
@@ -747,6 +753,10 @@
     font-size: 12px;
 }
 
+#chunk-review-modal .library-review-foot .btn {
+    font-size: 13px;
+}
+
 #chunk-review-modal .library-review-recompile.btn {
     padding: 0 14px;
     font-weight: 500;
@@ -757,37 +767,81 @@
     color: var(--st-text-muted);
 }
 
-/* Custom checkboxes (speaker selection, select all) */
+/* Custom checkboxes (speaker selection, select all): the design's 19px Material
+   check_box / check_box_outline_blank glyph, #6f685e idle and amber when ticked. */
 #chunk-review-modal .bulk-speaker-checkbox,
 #chunk-review-modal #chunk-review-select-all {
     -webkit-appearance: none;
     appearance: none;
+    display: inline-flex;
     flex: none;
-    width: 16px;
-    height: 16px;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
     margin: 0;
-    border: 1.5px solid var(--st-text-faint);
-    border-radius: 3px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
     background: transparent;
+    color: var(--st-text-faint);
+    vertical-align: middle;
     cursor: pointer;
-    transition: background-color 0.12s ease, border-color 0.12s ease;
+    transition: color 0.12s ease;
+}
+
+#chunk-review-modal .bulk-speaker-checkbox::before,
+#chunk-review-modal #chunk-review-select-all::before {
+    content: 'check_box_outline_blank';
+    display: block;
+    width: 1em;
+    height: 1em;
+    overflow: hidden;
+    font-family: var(--st-font-icon);
+    font-size: 19px;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    -webkit-font-smoothing: antialiased;
 }
 
 #chunk-review-modal .bulk-speaker-checkbox:hover,
 #chunk-review-modal #chunk-review-select-all:hover {
-    border-color: var(--st-text-3);
+    color: var(--st-text-3);
 }
 
 #chunk-review-modal .bulk-speaker-checkbox:checked,
-#chunk-review-modal #chunk-review-select-all:checked {
-    border-color: var(--st-accent);
-    background: var(--st-accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.6 8.3l2.9 2.9 5.9-6.3' fill='none' stroke='%231b1916' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 13px 13px no-repeat;
+#chunk-review-modal #chunk-review-select-all:checked,
+#chunk-review-modal #chunk-review-select-all:indeterminate {
+    color: var(--st-accent);
+}
+
+#chunk-review-modal .bulk-speaker-checkbox:checked::before,
+#chunk-review-modal #chunk-review-select-all:checked::before {
+    content: 'check_box';
+}
+
+#chunk-review-modal #chunk-review-select-all:indeterminate::before {
+    content: 'indeterminate_check_box';
+}
+
+#chunk-review-modal .bulk-speaker-checkbox:disabled,
+#chunk-review-modal #chunk-review-select-all:disabled {
+    color: var(--st-text-ghost);
+    cursor: not-allowed;
 }
 
 #chunk-review-modal .bulk-speaker-checkbox:focus-visible,
 #chunk-review-modal #chunk-review-select-all:focus-visible {
     outline: 2px solid rgba(226, 160, 79, 0.7);
-    outline-offset: 2px;
+    outline-offset: 0;
 }
 
 /* ---- Regeneration progress strip -------------------------------------- */
@@ -930,7 +984,7 @@
 }
 
 #chunk-review-modal .bulk-speaker-summary .bulk-speaker-checkbox {
-    margin-left: 2px;
+    margin-left: 0;
 }
 
 #chunk-review-modal .bulk-speaker-dot {
@@ -1521,6 +1575,39 @@
     white-space: nowrap;
 }
 
+#chunk-review-modal .library-chunk-main {
+    min-width: 0;
+}
+
+/* Status chips (Queued / Rendering / Failed / Updated / Refresh needed) live under the
+   text, so the duration and action columns keep the same x on every row. */
+#chunk-review-modal .library-chunk-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+#chunk-review-modal .library-chunk-status:empty {
+    display: none;
+}
+
+#chunk-review-modal .library-chunk-status .review-chip.warning {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+#chunk-review-modal .library-chunk-status .review-chip.warning::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: library-spin 0.8s linear infinite;
+}
+
 #chunk-review-modal .library-chunk-preview {
     display: -webkit-box;
     flex: initial;
@@ -1568,6 +1655,16 @@
     border-color: var(--st-border-strong);
     background: var(--st-raised);
     color: var(--st-text-strong);
+}
+
+/* Same width idle and busy ("Queued…", "Rendering…") so rows stay aligned: the busy
+   label fits the idle width, and the activity spinner moves to the row's status chip. */
+#chunk-review-modal .library-chunk-regen.btn {
+    min-width: 88px;
+}
+
+#chunk-review-modal .library-chunk-regen.is-loading::after {
+    display: none;
 }
 
 #chunk-review-modal .library-chunk-regen.is-loading {
@@ -2081,7 +2178,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    #refresh-library-btn.is-loading > .ms {
+    #refresh-library-btn.is-loading > .ms,
+    #chunk-review-modal .library-chunk-status .review-chip.warning::before {
         animation: none;
     }
 }

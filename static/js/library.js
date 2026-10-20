@@ -880,7 +880,7 @@ function formatSectionLabel(section, fallbackLabel) {
 // Chapter rows of an expanded production. The "Full story" (or single-file) row carries
 // .chapter-review-all and its data-full-story-* attributes; it reviews the whole production.
 function renderChapterControls(item) {
-    const jobIdAttr = escapeHtml(String(item.job_id || ''));
+    const jobIdAttr = libraryEscapeAttr(item.job_id || '');
     const sections = (item.book_mode && item.books?.length ? item.books : item.chapters) || [];
     const fallbackLabel = item.book_mode ? 'Book' : 'Chapter';
     const canReview = Boolean(item.has_chunks);
@@ -901,14 +901,14 @@ function renderChapterControls(item) {
         // Single output: one row for the whole production.
         const only = sections[0] || null;
         const onlyTitle = only ? formatSectionLabel(only, fallbackLabel) : '';
-        const label = escapeHtml(item.chapter_mode && onlyTitle && onlyTitle !== 'Full Story' ? onlyTitle : 'Single file');
+        const label = libraryEscapeAttr(item.chapter_mode && onlyTitle && onlyTitle !== 'Full Story' ? onlyTitle : 'Single file');
         const src = item.full_story?.output_file || only?.output_file || item.output_file || '';
         const path = item.full_story?.relative_path || only?.relative_path || item.relative_path || '';
         const duration = item.full_story?.duration_seconds ?? only?.duration_seconds ?? item.duration_seconds;
         return `
             <div class="library-chapters" data-job-id="${jobIdAttr}">
                 <div class="library-chapter is-full is-single" data-review-key="__full__">
-                    <div class="library-chapter-row chapter-review-all" data-review-all="true" data-job-id="${jobIdAttr}" data-full-story-src="${item.full_story?.output_file || ''}" data-full-story-path="${item.full_story?.relative_path || ''}" data-src="${escapeHtml(src)}" data-relative-path="${escapeHtml(path)}">
+                    <div class="library-chapter-row chapter-review-all" data-review-all="true" data-job-id="${jobIdAttr}" data-full-story-src="${item.full_story?.output_file || ''}" data-full-story-path="${item.full_story?.relative_path || ''}" data-src="${libraryEscapeAttr(src)}" data-relative-path="${libraryEscapeAttr(path)}">
                         <span class="library-chapter-num"></span>
                         <div class="library-chapter-name"><span class="library-chapter-title">${label}</span></div>
                         <span class="library-chapter-dur">${formatLibraryDuration(duration)}</span>
@@ -920,11 +920,14 @@ function renderChapterControls(item) {
     }
 
     const rows = sections.map((section, idx) => {
-        const label = escapeHtml(formatSectionLabel(section, fallbackLabel));
-        const position = Number.isInteger(section.position) ? section.position : idx;
+        // Labels go into text and attributes (aria-label, title), so escape quotes too.
+        const label = libraryEscapeAttr(formatSectionLabel(section, fallbackLabel));
+        // Only rows that map to metadata["chapters"] can be renamed (the listing sends
+        // position null for book rows and for chapters known only from the review manifest).
+        const position = !item.book_mode && Number.isInteger(section.position) ? section.position : '';
         return `
-            <div class="library-chapter${section.missing_file ? ' is-missing' : ''}" data-review-key="${escapeHtml(section.relative_path || `row-${idx}`)}">
-                <div class="library-chapter-row" data-job-id="${jobIdAttr}" data-relative-path="${escapeHtml(section.relative_path || '')}" data-src="${escapeHtml(section.output_file || '')}" data-index="${escapeHtml(String(section.index ?? (idx + 1)))}" data-position="${position}" data-row-index="${idx}">
+            <div class="library-chapter${section.missing_file ? ' is-missing' : ''}" data-review-key="${libraryEscapeAttr(section.relative_path || `row-${idx}`)}">
+                <div class="library-chapter-row" data-job-id="${jobIdAttr}" data-relative-path="${libraryEscapeAttr(section.relative_path || '')}" data-src="${libraryEscapeAttr(section.output_file || '')}" data-index="${libraryEscapeAttr(section.index ?? (idx + 1))}" data-position="${position}" data-row-index="${idx}">
                     <span class="library-chapter-num">${String(idx + 1).padStart(2, '0')}</span>
                     <div class="library-chapter-name">
                         <span class="library-chapter-title" title="${label}">${label}</span>
@@ -1050,7 +1053,7 @@ function renderLibraryPage(items) {
         const itemCard = document.createElement('div');
         itemCard.className = 'library-item';
         itemCard.dataset.jobId = item.job_id;
-        const jobIdAttr = escapeHtml(String(item.job_id || ''));
+        const jobIdAttr = libraryEscapeAttr(item.job_id || '');
 
         const createdDate = new Date(item.created_at);
         const formattedDate = Number.isNaN(createdDate.getTime())
@@ -1082,7 +1085,7 @@ function renderLibraryPage(items) {
 
         itemCard.innerHTML = `
             <div class="library-item-header library-item-summary" data-job-id="${jobIdAttr}">
-                <div class="library-item-controls" data-job-id="${jobIdAttr}" data-full-story-src="${item.full_story ? item.full_story.output_file : ''}" data-full-story-path="${item.full_story ? item.full_story.relative_path : ''}">
+                <div class="library-item-controls" data-job-id="${jobIdAttr}" data-full-story-src="${libraryEscapeAttr(item.full_story ? item.full_story.output_file : '')}" data-full-story-path="${libraryEscapeAttr(item.full_story ? item.full_story.relative_path : '')}">
                     <button type="button" class="library-item-control-btn library-item-play" data-job-id="${jobIdAttr}" data-state="stopped" aria-label="Play"></button>
                 </div>
                 <div class="library-item-info">
@@ -1410,13 +1413,17 @@ function renderLibraryPage(items) {
                 const rowMore = row.querySelector('.library-chapter-more');
                 rowMore?.addEventListener('click', (event) => {
                     event.stopPropagation();
-                    const position = Number(row.getAttribute('data-position'));
+                    // data-position is the chapter's index in metadata["chapters"] (what the rename
+                    // route addresses). It is empty for book rows and manifest-only chapters, which
+                    // that route cannot rename, so those rows offer no Rename entry.
+                    const positionAttr = row.getAttribute('data-position');
+                    const position = positionAttr === null || positionAttr === '' ? NaN : Number(positionAttr);
                     openLibraryMenu(rowMore, [
-                        {
+                        Number.isInteger(position) ? {
                             icon: 'edit',
-                            label: item.book_mode ? 'Rename book' : 'Rename chapter',
-                            onClick: () => openChapterRenameModal(jobId, Number.isFinite(position) ? position : 0, rowTitle)
-                        },
+                            label: 'Rename chapter',
+                            onClick: () => openChapterRenameModal(jobId, position, rowTitle)
+                        } : null,
                         {
                             icon: 'download',
                             label: item.book_mode ? 'Download book' : 'Download chapter',
@@ -1917,7 +1924,7 @@ function openChapterRenameModal(jobId, chapterIndex, currentTitle) {
             <div class="library-dialog-body">
                 <label class="field">
                     <span class="field-label">Chapter title</span>
-                    <input type="text" id="chapter-title" value="${escapeHtml(currentTitle)}">
+                    <input type="text" id="chapter-title">
                 </label>
             </div>
             <div class="library-dialog-footer">
@@ -1928,6 +1935,8 @@ function openChapterRenameModal(jobId, chapterIndex, currentTitle) {
     `;
 
     document.body.appendChild(modal);
+    const titleInput = modal.querySelector('#chapter-title');
+    if (titleInput) titleInput.value = currentTitle || '';
 
     const closeModal = () => {
         modal.remove();
@@ -2007,21 +2016,21 @@ async function openAudiobookMetadataModal(jobId) {
             <div class="library-dialog-body">
                 <label class="field">
                     <span class="field-label">Title</span>
-                    <input type="text" id="metadata-title" value="${escapeHtml(existingMetadata.title)}">
+                    <input type="text" id="metadata-title" value="${libraryEscapeAttr(existingMetadata.title)}">
                 </label>
                 <div class="library-dialog-grid">
                     <label class="field">
                         <span class="field-label">Author</span>
-                        <input type="text" id="metadata-author" value="${escapeHtml(existingMetadata.author)}">
+                        <input type="text" id="metadata-author" value="${libraryEscapeAttr(existingMetadata.author)}">
                     </label>
                     <label class="field">
                         <span class="field-label">Genre</span>
-                        <input type="text" id="metadata-genre" value="${escapeHtml(existingMetadata.genre)}">
+                        <input type="text" id="metadata-genre" value="${libraryEscapeAttr(existingMetadata.genre)}">
                     </label>
                 </div>
                 <label class="field library-dialog-year">
                     <span class="field-label">Year</span>
-                    <input type="text" id="metadata-year" value="${escapeHtml(existingMetadata.year)}">
+                    <input type="text" id="metadata-year" value="${libraryEscapeAttr(existingMetadata.year)}">
                 </label>
                 <label class="field">
                     <span class="field-label">Description</span>
@@ -2363,7 +2372,7 @@ function renderChunkReviewModal(data) {
     const speakerRows = Array.from(speakerMap.entries()).map(([speaker, info]) => {
         const speakerInstruction = speakerInstructionMap.get(speaker) || '';
         const profile = speakerProfileMap.get(speaker) || {};
-        const speakerAttr = escapeHtml(speaker);
+        const speakerAttr = libraryEscapeAttr(speaker);
         const color = librarySpeakerColor(speaker, libraryReviewSpeakerOrder);
         return `
         <div class="bulk-speaker-card" data-speaker="${speakerAttr}" style="--spk-color: ${color};">
@@ -2371,7 +2380,7 @@ function renderChunkReviewModal(data) {
                 <input type="checkbox" class="bulk-speaker-checkbox" data-speaker="${speakerAttr}" aria-label="Select ${speakerAttr} to regenerate">
                 <span class="bulk-speaker-dot" aria-hidden="true"></span>
                 <span class="bulk-speaker-who"><span class="bulk-speaker-name">${speakerAttr}</span> <span class="bulk-speaker-count">· ${info.count} ${info.count === 1 ? 'chunk' : 'chunks'}</span></span>
-                <span class="bulk-speaker-voice" data-current-voice="${escapeHtml(info.voiceLabel)}">${escapeHtml(info.voiceLabel)}</span>
+                <span class="bulk-speaker-voice" data-current-voice="${libraryEscapeAttr(info.voiceLabel)}">${escapeHtml(info.voiceLabel)}</span>
                 <button type="button" class="bulk-expand-toggle" aria-label="Voice, effects and profile for ${speakerAttr}"></button>
             </div>
             <div class="bulk-speaker-details collapsed" data-speaker="${speakerAttr}">
@@ -2422,7 +2431,7 @@ function renderChunkReviewModal(data) {
                                 <div class="bulk-regen-field bulk-regen-field-wide">
                                     <label>Custom instruction (optional)</label>
                                     <input type="text" class="bulk-qwen3-instruct" data-speaker="${speakerAttr}"
-                                           value="${escapeHtml(speakerInstruction)}"
+                                           value="${libraryEscapeAttr(speakerInstruction)}"
                                            placeholder="e.g., Speak with excitement" />
                                 </div>
                             </div>
@@ -2515,7 +2524,7 @@ function renderChunkReviewModal(data) {
         return `
             <div class="chapter-section" data-chapter-index="${chapterIdx}">
                 <div class="chapter-header" data-chapter-index="${chapterIdx}" aria-expanded="false">
-                    <button type="button" class="chapter-toggle" aria-label="Show or hide the chunks of ${escapeHtml(chapterTitle)}"></button>
+                    <button type="button" class="chapter-toggle" aria-label="Show or hide the chunks of ${libraryEscapeAttr(chapterTitle)}"></button>
                     <span class="chapter-title">${escapeHtml(chapterTitle)}</span>
                     <span class="chapter-chunk-count">${chapterChunks.length} ${chapterChunks.length === 1 ? 'chunk' : 'chunks'}</span>
                     <button class="btn btn-xs btn-ghost chapter-rebuild-btn" data-chapter-index="${chapterIdx}" type="button" title="Rebuild this chapter's audio file from its current chunks">
@@ -2545,7 +2554,7 @@ function renderChunkReviewModal(data) {
             return `
                 <div class="book-section" data-book-index="${bookIdx}">
                     <div class="book-header" data-book-index="${bookIdx}" aria-expanded="false">
-                        <button type="button" class="book-toggle" aria-label="Show or hide the chapters of ${escapeHtml(bookTitle)}"></button>
+                        <button type="button" class="book-toggle" aria-label="Show or hide the chapters of ${libraryEscapeAttr(bookTitle)}"></button>
                         <span class="book-title">${escapeHtml(bookTitle)}</span>
                         <span class="book-chapter-count">${bookChapters.length} ${bookChapters.length === 1 ? 'chapter' : 'chapters'}</span>
                     </div>
@@ -2841,20 +2850,23 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
 
     // Speaker label, colored like the rest of the app (production speaker order)
     const speakerColor = librarySpeakerColor(speaker || 'default', libraryReviewSpeakerOrder);
-    const speakerTag = `<span class="library-chunk-speaker" title="${escapeHtml(speaker || 'default')}">${escapeHtml(speaker || 'default')}</span>`;
+    const speakerTag = `<span class="library-chunk-speaker" title="${libraryEscapeAttr(speaker || 'default')}">${escapeHtml(speaker || 'default')}</span>`;
     const durationLabel = formatLibraryDuration(chunk.duration_seconds);
 
-    // Full text; CSS clamps it while the row is closed.
+    // Full text; CSS clamps it while the row is closed. Status chips sit in their own slot under
+    // the text so the duration and action columns stay aligned across rows.
     return `
         <div class="library-chunk-card" data-chunk-id="${chunkId}" data-idx="${idx}" style="--spk-color: ${speakerColor};">
             <div class="library-chunk-summary" data-chunk-id="${chunkId}">
                 <button type="button" class="library-chunk-play" data-audio-url="${audioUrl}" aria-label="Play chunk" ${audioUrl ? '' : 'disabled'}>▶</button>
                 ${speakerTag}
-                <span class="library-chunk-preview">${escapeHtml(text)}</span>
+                <div class="library-chunk-main">
+                    <span class="library-chunk-preview">${escapeHtml(text)}</span>
+                    <span class="library-chunk-status">${statusBadge}</span>
+                </div>
                 <span class="library-chunk-duration">${durationLabel}</span>
                 <div class="library-chunk-actions">
                     <span class="chunk-expand-toggle" aria-hidden="true"></span>
-                    ${statusBadge}
                     <button type="button" class="btn btn-ghost btn-xs library-chunk-edit" aria-expanded="false">Edit</button>
                     <button type="button" class="btn btn-ghost btn-xs library-chunk-regen" data-chunk-id="${chunkId}">Regenerate</button>
                 </div>
@@ -2863,12 +2875,12 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                 <div class="chunk-detail-section chunk-text-col">
                     <div class="chunk-detail-label">Voice <span class="library-chunk-voice-label">${escapeHtml(voiceLabel)}</span></div>
                     <div class="chunk-text-section">
-                        <label for="chunk-direction-${escapeHtml(chunkId)}">Voice Direction:</label>
-                        <textarea id="chunk-direction-${escapeHtml(chunkId)}" class="library-chunk-direction" data-chunk-id="${chunkId}" rows="2" placeholder="e.g. Quietly controlled, with restrained tension.">${escapeHtml(getChunkDirection(chunk))}</textarea>
+                        <label for="chunk-direction-${libraryEscapeAttr(chunkId)}">Voice Direction:</label>
+                        <textarea id="chunk-direction-${libraryEscapeAttr(chunkId)}" class="library-chunk-direction" data-chunk-id="${chunkId}" rows="2" placeholder="e.g. Quietly controlled, with restrained tension.">${escapeHtml(getChunkDirection(chunk))}</textarea>
                         <small>Delivery guidance, not spoken text. Used by Breeze and other direction-capable engines. Enter instructions without tags; clear to remove the chunk direction. Saved when Regenerate succeeds.</small>
                         <div class="chunk-index-emotion-control" ${(chunk.engine || engine) === 'index_tts' ? '' : 'hidden'}>
-                            <label for="chunk-emotion-strength-${escapeHtml(chunkId)}">IndexTTS emotion strength:</label>
-                            <input id="chunk-emotion-strength-${escapeHtml(chunkId)}" class="chunk-index-emotion-strength" type="number" min="0" max="1" step="0.05" value="${Number(chunk.index_tts_emotion_strength ?? 0.6)}">
+                            <label for="chunk-emotion-strength-${libraryEscapeAttr(chunkId)}">IndexTTS emotion strength:</label>
+                            <input id="chunk-emotion-strength-${libraryEscapeAttr(chunkId)}" class="chunk-index-emotion-strength" type="number" min="0" max="1" step="0.05" value="${Number(chunk.index_tts_emotion_strength ?? 0.6)}">
                             <small>0 disables emotional guidance; 1 gives stronger emotion. Saved for this chunk when regeneration succeeds. Does not change global settings.</small>
                         </div>
                     </div>
@@ -2883,7 +2895,7 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                         <select class="library-chunk-engine-select" data-chunk-id="${chunkId}" aria-label="TTS engine for this chunk">
                             <option value="">-- Same engine --</option>
                         </select>
-                        <select class="library-chunk-voice-select" data-chunk-id="${chunkId}" data-current-voice-label="${escapeHtml(voiceLabel)}" aria-label="Voice for this chunk">
+                        <select class="library-chunk-voice-select" data-chunk-id="${chunkId}" data-current-voice-label="${libraryEscapeAttr(voiceLabel)}" aria-label="Voice for this chunk">
                             <option value="">${escapeHtml(currentVoiceLabel)}</option>
                         </select>
                     </div>
@@ -2909,7 +2921,7 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                                 <option value="Auto">Auto</option>
                             </select>
                             <input type="text" class="chunk-qwen3-instruct" data-chunk-id="${chunkId}" 
-                                   value="${escapeHtml(instruction)}"
+                                   value="${libraryEscapeAttr(instruction)}"
                                    placeholder="Custom instruction (optional)" />
                         </div>
                     </div>
@@ -2966,6 +2978,18 @@ function getChunkInstruction(chunk) {
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Attribute-safe escaping (& < > " '). At runtime the global escapeHtml can be another
+// script's copy that leaves quotes alone (voice-manager.js loads after this file), so every
+// value interpolated into an attribute uses this helper instead.
+function libraryEscapeAttr(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function handleLibraryChunkPlayClick(btn) {
@@ -5065,8 +5089,11 @@ function updateLibraryChunkStatus(chunkId, status) {
     }
 
     if (badge) {
+        const slot = summary.querySelector('.library-chunk-status');
         const toggle = summary.querySelector('.chunk-expand-toggle');
-        if (toggle) {
+        if (slot) {
+            slot.insertAdjacentHTML('beforeend', badge);
+        } else if (toggle) {
             toggle.insertAdjacentHTML('afterend', badge);
         }
     }

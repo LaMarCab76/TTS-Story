@@ -11604,8 +11604,9 @@ def _build_library_listing():
                     "format": file_format,
                     "missing_file": not file_exists,
                     "duration_seconds": _library_audio_duration(file_path) if file_exists else None,
-                    # Position in metadata["chapters"]; the chapter rename route addresses chapters by it.
-                    "position": position,
+                    # Index in metadata["chapters"], which the chapter rename route addresses.
+                    # Book rows come from metadata["books"], so they have no chapter position.
+                    "position": None if metadata.get("book_mode") else position,
                 })
 
             manifest_path = job_dir / "review_manifest.json"

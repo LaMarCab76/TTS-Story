@@ -132,3 +132,34 @@ def test_durations_are_cached_until_the_file_changes(monkeypatch, library_dir):
     third = _items_by_id(app_module._build_library_listing())["cached-job"]["duration_seconds"]
     assert third == pytest.approx(3.0, abs=0.01)
     assert calls == ["output.wav", "output.wav"]
+
+
+def test_book_rows_report_durations_but_no_chapter_position(library_dir):
+    # Book rows come from metadata["books"]; the chapter rename route addresses
+    # metadata["chapters"], so book rows must not advertise a rename position.
+    job_dir = library_dir / "books-job"
+    _write_wav(job_dir / "book_01" / "b1.wav", 0.5)
+    _write_wav(job_dir / "book_02" / "b2.wav", 0.75)
+    _write_metadata(job_dir, {
+        "chapter_mode": True,
+        "book_mode": True,
+        "output_format": "wav",
+        "books": [
+            {"index": 1, "title": "Book One", "relative_path": "book_01/b1.wav"},
+            {"index": 2, "title": "Book Two", "relative_path": "book_02/b2.wav"},
+        ],
+        "chapters": [
+            {"index": 0, "title": "Ch A", "book_index": 0},
+            {"index": 1, "title": "Ch B", "book_index": 0},
+            {"index": 2, "title": "Ch C", "book_index": 1},
+        ],
+    })
+
+    item = _items_by_id(app_module._build_library_listing())["books-job"]
+
+    assert [row["title"] for row in item["books"]] == ["Book One", "Book Two"]
+    assert [row["position"] for row in item["books"]] == [None, None]
+    assert [row["duration_seconds"] for row in item["books"]] == [
+        pytest.approx(0.5, abs=0.01), pytest.approx(0.75, abs=0.01),
+    ]
+    assert item["duration_seconds"] == pytest.approx(1.25, abs=0.01)
