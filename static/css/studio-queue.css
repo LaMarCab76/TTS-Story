@@ -36,20 +36,15 @@
 /* --------------------------------------------------------------------------
    Grid (column header + rows share the same tracks)
    -------------------------------------------------------------------------- */
+/* Design tracks at every width. The progress floor is 180px instead of 170px:
+   at 170px "14 / 40 chunks" + "ETA 5m 12s" is clipped by ~1px (and longer
+   ETAs much more). It only takes effect where 1.3fr < 180px (below ~1340px
+   wide); at 1440 the computed tracks are exactly the design's. */
 #queue-tab .queue-board {
-    --queue-cols: 108px minmax(0, 1.4fr) minmax(170px, 1.3fr) minmax(0, 1fr) 128px 228px;
+    --queue-cols: 108px minmax(0, 1.4fr) minmax(180px, 1.3fr) minmax(0, 1fr) 128px 228px;
     --queue-gap: 16px;
     /* inline details start under the Job column: row padding + status track + gap */
     --queue-indent: 140px;
-}
-
-/* Below ~1366px the progress track would clip "14 / 40 chunks · ETA 5m 12s". */
-@media (max-width: 1365px) {
-    #queue-tab .queue-board {
-        --queue-cols: 96px minmax(0, 1.4fr) minmax(176px, 1.3fr) minmax(0, 1fr) 128px 228px;
-        --queue-gap: 12px;
-        --queue-indent: 124px;
-    }
 }
 
 #queue-tab .queue-grid {
@@ -525,6 +520,16 @@
 
 #queue-tab .queue-full-details-btn {
     flex: none;
+}
+
+/* No chart or facts below the cards: the button takes the last column of the
+   card grid (beside the last cards when that row has room), bottom-right. */
+#queue-tab .queue-detail-grid-action {
+    display: flex;
+    grid-column-end: -1;
+    align-items: flex-end;
+    justify-content: flex-end;
+    min-width: 0;
 }
 
 #queue-tab .queue-full-details-btn > .ms {

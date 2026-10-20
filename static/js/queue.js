@@ -1542,6 +1542,12 @@ function buildJobDetailCardList(details, queueJob, options = {}) {
     else if (typeof eta === 'number' && eta > 0) remaining = `≈ ${fmtDuration(eta)}`;
     else if (eta === 0) remaining = 'Finishing up…';
     const resumeIndex = Number(pick('resume_from_chunk_index'));
+    // The modal shows the checkpoint for every unfinished job (as before the
+    // redesign); the inline row only where it is actionable or about to be used.
+    const resumeChunk = status !== 'completed' && Number.isFinite(resumeIndex) && resumeIndex > 0
+        && (extended || ['queued', 'paused', 'interrupted', 'failed'].includes(status))
+        ? `Chunk ${resumeIndex + 1}`
+        : '';
     const error = String(pick('error') || '').trim();
 
     const cards = [];
@@ -1556,6 +1562,7 @@ function buildJobDetailCardList(details, queueJob, options = {}) {
         const position = Number(j.queue_position);
         add('Position', position > 0 ? `${queueOrdinal(position)} in queue` : 'Waiting');
         add('Chunks', total || estimated ? String(total || estimated) : 'Estimating…');
+        add('Resume from', resumeChunk);
         add('Engine', queueEngineLabel(engine));
         add('Speakers', speakers);
         add('Output', output);
@@ -1571,6 +1578,7 @@ function buildJobDetailCardList(details, queueJob, options = {}) {
         add('Chapters', chapters);
         if (extended) {
             add('Chunks', total ? `${Math.min(processed, total)} of ${total}` : 'Estimating…');
+            add('Resume from', resumeChunk);
             add('Created', created.label, { title: created.full });
         }
     } else {
@@ -1581,9 +1589,7 @@ function buildJobDetailCardList(details, queueJob, options = {}) {
         add('Speakers', speakers);
         add('Output', output);
         add('Chapters', chapters);
-        if (['paused', 'interrupted', 'failed'].includes(status) && Number.isFinite(resumeIndex) && resumeIndex > 0) {
-            add('Resume from', `Chunk ${resumeIndex + 1}`);
-        }
+        add('Resume from', resumeChunk);
         add('Created', created.label, { title: created.full });
     }
     if (extended && loaded) {
@@ -1607,6 +1613,7 @@ function renderJobDetailCards(details, queueJob, options = {}) {
                     <span class="job-detail-card-label">${queueEscapeHtml(card.label)}</span>
                     <span class="job-detail-card-value">${queueEscapeHtml(card.value)}</span>
                 </div>`).join('')}
+            ${options.trailingHtml || ''}
         </div>`;
 }
 
@@ -1644,7 +1651,16 @@ function renderQueueInlineDetails(item, job) {
     const factsHtml = facts.map(([label, value]) =>
         `<span class="queue-detail-fact"><span class="queue-detail-fact-label">${queueEscapeHtml(label)}</span> ${queueEscapeHtml(value)}</span>`
     ).join('');
-    const html = `
+    const fullDetailsButton = '<button type="button" class="btn btn-xs btn-ghost queue-full-details-btn" data-queue-action="full-details"><span class="ms" aria-hidden="true">open_in_full</span>Full details</button>';
+    // Nothing to show under the cards (e.g. a queued job): keep the button in the
+    // card grid, bottom-right, instead of on a line of its own.
+    const buttonInGrid = !chart && !factsHtml && !note;
+    const html = buttonInGrid
+        ? renderJobDetailCards(details, job, {
+            loadState,
+            trailingHtml: `<div class="queue-detail-grid-action">${fullDetailsButton}</div>`,
+        })
+        : `
         ${renderJobDetailCards(details, job, { loadState })}
         <div class="queue-detail-extra${chart ? ' has-chart' : ''}">
             ${chart ? `<div class="queue-detail-chart">${chart}</div>` : ''}
@@ -1653,7 +1669,7 @@ function renderQueueInlineDetails(item, job) {
                     ${note ? `<span class="queue-detail-note${entry && entry.error ? ' is-error' : ''}">${queueEscapeHtml(note)}</span>` : ''}
                     ${factsHtml}
                 </div>
-                <button type="button" class="btn btn-xs btn-ghost queue-full-details-btn" data-queue-action="full-details"><span class="ms" aria-hidden="true">open_in_full</span>Full details</button>
+                ${fullDetailsButton}
             </div>
         </div>`;
     if (panel._queueHtml !== html) {

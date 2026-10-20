@@ -195,3 +195,43 @@ def test_job_details_include_output_summary_error_and_optional_text(queue_state,
     assert light["output_format"] == "ogg"
 
     assert client.get("/api/jobs/missing/details").status_code == 404
+
+
+@pytest.fixture
+def submit_without_worker(queue_state, monkeypatch, tmp_path):
+    """/api/generate with the worker, persistence and engine side effects stubbed out."""
+    monkeypatch.setattr(app_module, "start_worker_thread", lambda: None)
+    monkeypatch.setattr(app_module, "_persist_job_state", lambda *a, **k: None)
+    monkeypatch.setattr(app_module, "_archive_old_jobs", lambda: None)
+    monkeypatch.setattr(app_module, "_consume_engine_first_run_notice", lambda *a: False)
+    monkeypatch.setattr(app_module, "_write_job_text", lambda *a: str(tmp_path / "input.txt"))
+    monkeypatch.setattr(app_module, "OUTPUT_DIR", tmp_path / "audio")
+    monkeypatch.setattr(app_module, "load_config", lambda: {**app_module.DEFAULT_CONFIG, "tts_engine": "kokoro"})
+    client = app_module.app.test_client()
+
+    def submit(**body):
+        assignments = {"narrator": {"voice": "af_heart", "lang_code": "a"}}
+        response = client.post("/api/generate", json={"tts_engine": "kokoro", "voice_assignments": assignments, **body})
+        assert response.status_code == 200, response.get_json()
+        return response.get_json()["job_id"]
+
+    return submit
+
+
+def test_generate_keeps_the_submitted_project_title_for_the_queue(submit_without_worker):
+    text = "[narrator]Chapter 1 - The hidden passage[/narrator]\n[narrator]Once upon a time.[/narrator]"
+    titled = submit_without_worker(text=text, project_name="  The   Hidden Path ")
+    produced = submit_without_worker(text=text, production_title="Moonlight Library")
+    untitled = submit_without_worker(text=text)
+
+    # The hints live on the job entry itself (not only in metadata.json).
+    assert app_module.jobs[titled]["collection_title"] == "The Hidden Path"
+    assert app_module.jobs[produced]["production_title"] == "Moonlight Library"
+
+    jobs = _get_queue()
+    assert jobs[titled]["title"] == "The Hidden Path"
+    assert jobs[titled]["text_title"] == "Chapter 1 - The hidden passage"
+    assert jobs[produced]["title"] == "Moonlight Library"
+    assert jobs[untitled]["title"] == "Chapter 1 - The hidden passage"
+    assert [jobs[j]["queue_position"] for j in (titled, produced, untitled)] == [1, 2, 3]
+    assert jobs[titled]["estimated_total_chunks"] >= 1
