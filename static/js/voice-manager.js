@@ -421,7 +421,7 @@ function setupQwenVoiceCreation() {
         const available = window.voiceDesignEngineAvailable?.(engine) === true;
         const known = window.voiceDesignEngineAvailabilityKnown?.(engine) === true;
         const status = document.getElementById('qwen-voice-status');
-        const installMessage = config.installMessage || 'Install the selected voice-design engine under Settings → Engine Settings.';
+        const installMessage = config.installMessage || 'Install the selected voice-design engine under Settings → Engines.';
         // The install hint lives in the unavailable notice (shown by refreshQwenVoiceDesignControls
         // once availability is known); the status line only reports the pending check.
         const noticeMessage = document.getElementById('voice-creation-unavailable-message');

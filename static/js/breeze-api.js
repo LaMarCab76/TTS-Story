@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await breezeFetch('/api/breeze-api/save-voice', preview);
         preview = null;
         await window.loadBreezeApiCatalog();
-        status.textContent = `Saved ${data.voice_id}. Select this voice in Speaker Properties with Breeze API selected on the main page. Save your project to retain assignments.`;
+        status.textContent = `Saved ${data.voice_id}. Select it in the speaker's voice drawer (Generate → Cast) with Breeze API as the engine. Save your project to retain assignments.`;
     }));
 });
 

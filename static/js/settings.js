@@ -111,6 +111,7 @@ function filterEngineSelectors() {
         generateButton.title = ready.size ? '' : 'Install or configure a TTS engine in Settings first.';
     }
     window.availableTtsEngineIds = Array.from(ready);
+    if (typeof refreshModeIndicatorReadiness === 'function') refreshModeIndicatorReadiness();
 }
 
 function engineStatusForTab(tabName) {

@@ -1345,7 +1345,7 @@
                                 <span class="engine-actions-note">Keys are saved in plain text in config.json. Never share that file.</span>
                             </div>
                             <p id="gemini-tts-status" class="help-text engine-action-status" role="status"></p>
-                            <p class="help-text engine-note">Save settings, select a preset in Speaker Properties, and use Quick Test to audition it (billable API call). Rate limits are retried; ambiguous connection failures stop to avoid duplicate charges.</p>
+                            <p class="help-text engine-note">Save settings, choose a preset in the speaker drawer (Generate → Cast), and use Test to audition it (billable API call). Rate limits are retried; ambiguous connection failures stop to avoid duplicate charges.</p>
                             <p class="help-text engine-note"><a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Create API key</a> · <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Google terms and data handling</a></p>
                         </div>
                         <div class="engine-panel" id="engine-panel-breeze-api">
@@ -1382,7 +1382,7 @@
                             <p id="breeze-api-catalog-status" class="help-text engine-action-status" role="status" aria-live="polite"></p>
                             <div class="engine-card">
                                 <h5 class="engine-card-title">Production voices</h5>
-                                <p class="help-text">Select local Qwen-created samples in Speaker Properties as usual. Starting a production asks for upload consent, then uploads each selected sample only when needed and reuses it on resume. Clear the local sample to use a hosted catalog voice instead.</p>
+                                <p class="help-text">Select local Qwen-created samples in the speaker drawer as usual. Starting a production asks for upload consent, then uploads each selected sample only when needed and reuses it on resume. Clear the local sample to use a hosted catalog voice instead.</p>
                                 <div class="engine-card-actions">
                                     <button type="button" class="btn btn-secondary" onclick="openBreezeProductions()">Manage production voices</button>
                                     <a class="btn-link engine-doc-link" href="https://docs.breezeblue.ai/guides/voice-clone" target="_blank" rel="noopener">Breeze API documentation</a>
@@ -1833,7 +1833,7 @@
                                     <span class="engine-status-pill" data-engine-status-pill>Checking…</span>
                                     <button type="button" class="help-icon" data-help-id="engine-index-tts" aria-label="Help: IndexTTS">?</button>
                                 </div>
-                                <p class="engine-desc">Multilingual cloning with passage-level emotion guidance; version 2 remains selectable. Uses the Voice Prompts library for reference audio.</p>
+                                <p class="engine-desc">Multilingual cloning with passage-level emotion guidance; version 2 remains selectable. Uses reference audio from Voices → Voice prompts.</p>
                                 <p class="engine-hw"><span class="ms" aria-hidden="true">memory</span>NVIDIA CUDA strongly recommended · 8–12 GB VRAM</p>
                             </div>
                             <div class="settings-form-grid">

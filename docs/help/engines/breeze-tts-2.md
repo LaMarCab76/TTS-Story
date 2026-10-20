@@ -42,7 +42,7 @@ Reference audio must have an exact transcript in **Voices → Voice prompts**. S
 
 ## Use Breeze for speaker casting
 
-Breeze can also replace Qwen3 as the reference-free casting engine. In the **Generate voices** dialog (the **…** button below the Cast list), choose **Breeze TTS 2** under **Voice design engine** before starting the batch. For one speaker, open it from the Cast list and choose **Breeze TTS 2 · Design** under **Design a new voice**. In [Voices](app:voices), open the **Voice creation** sub-tab and select **Breeze TTS 2** in **Design engine** to design and save a standalone reference sample.
+Breeze can also replace Qwen3 as the reference-free casting engine. In the **Generate voices** dialog (the **…** button below the Cast list), choose **Breeze TTS 2** under **Voice design engine** before starting the batch. For one speaker, open it from the Cast list and choose **Breeze TTS 2 · Design** under **Design a new voice**. In [Voices → Voice creation](app:voices/qwen), select **Breeze TTS 2** in **Design engine** to design and save a standalone reference sample.
 
 Each candidate uses the speaker's voice design prompt and the standardized preview passage. The Breeze model stays loaded in a persistent isolated worker while the batch runs, avoiding a full model reload between candidates. The candidate count, approval workflow, saved project state, and prompt-library behavior are the same as Qwen3 casting.
 

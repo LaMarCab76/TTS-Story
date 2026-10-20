@@ -1,6 +1,6 @@
 const MIN_CHATTERBOX_PROMPT_SECONDS = 5;
-const QWEN_VOICE_DESIGN_INSTALL_MESSAGE = 'Install Qwen3-TTS from Settings → Engine Settings to generate voices.';
-const BREEZE_VOICE_DESIGN_INSTALL_MESSAGE = 'Install Breeze TTS 2 and accept its non-commercial model license under Settings → Engine Settings to generate voices.';
+const QWEN_VOICE_DESIGN_INSTALL_MESSAGE = 'Install Qwen3-TTS from Settings → Engines to generate voices.';
+const BREEZE_VOICE_DESIGN_INSTALL_MESSAGE = 'Install Breeze TTS 2 and accept its non-commercial model license under Settings → Engines to generate voices.';
 window.qwenVoiceDesignAvailable = false;
 window.qwenVoiceDesignAvailabilityKnown = false;
 window.breezeVoiceDesignAvailable = false;
@@ -9,7 +9,7 @@ window.breezeVoiceDesignAvailabilityKnown = false;
 const VOICE_DESIGN_ENGINES = {
     gemini: {
         label: 'Gemini TTS · Cloud',
-        installMessage: 'Save your dedicated Gemini TTS API key under Settings → Engine Settings → Gemini TTS.',
+        installMessage: 'Save your dedicated Gemini TTS API key under Settings → Engines → Gemini TTS.',
         settingsTab: 'gemini-tts'
     },
     qwen3: {
@@ -90,7 +90,7 @@ function refreshQwenVoiceDesignControls() {
     if (batchButton) {
         batchButton.disabled = !anyAvailable || !hasDetectedSpeakers;
         batchButton.title = anyAvailable ? 'Generate voices for the whole cast' : (anyKnown
-            ? 'Install Qwen3-TTS or Breeze TTS 2 under Settings → Engine Settings to generate voices.'
+            ? 'Install Qwen3-TTS or Breeze TTS 2 under Settings → Engines to generate voices.'
             : 'Checking voice-design engine availability…');
     }
     document.getElementById('generate-voices-unavailable')?.classList.toggle('hidden', !anyKnown || anyAvailable);
@@ -2145,7 +2145,7 @@ function populateReferenceDropdown(selectEl, placeholderText = 'Use preset voice
             option.disabled = true;
             option.style.color = '#ff6b6b';
             option.textContent = `${entry?.name || promptPath}${metaLabel}${durationLabel} (transcript required)`;
-            option.title = 'Generate or enter this sample\'s exact transcript in Available Voices first.';
+            option.title = 'Generate or enter this sample\'s exact transcript in Voices → Voice prompts first.';
         }
         
         selectEl.appendChild(option);
@@ -4988,6 +4988,27 @@ function updateModeIndicator(engineName) {
     const modeIndicator = document.getElementById('mode-indicator');
     if (modeIndicator) {
         modeIndicator.dataset.kind = isLocal ? 'local' : 'cloud';
+        modeIndicator.dataset.engine = normalizedEngine;
+    }
+    refreshModeIndicatorReadiness();
+}
+
+// Dim the sidebar engine dot when the default engine is not installed/configured yet.
+function refreshModeIndicatorReadiness() {
+    const modeIndicator = document.getElementById('mode-indicator');
+    if (!modeIndicator || !modeIndicator.dataset.engine) return;
+    const readyIds = typeof window !== 'undefined' ? window.availableTtsEngineIds : null;
+    if (!Array.isArray(readyIds)) {
+        delete modeIndicator.dataset.ready;
+        modeIndicator.removeAttribute('title');
+        return;
+    }
+    const isReady = readyIds.includes(modeIndicator.dataset.engine);
+    modeIndicator.dataset.ready = isReady ? 'true' : 'false';
+    if (isReady) {
+        modeIndicator.removeAttribute('title');
+    } else {
+        modeIndicator.title = 'Not ready yet. Install or configure this engine in Settings → Engines.';
     }
 }
 

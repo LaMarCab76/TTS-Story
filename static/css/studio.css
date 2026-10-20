@@ -1445,6 +1445,14 @@ input[type="checkbox"].switch:focus-visible {
     background: var(--st-accent);
 }
 
+#mode-indicator[data-ready="false"] .dot {
+    background: var(--st-text-faint);
+}
+
+#mode-indicator[data-ready="false"] #current-mode {
+    color: var(--st-text-3);
+}
+
 #current-mode {
     overflow: hidden;
     color: var(--st-text);
