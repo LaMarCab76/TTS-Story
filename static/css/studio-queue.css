@@ -36,10 +36,12 @@
 /* --------------------------------------------------------------------------
    Grid (column header + rows share the same tracks)
    -------------------------------------------------------------------------- */
-/* Design tracks at every width. The progress floor is 180px instead of 170px:
-   at 170px "14 / 40 chunks" + "ETA 5m 12s" is clipped by ~1px (and longer
-   ETAs much more). It only takes effect where 1.3fr < 180px (below ~1340px
-   wide); at 1440 the computed tracks are exactly the design's. */
+/* Design tracks at every width. Deliberate deviation: the progress floor is
+   180px instead of the design's 170px, because at 170px "14 / 40 chunks" +
+   "ETA 5m 12s" is clipped by ~1px (and longer ETAs much more). It only takes
+   effect where 1.3fr < 180px (below ~1340px wide), where the Job column ends
+   up ~7px narrower than the design's; at 1440 the computed tracks are exactly
+   the design's. */
 #queue-tab .queue-board {
     --queue-cols: 108px minmax(0, 1.4fr) minmax(180px, 1.3fr) minmax(0, 1fr) 128px 228px;
     --queue-gap: 16px;
@@ -202,6 +204,20 @@
     display: block;
     color: var(--st-text-3);
     line-height: 1.4;
+}
+
+/* Below 1280 the Output track gets very thin (~60px at 1180) and labels wrapped
+   to 4-5 lines: clamp to 2 lines (full label in the title attribute). At 1280
+   and up every label fits in 3 lines, so nothing is hidden there. */
+@media (max-width: 1279px) {
+    #queue-tab .queue-output {
+        display: -webkit-box;
+        overflow: hidden;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        overflow-wrap: break-word;
+    }
 }
 
 #queue-tab .queue-created {

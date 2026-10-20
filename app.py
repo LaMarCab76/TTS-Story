@@ -13230,6 +13230,33 @@ QUEUE_HIDDEN_JOB_TYPES = frozenset({
     "omnivoice_design_save",
 })
 QUEUE_TITLE_MAX_CHARS = 80
+# A sentence break shorter than this ("Yes.", "Mr.") is not used as a title on its own.
+QUEUE_TITLE_MIN_SENTENCE_CHARS = 12
+# Words whose trailing period does not end a sentence ("Mr. Holmes", "St. Ives").
+QUEUE_TITLE_ABBREVIATIONS = frozenset({
+    "mr", "mrs", "ms", "mx", "dr", "st", "sr", "jr", "prof", "rev", "hon", "gen",
+    "col", "capt", "cpt", "lt", "sgt", "mt", "ft", "vs", "vol", "ch", "fig", "approx",
+})
+_QUEUE_TITLE_SENTENCE_END = re.compile(r"([.!?…]+)[\"'”’)]*(?=\s|$)")
+
+
+def _queue_title_sentence_end(line: str) -> Optional[int]:
+    """Index just past the first real sentence break in ``line``, or None.
+
+    Skips periods after abbreviations, single-letter initials and dotted
+    abbreviations ("a.m.", "U.S."), and breaks that would leave a very short title."""
+    for match in _QUEUE_TITLE_SENTENCE_END.finditer(line):
+        end = match.end()
+        candidate = line[:end].strip()
+        if len(candidate) < QUEUE_TITLE_MIN_SENTENCE_CHARS:
+            continue
+        if match.group(1) == ".":
+            words = line[: match.start()].split()
+            word = re.sub(r"^\W+", "", words[-1]) if words else ""
+            if word.lower() in QUEUE_TITLE_ABBREVIATIONS or len(word) == 1 or "." in word:
+                continue
+        return end
+    return None
 
 
 def _truncate_queue_title(value: str, limit: int = QUEUE_TITLE_MAX_CHARS) -> str:
@@ -13256,8 +13283,8 @@ def _queue_title_from_text(text: Optional[str]) -> str:
         line = " ".join(raw_line.split()).lstrip("#").strip()
         if not re.search(r"\w", line):
             continue
-        match = re.match(r"(.+?[.!?…])(?=\s|$)", line)
-        return _truncate_queue_title(match.group(1) if match else line)
+        end = _queue_title_sentence_end(line)
+        return _truncate_queue_title(line[:end] if end else line)
     return ""
 
 

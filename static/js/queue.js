@@ -1139,7 +1139,10 @@ function renderQueueLoadError() {
             <button type="button" class="btn-link" data-queue-action="retry">Try again</button>
         </div>`;
     const summary = document.getElementById('queue-summary');
-    if (summary) summary.textContent = 'Unavailable';
+    // aria-live region: only write when the text changes so it isn't re-announced.
+    if (summary && summary.textContent !== 'Unavailable') summary.textContent = 'Unavailable';
+    const footnote = document.getElementById('queue-footnote');
+    if (footnote) footnote.hidden = true;
 }
 
 function renderQueueEmptyState() {
@@ -1198,6 +1201,7 @@ function renderQueueRowCells(job) {
     const fullTitle = title.sub ? `${title.main} · ${title.sub}` : title.main;
     const error = String(job.error || '').trim();
     const created = queueFormatCreated(job.created_at);
+    const outputLabel = queueEscapeHtml(queueOutputLabel(job));
     return {
         status: `
             <span class="queue-status" data-status="${queueEscapeHtml(status)}">
@@ -1210,7 +1214,7 @@ function renderQueueRowCells(job) {
                 ${status === 'failed' && error ? `<span class="queue-job-error" title="${queueEscapeHtml(error)}">${queueEscapeHtml(error.split(/\r?\n/)[0])}</span>` : ''}
             </div>`,
         progress: renderJobProgress(job),
-        output: `<span class="queue-output">${queueEscapeHtml(queueOutputLabel(job))}</span>`,
+        output: `<span class="queue-output" title="${outputLabel}">${outputLabel}</span>`,
         created: `<span class="queue-created"${created.full ? ` title="${queueEscapeHtml(created.full)}"` : ''}>${queueEscapeHtml(created.label)}</span>`,
         actions: renderQueueActions(job),
     };
@@ -1300,13 +1304,17 @@ function displayQueue(data) {
 
     const summary = document.getElementById('queue-summary');
     if (summary) {
-        summary.textContent = queueSummaryText(jobs);
+        // #queue-summary is an aria-live region and this runs on every poll:
+        // only write when the text changes so screen readers don't re-announce it.
+        const summaryText = queueSummaryText(jobs);
+        if (summary.textContent !== summaryText) summary.textContent = summaryText;
         const currentIds = Array.isArray(data.current_jobs) && data.current_jobs.length
             ? data.current_jobs
             : (data.current_job ? [data.current_job] : []);
-        if (currentIds.length) {
-            summary.title = `Current jobs: ${currentIds.join(', ')}`;
-        } else {
+        const summaryTitle = currentIds.length ? `Current jobs: ${currentIds.join(', ')}` : '';
+        if (summaryTitle) {
+            if (summary.getAttribute('title') !== summaryTitle) summary.setAttribute('title', summaryTitle);
+        } else if (summary.hasAttribute('title')) {
             summary.removeAttribute('title');
         }
     }

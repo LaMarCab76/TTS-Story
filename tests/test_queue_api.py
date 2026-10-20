@@ -66,6 +66,21 @@ def test_title_falls_back_to_first_sentence_without_tags_or_directions(queue_sta
     assert jobs["empty"]["title"] == ""
 
 
+@pytest.mark.parametrize("text, expected", [
+    ("[narrator]Mr. Holmes looked up from the fire.[/narrator]", "Mr. Holmes looked up from the fire."),
+    ("Dr. Watson arrived at dawn... The fog was thick.", "Dr. Watson arrived at dawn..."),
+    ("It was 3 a.m. when the bell rang. Nobody moved.", "It was 3 a.m. when the bell rang."),
+    ("Mrs. St. Clair went to St. Ives on Tuesday. It rained.", "Mrs. St. Clair went to St. Ives on Tuesday."),
+    ("He lived in the U.S. for years. Then moved.", "He lived in the U.S. for years."),
+    ('"Run away from here now!" she said. Then left.', '"Run away from here now!"'),
+    ("Yes. I will go to the store tomorrow. And then home.", "Yes. I will go to the store tomorrow."),
+    ("Chapter I. The Beginning", "Chapter I. The Beginning"),
+    ("The price was 3.5 dollars. Cheap.", "The price was 3.5 dollars."),
+])
+def test_fallback_title_does_not_stop_at_abbreviations_or_tiny_sentences(text, expected):
+    assert app_module._queue_title_from_text(text) == expected
+
+
 def test_long_titles_are_truncated_to_80_chars(queue_state):
     state, _ = queue_state
     state["long"] = _job(text_preview="word " * 60)
