@@ -1323,6 +1323,7 @@ async function deleteProject(projectId) {
     if (activeProjectId !== null && String(activeProjectId) === String(projectId)) {
         activeProjectId = null;
         setCurrentProjectLabel('');
+        window.studioProjectStatus?.refresh?.();
     }
     renderProjectList();
 }
@@ -2629,7 +2630,7 @@ function populateGeminiPresetDropdown(selectedId) {
     select.innerHTML = '';
     const defaultOption = document.createElement('option');
     defaultOption.value = '';
-    defaultOption.textContent = 'Use default prompt';
+    defaultOption.textContent = 'Default prompt';
     select.appendChild(defaultOption);
     availableGeminiPromptPresets.forEach(preset => {
         const option = document.createElement('option');
@@ -3083,10 +3084,17 @@ function escapeHtml(value) {
         .replace(/'/g, '&#39;');
 }
 
-function updateSectionReviewButton(enabled) {
+function updateSectionReviewButton(enabled, count) {
     const reviewBtn = document.getElementById('review-sections-btn');
     if (!reviewBtn) return;
     reviewBtn.disabled = !enabled;
+    const total = Number(count) || 0;
+    reviewBtn.textContent = enabled && total > 0
+        ? `Review ${total} section${total === 1 ? '' : 's'}`
+        : 'Review sections';
+    reviewBtn.title = enabled
+        ? 'Review and edit the detected section headings'
+        : 'No section headings detected yet';
 }
 
 function closeSectionReviewModal() {
@@ -3344,7 +3352,7 @@ function _showPrepResumePanel(completedCount, totalCount, onResume, onRestart, o
     const abortBtn = document.getElementById('gemini-abort-panel-btn');
     if (!panel) return;
     const remaining = totalCount - completedCount;
-    if (label) label.textContent = `⚠️ ${completedCount} of ${totalCount} sections completed. ${remaining} remaining — will resume from section ${completedCount + 1}.`;
+    if (label) label.textContent = `Prep paused: ${completedCount} of ${totalCount} sections done, ${remaining} remaining. Resume continues from section ${completedCount + 1}.`;
     panel.style.display = 'block';
     [resumeBtn, restartBtn, abortBtn].forEach(btn => {
         if (!btn) return;
@@ -3438,7 +3446,7 @@ async function _runGeminiPrep(buttonEl, text, textHash, savedProgress) {
     const originalLabel = buttonEl ? buttonEl.textContent : '';
     if (buttonEl) {
         buttonEl.disabled = true;
-        buttonEl.textContent = 'Processing with LLM...';
+        buttonEl.textContent = 'Prepping…';
     }
 
     _geminiPrepPauseRequested = false;
@@ -3687,7 +3695,7 @@ async function _runGeminiPrep(buttonEl, text, textHash, savedProgress) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Prep Text';
+            buttonEl.textContent = originalLabel || 'Prep text';
         }
         const pauseBtn = document.getElementById('gemini-pause-btn');
         if (pauseBtn) { pauseBtn.textContent = 'Pause'; pauseBtn.disabled = false; }
@@ -3734,23 +3742,16 @@ function renderDefaultHeadingChips() {
 
     container.innerHTML = '';
     DEFAULT_SECTION_HEADINGS.forEach(heading => {
-        const chip = document.createElement('div');
+        const chip = document.createElement('button');
         const isEnabled = enabledSectionHeadings.includes(heading);
-        chip.className = 'heading-chip';
+        const label = heading.charAt(0).toUpperCase() + heading.slice(1);
+        chip.type = 'button';
+        chip.className = `heading-chip${isEnabled ? ' is-enabled' : ''}`;
         chip.dataset.heading = heading;
         chip.dataset.type = 'default';
-        chip.style.cssText = `
-            padding: 6px 12px;
-            border-radius: 16px;
-            border: 1px solid ${isEnabled ? 'var(--primary-color, #6366f1)' : 'var(--border-color, #4a5568)'};
-            background: ${isEnabled ? 'var(--primary-color, #6366f1)' : 'transparent'};
-            color: ${isEnabled ? 'var(--st-accent-ink, #1b1916)' : 'var(--text-color, #e2e8f0)'};
-            cursor: pointer;
-            font-size: 0.85rem;
-            user-select: none;
-            transition: all 0.2s ease;
-        `;
-        chip.textContent = heading.charAt(0).toUpperCase() + heading.slice(1);
+        chip.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
+        chip.title = isEnabled ? `Detecting "${label}" headings · click to turn off` : `"${label}" headings are ignored · click to turn on`;
+        chip.textContent = label;
         chip.addEventListener('click', () => toggleDefaultHeading(heading));
         container.appendChild(chip);
     });
@@ -3762,33 +3763,22 @@ function renderCustomHeadingChips() {
 
     container.innerHTML = '';
     customSectionHeadings.forEach(heading => {
-        const chip = document.createElement('div');
-        chip.className = 'heading-chip';
+        const chip = document.createElement('span');
+        const label = heading.charAt(0).toUpperCase() + heading.slice(1);
+        chip.className = 'heading-chip is-enabled is-custom';
         chip.dataset.heading = heading;
         chip.dataset.type = 'custom';
-        chip.style.cssText = `
-            padding: 6px 12px;
-            border-radius: 16px;
-            border: 1px solid var(--success-color, #10b981);
-            background: var(--st-green-soft, rgba(148, 184, 158, 0.14));
-            color: var(--success-color, #10b981);
-            cursor: pointer;
-            font-size: 0.85rem;
-            user-select: none;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s ease;
-        `;
-        chip.innerHTML = `
-            <span>${heading.charAt(0).toUpperCase() + heading.slice(1)}</span>
-            <span style="font-size: 1.1rem; line-height: 1; cursor: pointer; opacity: 0.7;">&times;</span>
-        `;
-        chip.addEventListener('click', (e) => {
-            if (e.target.tagName === 'SPAN' && e.target.textContent === '×') {
-                removeCustomHeading(heading);
-            }
-        });
+        const name = document.createElement('span');
+        name.className = 'heading-chip-label';
+        name.textContent = label;
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'heading-chip-remove';
+        remove.textContent = '×';
+        remove.title = `Remove the custom "${label}" heading`;
+        remove.setAttribute('aria-label', `Remove ${label} heading`);
+        remove.addEventListener('click', () => removeCustomHeading(heading));
+        chip.append(name, remove);
         container.appendChild(chip);
     });
 }
@@ -3983,12 +3973,7 @@ function hideAnalysis() {
         chapterInfo.style.display = 'none';
     }
     // The stat values live in the always-visible manuscript footer bar, so reset them.
-    ['stat-speakers', 'stat-chunks', 'stat-words'].forEach(id => {
-        const statEl = document.getElementById(id);
-        if (statEl) {
-            statEl.textContent = '0';
-        }
-    });
+    ['stat-speakers', 'stat-chunks', 'stat-words'].forEach(id => setManuscriptStat(id, 0));
     const durationStat = document.getElementById('stat-duration');
     if (durationStat) {
         durationStat.textContent = '0:00';
@@ -4727,7 +4712,9 @@ function setupEventListeners() {
                 const saved = await saveProject(project);
                 activeProjectId = saved?.id || project.id;
                 setCurrentProjectLabel(saved?.name || name);
-                if (projectStatus) {
+                if (window.studioProjectStatus?.markSaved) {
+                    window.studioProjectStatus.markSaved(saved?.saved_at || project.saved_at);
+                } else if (projectStatus) {
                     projectStatus.textContent = `Saved ${name}`;
                 }
             } catch (error) {
@@ -6270,7 +6257,10 @@ async function applyProjectState(project) {
         projectNameInput.value = project.name;
     }
     const formatSelect = document.getElementById('job-output-format');
-    if (formatSelect) formatSelect.value = project.output_format || 'mp3';
+    if (formatSelect) {
+        formatSelect.value = project.output_format || 'mp3';
+        handleOutputFormatChange(formatSelect.value);
+    }
     const bitrateSelect = document.getElementById('job-output-bitrate');
     if (bitrateSelect) bitrateSelect.value = project.output_bitrate || '128';
     const acxCheckbox = document.getElementById('acx-compliance-checkbox');
@@ -6306,6 +6296,7 @@ async function applyProjectState(project) {
     pendingProjectLoad = project;
     applyProjectAssignments(project);
     pendingProjectLoad = null;
+    window.studioProjectStatus?.markLoaded?.(project.saved_at);
     showNotification('Project loaded.', 'success');
 }
 
@@ -6377,6 +6368,45 @@ function applyProjectAssignments(project) {
     });
 }
 
+// Manuscript footer stats: "3 speakers · 7 chunks · 132 words · ≈ 0:54"
+function formatManuscriptDuration(totalSeconds) {
+    const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const rest = seconds % 60;
+    const pad = value => String(value).padStart(2, '0');
+    return hours > 0 ? `${hours}:${pad(minutes)}:${pad(rest)}` : `${minutes}:${pad(rest)}`;
+}
+
+function setManuscriptStat(id, value) {
+    const valueEl = document.getElementById(id);
+    if (!valueEl) return;
+    const count = Number(value) || 0;
+    valueEl.textContent = count.toLocaleString();
+    const unitEl = valueEl.parentElement?.querySelector?.('.stat-unit');
+    if (unitEl?.dataset?.unit) {
+        unitEl.textContent = count === 1 ? unitEl.dataset.unit : `${unitEl.dataset.unit}s`;
+    }
+}
+
+function describeSectionDetection(detection) {
+    const {
+        detected,
+        count = 0,
+        kind,
+        book_count: bookCount = 0,
+        section_count: sectionCount = 0
+    } = detection || {};
+    if (!detected) return 'No sections detected';
+    const sections = kind === 'book' ? sectionCount : count;
+    const sectionLabel = `${sections} section${sections === 1 ? '' : 's'}`;
+    if (kind === 'book') {
+        const books = bookCount || count;
+        return `${books} book${books === 1 ? '' : 's'} · ${sectionLabel} detected`;
+    }
+    return `${sectionLabel} detected`;
+}
+
 // Display statistics
 function displayStatistics(stats) {
     const detectedSpeakers = Array.isArray(stats.speakers) ? stats.speakers : [];
@@ -6385,15 +6415,14 @@ function displayStatistics(stats) {
     const speakerCount = hasDetectedSpeakers
         ? (stats.speaker_count || detectedSpeakers.length)
         : 1;
-    document.getElementById('stat-speakers').textContent = speakerCount;
-    document.getElementById('stat-chunks').textContent = stats.total_chunks;
-    document.getElementById('stat-words').textContent = stats.word_count;
-    
-    const duration = Math.floor(stats.estimated_duration);
-    const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
-    document.getElementById('stat-duration').textContent = 
-        `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    setManuscriptStat('stat-speakers', stats.word_count ? speakerCount : 0);
+    setManuscriptStat('stat-chunks', stats.total_chunks);
+    setManuscriptStat('stat-words', stats.word_count);
+
+    const durationEl = document.getElementById('stat-duration');
+    if (durationEl) {
+        durationEl.textContent = formatManuscriptDuration(stats.estimated_duration);
+    }
     
     // Display speakers
     const speakersList = document.getElementById('speakers-list');
@@ -6411,21 +6440,21 @@ function displayStatistics(stats) {
         } = stats.section_detection;
         if (detected) {
             chapterInfo.style.display = 'block';
-            const titleList = titles && titles.length ? ` (<em>${titles.slice(0, 5).join(', ')}${titles.length > 5 ? ', …' : ''}</em>)` : '';
-            if (kind === 'book') {
-                const booksLabel = bookCount || count;
-                chapterInfo.innerHTML = `📚 Books detected: <strong>${booksLabel}</strong> · Sections detected: <strong>${sectionCount}</strong>${titleList}`;
-            } else {
-                chapterInfo.innerHTML = `📚 Sections detected: <strong>${count}</strong>${titleList}`;
-            }
+            // Compact footer label; the full list of detected titles lives in the tooltip.
+            chapterInfo.textContent = describeSectionDetection(stats.section_detection);
+            const titleList = Array.isArray(titles) ? titles.filter(Boolean) : [];
+            chapterInfo.title = titleList.length
+                ? `${kind === 'book' ? `Books: ${bookCount || count} · ` : ''}Sections:\n${titleList.join('\n')}`
+                : '';
             if (chapterCheckbox && !chapterCheckbox.dataset.userToggled) {
                 chapterCheckbox.disabled = false;
                 chapterCheckbox.classList.remove('disabled');
             }
-            updateSectionReviewButton(true);
+            updateSectionReviewButton(true, kind === 'book' ? sectionCount : count);
         } else {
             chapterInfo.style.display = 'block';
-            chapterInfo.innerHTML = '📚 No section headings detected.';
+            chapterInfo.textContent = describeSectionDetection(stats.section_detection);
+            chapterInfo.title = 'Lines that start with an enabled heading (Chapter, Part, …) begin a new section.';
             updateSectionReviewButton(false);
         }
     }
@@ -6937,7 +6966,25 @@ function showEngineFirstRunNotice(engineName) {
     document.getElementById('engine-first-run-ok')?.focus();
 }
 
+// Guards against double submissions; #generate-btn's disabled state stays owned by settings.js.
+let generateAudioInFlight = false;
+
 async function generateAudio() {
+    if (generateAudioInFlight) return;
+    generateAudioInFlight = true;
+    const generateBtn = document.getElementById('generate-btn');
+    generateBtn?.classList.add('is-busy');
+    generateBtn?.setAttribute('aria-busy', 'true');
+    try {
+        await submitGenerateAudioJob();
+    } finally {
+        generateAudioInFlight = false;
+        generateBtn?.classList.remove('is-busy');
+        generateBtn?.removeAttribute('aria-busy');
+    }
+}
+
+async function submitGenerateAudioJob() {
     const text = document.getElementById('input-text').value;
     
     if (!text.trim()) {
@@ -7044,6 +7091,13 @@ async function generateAudio() {
         if (data.success) {
             // Show success notification
             showNotification(`Job queued! Position: ${data.queue_position}`, 'success');
+
+            // Jump to the queue and open the new job there.
+            if (typeof window.studioGoToTab === 'function' && window.studioGoToTab('queue')) {
+                document.dispatchEvent(new CustomEvent('queue:focus-job', {
+                    detail: { jobId: data.job_id }
+                }));
+            }
 
             if (data.first_run_notice) {
                 showEngineFirstRunNotice(data.engine || selectedEngine);
@@ -7478,12 +7532,9 @@ async function updateQueueIndicator() {
             }
             
             if (indicator) {
-                if (queueSize > 0 || processingJobs > 0) {
-                    indicator.style.display = 'inline-block';
-                    indicator.textContent = `${processingJobs} processing, ${queueSize} queued`;
-                } else {
-                    indicator.style.display = 'none';
-                }
+                indicator.textContent = (queueSize > 0 || processingJobs > 0)
+                    ? `${processingJobs} running · ${queueSize} queued`
+                    : 'Queue is empty';
             }
 
             const activeCount = (Number(processingJobs) || 0) + (Number(queueSize) || 0);
@@ -7537,7 +7588,9 @@ function updateLatestAudioFromQueue(jobs) {
     }
 
     container.style.display = 'block';
-    label.textContent = `Most recently completed job (${latestCompleted.job_id})`;
+    const latestTitle = String(latestCompleted.text_preview || '').replace(/\[\/?[^\]]+\]/g, '').replace(/\s+/g, ' ').trim();
+    label.textContent = latestTitle || latestCompleted.job_id;
+    label.title = `Most recently completed job (${latestCompleted.job_id})`;
     
     if (player.src !== window.location.origin + latestCompleted.output_file) {
         player.src = latestCompleted.output_file;
@@ -8446,7 +8499,7 @@ function renderAltWordTable() {
     const text = getCurrentInputText();
 
     if (altWordRegistry.length === 0) {
-        tbody.innerHTML = '<tr id="awr-empty-row"><td colspan="4" class="awr-empty">No entries yet. Click <strong>＋ Add Entry</strong> to get started.</td></tr>';
+        tbody.innerHTML = '<tr id="awr-empty-row"><td colspan="4" class="awr-empty">No entries yet. Click <strong>Add entry</strong> to get started.</td></tr>';
         if (countLabel) countLabel.textContent = '';
         return;
     }
@@ -8629,11 +8682,11 @@ function openAwrEntryModal(editIdx = -1) {
     const replInput = document.getElementById('awr-replacement-input');
 
     if (editIdx >= 0 && altWordRegistry[editIdx]) {
-        if (titleEl) titleEl.textContent = 'Edit Alt Word Entry';
+        if (titleEl) titleEl.textContent = 'Edit alt word entry';
         if (origInput) origInput.value = altWordRegistry[editIdx].original;
         if (replInput) replInput.value = altWordRegistry[editIdx].replacement;
     } else {
-        if (titleEl) titleEl.textContent = 'Add Alt Word Entry';
+        if (titleEl) titleEl.textContent = 'Add alt word entry';
         if (origInput) origInput.value = '';
         if (replInput) replInput.value = '';
     }
