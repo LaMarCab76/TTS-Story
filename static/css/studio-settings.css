@@ -1,2 +1,1133 @@
 /* studio-settings.css — Settings screen.
-   Owned by the settings screen agent of the "Estudio" redesign. Loaded after studio.css. */
+   Owned by the settings screen agent of the "Estudio" redesign. Loaded after studio.css.
+
+   #settings-tab.settings-screen                       flex column (screen scaffold)
+     .screen-header                                    60px: title, help, subtitle | Reset, Save
+     .settings-layout                                  grid: 220px section nav | scrolling pane
+       nav.settings-nav > .settings-nav-item           [data-settings-section=<group id>]
+       #settings-pane.settings-pane                    overflow:auto
+         .settings-accordion > .settings-group         one visible group (the one without .collapsed)
+           .settings-group-header                      hidden; kept for help.js deep links
+           .settings-group-content                     .settings-section | .engine-settings-layout
+   Engines: .engine-tabs (sticky 240px list) | .engine-detail > .engine-panel.active
+   Every rule is scoped to #settings-tab (or to a Settings-owned dialog id). */
+
+/* --------------------------------------------------------------------------
+   Layout
+   -------------------------------------------------------------------------- */
+#settings-tab .settings-layout {
+    display: grid;
+    flex: 1;
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-width: 0;
+    min-height: 0;
+}
+
+#settings-tab .screen-actions .btn {
+    padding: 0 14px;
+}
+
+#settings-tab .settings-title-help {
+    align-self: center;
+}
+
+#settings-tab .settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+    padding: 18px 12px;
+    border-right: 1px solid var(--st-border);
+    overflow-y: auto;
+}
+
+#settings-tab .settings-nav-item {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 34px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--st-text-nav);
+    font: inherit;
+    line-height: 1.2;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+#settings-tab .settings-nav-item > .ms {
+    color: var(--st-text-muted);
+    font-size: 18px;
+    transition: color 0.12s ease;
+}
+
+#settings-tab .settings-nav-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#settings-tab .settings-nav-item:hover {
+    background: rgba(236, 230, 220, 0.035);
+    color: var(--st-text);
+}
+
+#settings-tab .settings-nav-item.is-active {
+    background: var(--st-control);
+    color: var(--st-text-strong);
+}
+
+#settings-tab .settings-nav-item.is-active > .ms {
+    color: var(--st-accent);
+}
+
+#settings-tab .settings-nav-item:focus-visible {
+    outline: 2px solid rgba(226, 160, 79, 0.7);
+    outline-offset: -2px;
+}
+
+#settings-tab .settings-pane {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+}
+
+#settings-tab .settings-accordion {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 100%;
+}
+
+#settings-tab .settings-group {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    overflow: visible;
+}
+
+#settings-tab .settings-group.collapsed {
+    display: none;
+}
+
+/* The accordion headers stay in the DOM (help.js clicks them) but the section
+   nav replaces them visually. */
+#settings-tab .settings-group-header {
+    display: none;
+}
+
+#settings-tab .settings-group-content {
+    display: block;
+    flex: 1 0 auto;
+    padding: 0;
+    border: none;
+}
+
+/* --------------------------------------------------------------------------
+   Section scaffold (General, Audio, Text prep, Remote)
+   -------------------------------------------------------------------------- */
+#settings-tab .settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 760px;
+    padding: 28px 32px 48px;
+}
+
+#settings-tab .settings-section-narrow {
+    max-width: 720px;
+}
+
+#settings-tab .settings-section-roomy {
+    gap: 22px;
+}
+
+#settings-tab .settings-section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#settings-tab .settings-section-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#settings-tab .settings-section-title {
+    margin: 0;
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.25;
+}
+
+#settings-tab .settings-section-desc {
+    margin: 0;
+    color: var(--st-text-3);
+    line-height: 1.5;
+    text-wrap: pretty;
+}
+
+#settings-tab .settings-general-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+#settings-tab .settings-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 20px;
+}
+
+#settings-tab .settings-field-wide {
+    grid-column: 1 / -1;
+}
+
+/* --------------------------------------------------------------------------
+   Fields
+   -------------------------------------------------------------------------- */
+#settings-tab .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    margin: 0;
+}
+
+#settings-tab .form-group label {
+    display: block;
+    margin: 0;
+    color: var(--st-text-2);
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+#settings-tab .form-group small,
+#settings-tab .form-group > .help-text {
+    display: block;
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+#settings-tab .form-group small a,
+#settings-tab .help-text a {
+    color: var(--st-accent);
+}
+
+#settings-tab .form-group small a:hover,
+#settings-tab .help-text a:hover {
+    color: var(--st-accent-link-hover);
+}
+
+#settings-tab .form-group > .btn {
+    align-self: flex-start;
+}
+
+#settings-tab .form-group.disabled > label {
+    opacity: 0.55;
+}
+
+#settings-tab :where(input[type="text"], input[type="number"], input[type="password"], input[type="url"], input:not([type]), select) {
+    width: 100%;
+}
+
+#settings-tab textarea {
+    width: 100%;
+    min-height: 76px;
+    resize: vertical;
+}
+
+#settings-tab .input-mono,
+#settings-tab .input-unit > input {
+    font-family: var(--st-font-mono);
+    font-size: 12.5px;
+}
+
+#settings-tab .settings-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+#settings-tab .settings-input-row > input,
+#settings-tab .settings-input-row > select {
+    flex: 1;
+    min-width: 0;
+}
+
+#settings-tab .settings-input-row .btn {
+    flex: none;
+    height: 34px;
+}
+
+#settings-tab .settings-input-row > .settings-inline-actions {
+    display: flex;
+    flex: none;
+}
+
+#settings-tab .check-row,
+#settings-tab .form-group .check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    color: var(--st-text-2);
+    font-size: 13px;
+    line-height: 1.5;
+    cursor: pointer;
+}
+
+#settings-tab .check-row > input[type="checkbox"] {
+    flex: none;
+    margin: 3px 0 0;
+}
+
+#settings-tab .settings-toggle-wrap > .toggle-card {
+    margin: 0;
+}
+
+#settings-tab .toggle-card {
+    margin: 0;
+}
+
+#settings-tab .toggle-card-desc {
+    text-wrap: pretty;
+}
+
+#settings-tab .settings-speed {
+    gap: 6px;
+}
+
+#settings-tab .settings-speed-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#settings-tab #speed-value {
+    color: var(--st-text);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+}
+
+#settings-tab .settings-speed input[type="range"] {
+    width: 100%;
+    max-width: 420px;
+    margin: 4px 0 0;
+}
+
+/* --------------------------------------------------------------------------
+   Cards (engine field cards, LLM provider cards)
+   -------------------------------------------------------------------------- */
+#settings-tab .settings-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+#settings-tab .engine-panel > .settings-form-grid,
+#settings-tab .engine-card,
+#settings-tab .settings-card {
+    margin: 0;
+    padding: 18px;
+    border: 1px solid var(--st-border);
+    border-radius: 10px;
+    background: var(--st-panel);
+}
+
+#settings-tab .engine-card,
+#settings-tab .settings-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+}
+
+#settings-tab .engine-card-title,
+#settings-tab .settings-card-title {
+    margin: 0;
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+#settings-tab .settings-card-head {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#settings-tab .engine-card > .help-text,
+#settings-tab .settings-card-head > .help-text,
+#settings-tab .engine-details-body > .help-text {
+    margin: 0;
+    color: var(--st-text-3);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+#settings-tab .engine-card-actions,
+#settings-tab .settings-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+}
+
+#settings-tab .engine-toggle-row {
+    padding-top: 14px;
+    border-top: 1px solid var(--st-border);
+}
+
+#settings-tab .engine-steps {
+    display: grid;
+    gap: 4px;
+    margin: 0;
+    padding-left: 20px;
+    color: var(--st-text-3);
+    font-size: 12.5px;
+}
+
+#settings-tab .engine-steps li::marker {
+    color: var(--st-text-muted);
+}
+
+#settings-tab details.engine-card {
+    display: block;
+}
+
+#settings-tab .engine-details > summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+}
+
+#settings-tab .engine-details > summary::-webkit-details-marker {
+    display: none;
+}
+
+#settings-tab .engine-details > summary::before {
+    content: "chevron_right";
+    color: var(--st-text-muted);
+    font-family: var(--st-font-icon);
+    font-size: 18px;
+    font-weight: normal;
+    line-height: 1;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+    transition: transform 0.15s ease;
+}
+
+#settings-tab .engine-details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+#settings-tab .engine-details-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+#settings-tab .engine-details-body audio {
+    width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Engines: list column
+   -------------------------------------------------------------------------- */
+#settings-tab .engine-settings-layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    min-height: 100%;
+}
+
+#settings-tab .engine-tabs {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    max-height: calc(100vh - 60px);
+    margin: 0;
+    padding: 20px 12px;
+    border: none;
+    overflow-y: auto;
+}
+
+#settings-tab .engine-tab-group,
+#settings-tab .engine-tab-group-remote {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+}
+
+#settings-tab .engine-tab-group-heading {
+    display: block;
+    margin: 0;
+    padding: 0 10px 6px;
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+#settings-tab .engine-tab-group-buttons {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 1px;
+}
+
+#settings-tab .engine-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: 30px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--st-text-2);
+    font: inherit;
+    line-height: 1.2;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+#settings-tab .engine-tab-btn::before {
+    content: "";
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--st-border-strong);
+    transition: background-color 0.15s ease;
+}
+
+#settings-tab .engine-tab-btn:hover {
+    background: rgba(236, 230, 220, 0.035);
+    color: var(--st-text);
+}
+
+#settings-tab .engine-tab-btn.active,
+#settings-tab .engine-tab-btn.active:hover {
+    background: var(--st-control);
+    color: var(--st-text-strong);
+}
+
+#settings-tab .engine-tab-btn:focus-visible {
+    outline: 2px solid rgba(226, 160, 79, 0.7);
+    outline-offset: -2px;
+}
+
+/* State dots: data-engine-state is written by settings.js (refreshEngineStateIndicators);
+   engine-status-ready/-missing/-busy are the legacy classes the first-run flow relies on. */
+#settings-tab .engine-tab-btn.engine-status-ready::before,
+#settings-tab .engine-tab-btn[data-engine-state="ready"]::before {
+    background: var(--st-green);
+}
+
+#settings-tab .engine-tab-btn[data-engine-state="setup"]::before,
+#settings-tab .engine-tab-btn[data-engine-state="partial"]::before,
+#settings-tab .engine-tab-btn[data-engine-state="restart"]::before {
+    background: var(--st-accent);
+}
+
+#settings-tab .engine-tab-btn[data-engine-state="none"]::before {
+    background: var(--st-text-faint);
+}
+
+#settings-tab .engine-tab-btn.engine-status-busy::before,
+#settings-tab .engine-tab-btn[data-engine-state="busy"]::before {
+    background: var(--st-accent);
+    animation: st-settings-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes st-settings-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+}
+
+#settings-tab .engine-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 10px 0;
+    border-top: 1px solid var(--st-border);
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+#settings-tab .engine-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#settings-tab .engine-legend-help {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--st-text-3);
+    font: inherit;
+    font-size: 12px;
+    text-decoration: underline;
+    text-decoration-color: var(--st-border-dashed);
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+
+#settings-tab .engine-legend-help:hover {
+    color: var(--st-accent);
+    text-decoration-color: currentColor;
+}
+
+/* --------------------------------------------------------------------------
+   Engines: detail pane
+   -------------------------------------------------------------------------- */
+#settings-tab .engine-detail {
+    min-width: 0;
+    border-left: 1px solid var(--st-border);
+}
+
+#settings-tab .engine-panel {
+    display: none;
+}
+
+#settings-tab .engine-panel.active {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 760px;
+    padding: 28px 32px 48px;
+}
+
+#settings-tab .engine-panel-head {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#settings-tab .engine-group-label {
+    color: var(--st-text-muted);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+#settings-tab .settings-panel-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 14px;
+    margin: 0;
+}
+
+#settings-tab .settings-panel-title h4 {
+    margin: 0;
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 32px;
+    font-weight: 400;
+    line-height: 1;
+}
+
+#settings-tab .settings-panel-title .help-icon {
+    margin-left: -4px;
+}
+
+#settings-tab .engine-status-pill {
+    --pill-color: var(--st-text-muted);
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--st-raised);
+    color: var(--pill-color);
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+#settings-tab .engine-status-pill::before {
+    content: "";
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+#settings-tab .engine-status-pill[data-engine-state="ready"] { --pill-color: var(--st-green); }
+#settings-tab .engine-status-pill[data-engine-state="setup"],
+#settings-tab .engine-status-pill[data-engine-state="partial"],
+#settings-tab .engine-status-pill[data-engine-state="restart"],
+#settings-tab .engine-status-pill[data-engine-state="busy"] { --pill-color: var(--st-accent); }
+#settings-tab .engine-status-pill[data-engine-state="none"] { --pill-color: var(--st-text-faint); }
+#settings-tab .engine-status-pill[data-engine-state="busy"]::before {
+    animation: st-settings-pulse 1.2s ease-in-out infinite;
+}
+
+#settings-tab .engine-desc {
+    max-width: 600px;
+    margin: 0;
+    color: var(--st-text-2);
+    font-size: 13px;
+    line-height: 1.55;
+    text-wrap: pretty;
+}
+
+#settings-tab .engine-desc code,
+#settings-tab .engine-card code,
+#settings-tab .warning-box code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--st-control);
+    color: var(--st-text-soft);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+}
+
+#settings-tab .engine-hw {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--st-text-3);
+    line-height: 1.4;
+}
+
+#settings-tab .engine-hw > .ms {
+    font-size: 17px;
+}
+
+#settings-tab .engine-note {
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#settings-tab .warning-box {
+    display: flex;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 8px;
+    background: var(--st-accent-wash);
+    color: var(--st-accent-text-soft);
+    line-height: 1.5;
+}
+
+#settings-tab .warning-box > .ms {
+    font-size: 18px;
+    line-height: 1.2;
+    height: 1.2em;
+}
+
+#settings-tab .warning-box p {
+    margin: 0;
+}
+
+#settings-tab .warning-box strong {
+    color: var(--st-accent-text-soft);
+    font-weight: 600;
+}
+
+#settings-tab .warning-box a {
+    color: var(--st-accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+#settings-tab .engine-inline-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-bg);
+}
+
+#settings-tab .engine-inline-status > p {
+    margin: 0;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+}
+
+#settings-tab .engine-inline-status > .btn {
+    flex: none;
+}
+
+/* Cloud provider action row */
+#settings-tab .engine-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+#settings-tab .engine-save-provider {
+    padding: 0 14px;
+    font-weight: 500;
+}
+
+#settings-tab .engine-actions-note {
+    margin-left: 6px;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* The note sits inline after the buttons, as in the design, whenever the row is
+   wide enough for it (button widths are fixed by their labels: 1 button + note
+   needs ~470px, 2 buttons + note ~690px; 3 buttons never fit). When it cannot
+   fit it gets its own line, flush left, instead of wrapping with the inline
+   6px offset. Container queries track the row's real width at any viewport. */
+#settings-tab .engine-actions {
+    container: engine-actions / inline-size;
+}
+
+#settings-tab .engine-actions:has(> .btn:nth-of-type(3)) .engine-actions-note {
+    flex-basis: 100%;
+    margin-left: 0;
+}
+
+@container engine-actions (max-width: 689px) {
+    #settings-tab .engine-actions:has(> .btn:nth-of-type(2)) .engine-actions-note {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+}
+
+@container engine-actions (max-width: 469px) {
+    #settings-tab .engine-actions-note {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+}
+
+#settings-tab .engine-action-status {
+    display: block;
+    margin: -10px 0 0;
+    color: var(--st-text-3);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#settings-tab .engine-action-status:empty {
+    display: none;
+}
+
+#settings-tab .form-group .engine-action-status {
+    margin: 0;
+}
+
+#settings-tab .engine-doc-link {
+    font-size: 12.5px;
+}
+
+/* Install / remove card (built by renderEngineSetupStatus) */
+#settings-tab .engine-setup-status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+    margin: 0;
+    padding: 16px 18px;
+    border: 1px solid var(--st-border);
+    border-radius: 10px;
+    background: var(--st-panel);
+}
+
+#settings-tab .engine-setup-status.ready {
+    border-color: var(--st-border);
+    background: transparent;
+}
+
+#settings-tab .engine-setup-status.missing {
+    border-color: var(--st-border);
+}
+
+#settings-tab .engine-setup-status.busy {
+    border-color: rgba(226, 160, 79, 0.32);
+    background: var(--st-accent-wash);
+}
+
+#settings-tab .engine-setup-status-text {
+    flex: 1 1 260px;
+    min-width: 0;
+    color: var(--st-text-3);
+    line-height: 1.5;
+}
+
+#settings-tab .engine-setup-status-text strong {
+    color: var(--st-text);
+    font-weight: 500;
+}
+
+#settings-tab .engine-setup-status > .btn {
+    flex: none;
+}
+
+#settings-tab .engine-setup-status .engine-install-btn {
+    height: 34px;
+    padding: 0 16px;
+}
+
+#settings-tab .engine-setup-status .btn[data-icon]::before {
+    font-size: 18px;
+}
+
+#settings-tab .engine-install-output {
+    flex-basis: 100%;
+    max-height: 190px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--st-border);
+    border-radius: 6px;
+    background: var(--st-bg);
+    color: var(--st-text-3);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Text prep (LLM)
+   -------------------------------------------------------------------------- */
+#settings-tab .settings-card .settings-form-grid,
+#settings-tab .engine-card .settings-form-grid {
+    padding: 0;
+    border: none;
+    background: none;
+}
+
+#settings-tab .settings-card-actions .help-text,
+#settings-tab .engine-card-actions .help-text {
+    margin: 0;
+    font-size: 12px;
+}
+
+#settings-tab #llm-backup-profiles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#settings-tab .llm-backup-profile-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-bg);
+}
+
+#settings-tab .llm-backup-profile-heading {
+    margin: 0;
+    color: var(--st-text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#settings-tab .gemini-preset-list {
+    gap: 6px;
+    margin: 0;
+}
+
+#settings-tab .gemini-preset-item {
+    align-items: center;
+    padding: 8px 8px 8px 12px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-bg);
+}
+
+#settings-tab .gemini-preset-title {
+    overflow: hidden;
+    color: var(--st-text);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#settings-tab .gemini-preset-empty {
+    padding: 12px 14px;
+    border: 1px dashed var(--st-border-strong);
+    border-radius: 8px;
+    color: var(--st-text-3);
+    font-size: 12.5px;
+}
+
+#settings-tab .gemini-preset-form {
+    gap: 12px;
+    margin: 0;
+    padding: 14px;
+    border: 1px dashed var(--st-border-strong);
+    border-radius: 8px;
+    background: transparent;
+}
+
+#settings-tab .gemini-preset-form-actions {
+    align-items: center;
+}
+
+#settings-tab #gemini-preset-form-hint {
+    margin-left: 4px;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#settings-tab #gemini-preset-form-hint[data-tone="warning"] { color: var(--st-accent); }
+#settings-tab #gemini-preset-form-hint[data-tone="success"] { color: var(--st-green); }
+#settings-tab #gemini-preset-form-hint[data-tone="info"] { color: var(--st-text-2); }
+
+/* --------------------------------------------------------------------------
+   Remote admin
+   -------------------------------------------------------------------------- */
+#settings-tab #remote-admin-settings-group:has(#remote-engine-management-enabled:not(:checked)) .remote-token-field {
+    display: none;
+}
+
+#settings-tab .callout-warning.warning-text {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* --------------------------------------------------------------------------
+   Breeze production voices dialog (breeze-api.js, launched from Settings)
+   -------------------------------------------------------------------------- */
+#breeze-productions-dialog h2 {
+    margin: 0 0 8px;
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+#breeze-productions-dialog h3 {
+    margin: 0 0 4px;
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#breeze-productions-dialog p {
+    margin: 0 0 10px;
+    color: var(--st-text-3);
+    line-height: 1.5;
+}
+
+#breeze-productions-dialog [data-status]:empty {
+    display: none;
+}
+
+#breeze-productions-dialog button {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    margin: 0 6px 10px 0;
+    padding: 0 10px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--st-text-btn);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+#breeze-productions-dialog button:hover {
+    border-color: var(--st-border-strong);
+    background: rgba(236, 230, 220, 0.04);
+    color: var(--st-text-strong);
+}
+
+#breeze-productions-dialog button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   Narrower desktops (1180–1320px): the section nav (220px) and the 32px engine
+   name stay as designed; the space comes from the engine list (240 → 200px)
+   and tighter padding only.
+   -------------------------------------------------------------------------- */
+@media (max-width: 1320px) {
+    #settings-tab .engine-settings-layout {
+        grid-template-columns: 200px minmax(0, 1fr);
+    }
+
+    #settings-tab .engine-tabs {
+        padding: 18px 8px;
+    }
+
+    #settings-tab .engine-panel.active {
+        padding: 24px 24px 40px;
+    }
+
+    #settings-tab .settings-section {
+        padding: 24px 28px 40px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #settings-tab .engine-tab-btn[data-engine-state="busy"]::before,
+    #settings-tab .engine-tab-btn.engine-status-busy::before,
+    #settings-tab .engine-status-pill[data-engine-state="busy"]::before {
+        animation: none;
+    }
+}
