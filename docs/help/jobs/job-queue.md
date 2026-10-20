@@ -39,7 +39,7 @@ Progress may show processed chunks, total chunks, post-processing, and an ETA. I
 
 ## Review happens in Library
 
-The current Queue page is for monitoring and job control. Chunk editing and regeneration are not performed in the queue. When a job completes, open [Audio Library](app:library), choose a chapter or Full Story, and select **Review Chunks**. See [Review and Regenerate Chunks](help:job-review).
+The current Queue page is for monitoring and job control. Chunk editing and regeneration are not performed in the queue. When a job completes, open [Audio Library](app:library), expand the production, and click **Review chunks** on a chapter row or on the **Full story** row. See [Review and Regenerate Chunks](help:job-review).
 
 ## If progress stops
 

@@ -2,9 +2,9 @@
 
 Voice creation synthesizes a short voice sample from a written description. An accepted preview can be saved to voice prompts and reused as reference audio by compatible cloning engines.
 
-Open [Voices](app:voices), select the **Voice creation** sub-tab, and choose **Qwen3-TTS**, **Breeze TTS 2**, or **OmniVoice** in the engine switch. **Gemini voice design** in the same row opens the separate Gemini designer for hosted Google voices.
+Open [Voices](app:voices), select the **Voice creation** sub-tab, and choose **Qwen3-TTS**, **Breeze TTS 2**, or **OmniVoice** in the **Design engine** switch. **Gemini voice design** in the same row opens the separate Gemini designer for hosted Google voices.
 
-![Voice Creation panel with engine selection, sample text, instructions, and preview controls](../../../static/help/screenshots/voice-creation.png)
+![Voice creation sub-tab with the Design engine switch, Gemini voice design, voice fields, Generate preview, and Save to voice prompts](../../../static/help/screenshots/voice-creation.png)
 
 *Describe the intended voice, generate a short preview, and save only an approved result to voice prompts.*
 
@@ -43,11 +43,11 @@ Use [Reference Voice Prompts](help:voice-prompts) to preview, archive, export, o
 
 ## Create voices from speaker profiles
 
-Prep Text can generate speaker profiles. Back on [Generate](app:generate), **Generate Voices** lets you select Qwen3 or Breeze and creates samples sequentially for all detected speakers, optionally adding a name prefix. The same choice is available for an individual speaker in Speaker Properties. See [Generate and Auto-Assign Voices](help:auto-assign-voices).
+Prep text or **Build profiles** can create speaker profiles. Back on [Generate](app:generate), the **…** button to the right of **Build profiles** (below the Cast list) opens **Generate voices**, where you choose Qwen3-TTS, Breeze TTS 2, or Gemini TTS · Cloud Voice Design under **Voice design engine**, an optional **Name prefix**, and **Candidates per speaker**. The same choice is available for one speaker under **Design a new voice** in its Edit speaker drawer. See [Generate and Auto-Assign Voices](help:auto-assign-voices).
 
 ## Quality and consent
 
-Generate several short candidates rather than committing a full book to the first preview. Confirm language, names, emotional range, and long-sentence stability with Quick Tests.
+Generate several short candidates rather than committing a full book to the first preview. Confirm language, names, emotional range, and long-sentence stability with **Quick test**.
 
 Use only voices and reference material you have the right and consent to use. A generated design can still resemble recognizable speech characteristics, and cloud services may impose additional usage policies.
 

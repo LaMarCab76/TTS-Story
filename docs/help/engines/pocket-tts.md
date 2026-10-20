@@ -12,9 +12,9 @@ Preset voices initialize and generate more simply than a new audio prompt. Use C
 
 ## Requirements and setup
 
-![Voice Prompts library for uploading and organizing reference voices](../../../static/help/screenshots/voice-prompts.png)
+![Voice prompts sub-tab for uploading and organizing reference voices](../../../static/help/screenshots/voice-prompts.png)
 
-*Pocket TTS Clone uses a saved reference from Voice Prompts; Preset mode does not require one.*
+*Pocket TTS Clone uses a saved reference from Voices → Voice prompts; Preset mode does not require one.*
 
 The normal setup installs `pocket-tts==1.0.3`. TTS-Story intentionally uses the older `b6369a24` model variant and declares this integration English-only, even if a newer upstream release advertises additional capabilities.
 
@@ -24,22 +24,22 @@ To enable cloning:
 
 1. Sign in and open the [Kyutai Pocket TTS model page](https://huggingface.co/kyutai/pocket-tts). Review and accept its access conditions, including the requirement for explicit and lawful consent when cloning a voice.
 2. Open [Hugging Face Access Tokens](https://huggingface.co/settings/tokens) and create either a **Read** token or a fine-grained token with read access to `kyutai/pocket-tts`.
-3. In TTS-Story, open **Settings → Engine Settings → Pocket TTS**, paste the token, and select **Verify Voice-Cloning Access**.
-4. Save Settings. The token is stored only in the local configuration, passed to the isolated Pocket TTS process, and removed by TTS-Story's repository-sync scrubber.
+3. In TTS-Story, open **Settings → Engines → Pocket TTS**, paste the token, and click **Verify voice-cloning access**.
+4. Click **Save settings**. The token is stored only in the local configuration, passed to the isolated Pocket TTS process, and removed by TTS-Story's repository-sync scrubber.
 
 Choose the preset or clone engine on Generate. For cloning, assign a supported audio prompt such as WAV or MP3, or a compatible `.safetensors` voice state. See [Reference Voice Prompts](help:voice-prompts).
 
 ## Controls TTS-Story exposes
 
 - **Model Variant:** keep `b6369a24` unless validating an adapter-compatible alternative
-- **Hugging Face Access Token:** required only for custom voice cloning; use **Verify Voice-Cloning Access** before starting a long job
-- **Chunk Size:** 450 characters by default; 300–500 is a useful starting range
+- **Hugging Face access token:** required only for custom voice cloning; use **Verify voice-cloning access** before starting a long job
+- **Chunk size (chars):** 450 characters by default; 300–500 is a useful starting range
 - **Temperature:** starts at 0.7; higher values can add variation and instability
 - **Decode Steps:** starts at 1; extra work is not automatically better for every passage
 - **Noise Clamp:** optional and blank by default
 - **EOS Threshold:** controls end-of-speech behavior; restore `-4.0` if clips end too early or continue unexpectedly after experimentation
-- **Default Voice Prompt** and **Truncate Prompt Audio**
-- **CPU Threads** and **Interop Threads:** blank means let the runtime choose
+- **Default voice prompt** and **Truncate prompt audio**
+- **CPU threads** and **Interop threads:** blank means let the runtime choose
 
 The preset voice list is read from the installed Pocket TTS package, so the exact names shown by TTS-Story belong to that pinned installation.
 

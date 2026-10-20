@@ -2,7 +2,7 @@
 
 A voice prompt is a clean audio clip used by a cloning engine to guide voice identity and delivery. TTS-Story manages uploaded files and generated voice-design samples on the **Voice prompts** sub-tab of [Voices](app:voices).
 
-![Voice Prompts manager with upload, filtering, preview, and library actions](../../../static/help/screenshots/voice-prompts.png)
+![Voice prompts sub-tab with search and filters, Load external voices, Add voice, the drop zone, and the prompt table](../../../static/help/screenshots/voice-prompts.png)
 
 *Use the prompt manager to upload clean references, verify metadata, preview clips, and maintain the reusable library.*
 
@@ -48,10 +48,10 @@ Each row has a play button, an edit icon, and a **More actions** menu with expor
 ## Assign a prompt
 
 1. Open [Generate](app:generate) and select a reference-based engine.
-2. Analyze the text and click a speaker chip.
-3. Select the prompt in the reference selector.
-4. Enter a transcript if the selected engine exposes and requires one.
-5. Use **Quick Test**.
+2. Let the text be analyzed and click the speaker in the **Cast** list.
+3. In the **Edit speaker** drawer, choose the clip in **Voice Sample** (use the filter field above it for long lists).
+4. If the engine needs a transcript, make sure the prompt has one (pencil icon on the **Voice prompts** sub-tab).
+5. Click **Test** under **Quick test**. For reference engines this replays the clip with the selected pitch and speed.
 
 The same prompt can behave differently across Chatterbox, VoxCPM, Pocket TTS, Qwen3, OmniVoice, IndexTTS, and Dot.TTS. Test it with the actual engine rather than relying on the raw clip preview.
 

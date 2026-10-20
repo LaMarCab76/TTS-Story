@@ -2,7 +2,7 @@
 
 A custom Kokoro voice combines one or more built-in voice packs. One component creates a reusable custom alias for that voice; two or more components create an actual blend. It is reusable anywhere a Kokoro voice can be selected and requires no reference recording.
 
-![Custom Kokoro Voice Blend editor with component voices and weight controls](../../../static/help/screenshots/kokoro-blend.png)
+![New blend dialog with name, language, weighted component voices, Add component, notes, and Save blend](../../../static/help/screenshots/kokoro-blend.png)
 
 *Build a reusable blend by choosing same-language components and adjusting their relative weights.*
 
@@ -42,6 +42,6 @@ Use the delete icon only after checking saved Projects and planned jobs. A proje
 
 ## Assign and test
 
-Open [Generate](app:generate), select a Kokoro engine, click the speaker chip, and choose the custom name from the appropriate language group. Run **Quick Test** with the manuscript's actual language and punctuation.
+Open [Generate](app:generate), select a Kokoro engine in **Output**, click the speaker in the **Cast** list, and choose the blend in **Voice** (blends are listed with the built-in voices of their language). Click **Test** under **Quick test** with the manuscript's actual language and punctuation.
 
 For built-in catalog guidance, see [Kokoro Voices and Previews](help:kokoro-voices).

@@ -10,7 +10,7 @@ After chunks complete, TTS-Story estimates the remaining time from elapsed time 
 
 *Queue progress becomes a more useful planning estimate after several representative chunks have completed.*
 
-The duration shown in Generate statistics is different: it assumes about 150 spoken words per minute and estimates listening length, not synthesis time.
+The ≈ duration in the manuscript footer on Generate is different: it assumes about 150 spoken words per minute and estimates listening length, not synthesis time.
 
 ## Measure your own baseline
 
@@ -18,7 +18,7 @@ The most useful estimate comes from one representative chapter.
 
 1. Use the same engine, voice type, output format, and effects planned for the book.
 2. Generate a chapter containing narration and dialogue.
-3. Open **Metrics** on its [Library](app:library) card when metrics are available.
+3. In [Library](app:library), open the production's **…** menu and choose **Metrics** (shown when timing metrics are available).
 4. Record total processing time, chunk count, and audio duration.
 5. Scale cautiously for the remaining word or chunk count.
 
@@ -36,7 +36,7 @@ If a representative 1,500-word chapter takes 12 minutes after the model is alrea
 - Voice cloning that analyzes a prompt for many chunks
 - Per-chunk speed/pitch processing
 - ACX normalization and compressed output encoding
-- Chapter, Full Story, ZIP, or M4B compilation
+- Chapter, Full story, ZIP, or M4B compilation
 - Provider rate limits, network latency, or account concurrency limits
 - Very small text chunks, which increase request and merge overhead
 

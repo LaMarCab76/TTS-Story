@@ -4,15 +4,15 @@ Audio8 TTS is a compact local 0.6B-parameter model that produces 44.1 kHz speech
 
 ## Install and first use
 
-Open [Settings → Engine Settings](app:settings/audio8-tts), select **Audio8 TTS**, and choose **Install Engine**. TTS-Story creates `engines/audio8_tts/.venv`; it does not change another engine's packages. The model weights download into Audio8's isolated model directory during the first generation, so that first request can take several minutes.
+Open [Settings → Engines](app:settings/audio8-tts), select **Audio8 TTS**, and click **Install engine**. TTS-Story creates `engines/audio8_tts/.venv`; it does not change another engine's packages. The model weights download into Audio8's isolated model directory during the first generation, so that first request can take several minutes.
 
 CUDA is recommended. CPU mode is available in float32 but can be too slow for audiobook-length work. The separately released ONNX runtime is not used by this initial adapter.
 
 ## Prepare a reference voice
 
-![Voice Prompts library for adding and managing reference recordings](../../../static/help/screenshots/voice-prompts.png)
+![Voice prompts sub-tab for adding and managing reference recordings](../../../static/help/screenshots/voice-prompts.png)
 
-Audio8 needs an exact transcript whenever you select a reference recording. In **Available Voices → Voice Prompts**, upload a clean single-speaker sample and enter its transcript or use **Generate Transcript**. Samples without transcripts remain in the library but cannot condition Audio8 cloning.
+Audio8 needs an exact transcript whenever you select a reference recording. On the **Voice prompts** sub-tab of **Voices**, upload a clean single-speaker sample (**Add voice**) and enter its transcript, or use **More actions (…) → Generate transcript**. Samples without transcripts remain in the library but cannot condition Audio8 cloning.
 
 For best results, use a clean sample with no music, echo, overlapping speech, clipping, or heavy compression. Audio8 can also synthesize without a reference, but that path does not preserve a selected speaker identity.
 
@@ -20,7 +20,7 @@ For best results, use a clean sample with no music, echo, overlapping speech, cl
 
 - **Model:** the official 0.6B preview model by default
 - **Device and Precision:** Auto selects CUDA/BF16 when available and CPU/FP32 otherwise
-- **Preferred Chunk Size:** 140 characters by default. This is a quality target, not a forced sentence break.
+- **Preferred chunk size (chars):** 140 characters by default. This is a quality target, not a forced sentence break.
 - **Sentence Hard Limit:** 400 characters by default. Complete sentences stay intact up to this ceiling; longer sentences split at punctuation or clause boundaries where possible.
 - **Temperature, Top P, and Top K:** upstream sampling controls
 - **Base Seed:** combined with chunk order for repeatable resume behavior

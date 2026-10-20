@@ -4,9 +4,9 @@ TTS-Story offers local engines and remote providers, including Breeze API for ho
 
 Choose an engine for the voice source you need first, then consider hardware, language, privacy, and cost. A fast engine with the wrong voice is rarely the best choice for a long project.
 
-The initial installer now installs only TTS-Story's core application and shared audio tools. Open **Settings → Engine Settings** to install individual local engines or configure hosted services. Every installed local engine receives a dedicated virtual environment plus an engine-owned model/cache folder, preventing one engine's PyTorch, Transformers, or other package versions from changing another engine. Red tabs require attention; green tabs are ready. Only ready engines are listed on the Generate page, so unused models and isolated environments no longer consume installation time or disk space.
+The initial installer now installs only TTS-Story's core application and shared audio tools. Open **Settings → Engines** to install individual local engines or configure hosted services. Every installed local engine receives a dedicated virtual environment plus an engine-owned model/cache folder, preventing one engine's PyTorch, Transformers, or other package versions from changing another engine. In the engine list, a grey (*Not installed*) or amber (*Needs setup*) dot means the engine still needs attention; a green dot means it is ready. Only ready engines are listed on the Generate page, so unused models and isolated environments no longer consume installation time or disk space.
 
-Ready local engines can be removed from the same panel. **Uninstall Engine** removes only that engine's isolated environment and downloaded models. It retains the core application along with every project, setting, generated audio file, and saved reference voice. Reinstallation recreates a compatible environment and requires downloading the removed runtime and models again. See [Install, Remove, and Reinstall TTS Engines](help:engine-management) for the complete workflow.
+Ready local engines can be removed from the same panel. **Remove engine** removes only that engine's isolated environment and downloaded models, and **Repair** re-runs the installer for an installed engine. It retains the core application along with every project, setting, generated audio file, and saved reference voice. Reinstallation recreates a compatible environment and requires downloading the removed runtime and models again. See [Install, Remove, and Reinstall TTS Engines](help:engine-management) for the complete workflow.
 
 ## Quick comparison
 
@@ -33,7 +33,7 @@ Ready local engines can be removed from the same panel. **Uninstall Engine** rem
 | OpenAI-compatible TTS | Cloud or compatible endpoint | Provider voice IDs | OpenAI speech models or another compatible service | Voice cloning is not part of the standard OpenAI speech request |
 | LocalAI TTS | Self-hosted service | LocalAI voices, saved profiles, or transcript-ready TTS-Story prompts when supported | Reuse models already deployed in LocalAI without a duplicate TTS-Story install | Hardware, model support, and reliability belong to the LocalAI host |
 
-OmniVoice Design is available through [Voice Creation](help:voice-creation). It turns an instruction into speech locally, but it is not in the normal Generate engine list.
+OmniVoice Design is available through [Voices → Voice creation](help:voice-creation). It turns an instruction into speech locally, but it is not in the normal Generate engine list.
 
 ## Hardware and privacy
 
@@ -47,19 +47,19 @@ OmniVoice Design is available through [Voice Creation](help:voice-creation). It 
 
 Cloning reproduces characteristics from a clean reference recording. Use a short, single-speaker clip with little noise, music, reverberation, or compression. Engines that request a transcript work best when it matches the clip exactly. See [Reference Voice Prompts](help:voice-prompts).
 
-Voice design starts from a written description. TTS-Story exposes Qwen3 VoiceDesign and OmniVoice Design through Voice Creation. A designed result can be saved as a reusable prompt, but it is not the same as a permanently trained custom model.
+Voice design starts from a written description. TTS-Story exposes Qwen3 VoiceDesign, Breeze TTS 2 design, and OmniVoice Design through **Voices → Voice creation**. A designed result can be saved as a reusable prompt, but it is not the same as a permanently trained custom model.
 
 Kokoro custom voices are weighted blends of compatible Kokoro embeddings. They are neither reference clones nor newly trained voices.
 
 ## Settings shared by engines
 
-![Engine Settings navigation with the engine tabs and configuration panels](../../../static/help/screenshots/engine-settings-navigation.png)
+![Settings → Engines list with status dots and an engine panel](../../../static/help/screenshots/engine-settings-navigation.png)
 
-*Expand Engine Settings, then select an engine tab to reveal its dedicated controls.*
+*Open Settings → Engines, then select an engine in the list to show its controls.*
 
-Engine-specific controls live under [Settings → Engine Settings](app:settings). Output format, bitrate, chunk transitions, silence, global speed, chapter behavior, and VRAM cleanup are separate generation settings. Per-speaker assignments can override the default voice, language, prompt, speed, and supported engine extras.
+Engine-specific controls live under [Settings → Engines](app:settings). Output format, bitrate, chunk transitions, silence, global speed, chapter behavior, and VRAM cleanup are separate generation settings. Per-speaker assignments can override the default voice, language, prompt, speed, and supported engine extras.
 
-Start with defaults and a short representative passage. Change one setting at a time, use Quick Test, and keep the result that sounds better rather than assuming a larger number means higher quality. See [Performance Tuning](help:performance-tuning) and [Generation Time and ETA](help:generation-times).
+Start with defaults and a short representative passage. Change one setting at a time, use **Quick test**, and keep the result that sounds better rather than assuming a larger number means higher quality. See [Performance Tuning](help:performance-tuning) and [Generation Time and ETA](help:generation-times).
 
 ## First-run expectations
 

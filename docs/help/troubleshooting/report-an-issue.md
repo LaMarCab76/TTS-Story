@@ -14,7 +14,7 @@ Check existing reports at [TTS-Story Issues](https://github.com/Xerophayze/TTS-S
 
 Do not remove the failed Queue or Library item until evidence is collected.
 
-![Job Details dialog with the non-sensitive fields useful in an issue report](../../../static/help/screenshots/job-details.png)
+![Job details window with the non-sensitive fields useful in an issue report](../../../static/help/screenshots/job-details.png)
 
 *Record the Job ID, selected engine, status, progress, and exact error, then redact private text and paths before sharing.*
 
@@ -51,10 +51,10 @@ Write numbered steps beginning from startup. For example:
 1. Start TTS-Story and select Edge TTS.
 2. Load the voice catalog and choose a named voice.
 3. Paste the attached two-sentence sample.
-4. Assign the voice and click Quick Test.
+4. Assign the voice and click **Test** under **Quick test**.
 5. Observe the exact error.
 
-Attach a tiny synthetic/public-domain input when possible. State whether Quick Test, full generation, Library regeneration, rebuild, or export fails; those use different paths.
+Attach a tiny synthetic/public-domain input when possible. State whether Quick test, full generation, Library regeneration, rebuild, or export fails; those use different paths.
 
 ## Include safe diagnostic output
 
@@ -66,7 +66,7 @@ Useful evidence includes:
 - the per-job `static/audio/<job-id>/job.log` after reviewing it; and
 - a screenshot with private fields obscured.
 
-Job Details can include full manuscript text. Job logs and paths can reveal usernames, filenames, speaker names, or project titles. Read every attachment and redact private material before posting.
+The **Job details** window (Details → Full details) can include the full manuscript text. Job logs and paths can reveal usernames, filenames, speaker names, or project titles. Read every attachment and redact private material before posting.
 
 ## Never include
 

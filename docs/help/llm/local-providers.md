@@ -15,35 +15,35 @@ In LM Studio or Ollama:
 1. Install or download a model that can follow editing instructions.
 2. Load the model if the provider requires it.
 3. Start the local API server.
-4. Keep the server running while Prep Text is active.
+4. Keep the server running while Prep text is active.
 
 A model can be fully local while still consuming substantial RAM or VRAM. Leave enough resources for the TTS engine you intend to use later, or unload the LLM before speech generation.
 
 ## Connect to LM Studio
 
-1. Open [Settings](app:settings) and expand **LLM Pre-Processing**.
-2. Choose **Local (LM Studio / Ollama)** as the LLM Provider.
-3. Choose **LM Studio (OpenAI-compatible)** as Local Provider.
+1. Open [Settings](app:settings) and choose **Text prep (LLM)**.
+2. Choose **Local (LM Studio / Ollama)** as **Primary provider**.
+3. Choose **LM Studio (OpenAI-compatible)** as **Local provider** in the *Local LLM (LM Studio / Ollama)* card.
 4. Use `http://localhost:1234/v1` as the Base URL unless LM Studio shows a different port.
 5. Add an API key only if your local server requires one.
-6. Click **Fetch Local Models**, select a model, and click **Save Settings**.
+6. Click **Fetch local models**, select a model, and click **Save settings**.
 
 TTS-Story normalizes LM Studio's OpenAI-compatible URL to include `/v1`, but entering the complete URL makes the configuration easier to verify.
 
 ## Connect to Ollama
 
-1. Choose **Ollama** as Local Provider.
+1. Choose **Ollama** as **Local provider**.
 2. Use `http://localhost:11434` as the Base URL unless Ollama is listening elsewhere.
-3. Click **Fetch Local Models**.
-4. Select a locally installed model and click **Save Settings**.
+3. Click **Fetch local models**.
+4. Select a locally installed model and click **Save settings**.
 
 Do not add `/v1` to the normal Ollama URL. The two local providers use different request formats.
 
 ## Test with a small section
 
-Before processing a book, open [Generate](app:generate), paste a few paragraphs, and run **Prep Text** with a narrow prompt. Confirm that:
+Before processing a book, open [Generate](app:generate), paste a few paragraphs, and run **Prep text** with a narrow prompt. Confirm that:
 
-- a model appears in **Fetch Local Models**;
+- a model appears after **Fetch local models**;
 - the request completes before the configured timeout;
 - the response contains only the revised manuscript text;
 - speaker and chapter tags remain balanced; and

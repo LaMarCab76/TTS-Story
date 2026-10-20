@@ -18,9 +18,9 @@ Avoid conflicting goals such as “preserve every word” and “rewrite for nat
 
 ## Use presets
 
-In [Settings](app:settings), expand **LLM Pre-Processing** and use **Prompt Presets** to save a named instruction. On [Generate](app:generate), select the preset beside **Prep Text**.
+In [Settings](app:settings), choose **Text prep (LLM)** and use the **Prompt presets** card (**Preset name**, **Preset prompt**, **Save preset**) to save a named instruction. On [Generate](app:generate), select the preset in the prompt selector beside **Prep text**.
 
-The Prompt Prefix is the general instruction used for processing. A selected preset supplies the preparation instruction for that run. The separate Speaker Profile Prompt guides the profile request made after text preparation; it does not rewrite the manuscript.
+The **Prompt prefix** is the general instruction used for processing. A selected preset supplies the preparation instruction for that run. The separate **Speaker profile prompt** guides the profile request made after text preparation; it does not rewrite the manuscript.
 
 Save a Project before experimenting. Projects preserve the current editor text and selected prompt information, but they do not preserve global provider settings or API keys. See [Save and Restore Projects](help:projects).
 
@@ -51,23 +51,23 @@ Change one setting at a time and rerun the same small sample.
 
 ## Pause, resume, restart, and abort
 
-![Prep Text progress with pause and resume actions](../../../static/help/screenshots/prep-text-resume.png)
+![Paused Prep text strip with Resume, Restart, and Abort under the Manuscript header](../../../static/help/screenshots/prep-text-resume.png)
 
 *Use these controls to stop safely between sections or continue a saved preparation run.*
 
-Prep Text processes sections sequentially. Failures marked retryable by the provider, including HTTP 503 responses, are retried up to five times; authentication, validation, and other non-retryable failures stop immediately. **Pause** stops further progress, **Resume** continues saved progress, **Restart** clears that progress and starts again from section 1, and **Abort** abandons the active run.
+Prep text processes sections sequentially. Failures marked retryable by the provider, including HTTP 503 responses, are retried up to five times; authentication, validation, and other non-retryable failures stop immediately. **Pause** stops further progress, **Resume** continues saved progress, **Restart** clears that progress and starts again from section 1, and **Abort** abandons the active run.
 
 Resume is tied to the current source text. Material edits can make saved progress unsuitable, so restart after changing the manuscript or prompt.
 
 ## Mandatory review
 
-When processing completes, the generated result replaces the Generate editor contents. Before synthesis:
+When processing completes, the generated result replaces the Generate manuscript. Before synthesis:
 
 1. Compare the output with the saved source.
 2. Search for proper names and numeric values.
 3. Check every speaker tag pair.
 4. Review text at section boundaries.
-5. Confirm headings with **Review detected sections**.
-6. Run a short Quick Test for each important voice.
+5. Confirm headings with **Review N sections** in the Chapters section.
+6. Run a short **Quick test** for each important voice.
 
 Continue with [Prepare Text with an LLM](help:prep-text) or [Analyze Text and Review Statistics](help:text-statistics).

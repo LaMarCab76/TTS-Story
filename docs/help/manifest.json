@@ -1,7 +1,7 @@
 {
   "title": "TTS-Story User Guide",
   "subtitle": "From first launch to a finished, reviewed audiobook",
-  "version": "2026.08.31.1",
+  "version": "2026.10.20.1",
   "categories": [
     {
       "id": "start-here",
@@ -168,7 +168,7 @@
       "id": "workflow-map",
       "file": "start-here/workflow-map.md",
       "title": "How the Pages Work Together",
-      "summary": "See how Generate, Job Queue, Library, Available Voices, and Settings share one workflow.",
+      "summary": "See how Generate, Job Queue, Library, Voices, and Settings share one workflow.",
       "keywords": ["workflow", "generate", "queue", "library", "voices", "settings"],
       "related": ["welcome", "job-queue", "audio-library"]
     },
@@ -194,7 +194,7 @@
       "file": "create-audio/input-text.md",
       "title": "Enter or Import Your Text",
       "summary": "Paste a story or import supported document formats while keeping a clean source copy.",
-      "keywords": ["paste", "document", "pdf", "docx", "epub", "drag drop", "input"],
+      "keywords": ["paste", "document", "pdf", "docx", "epub", "drag drop", "input", "manuscript", "script view", "raw tags", "load document"],
       "related": ["speaker-tags", "prep-text", "projects"]
     },
     {
@@ -202,7 +202,7 @@
       "file": "create-audio/speaker-tags.md",
       "title": "Speaker and Expression Tags",
       "summary": "Structure multi-voice text correctly and use paralinguistic tags only with engines that support them.",
-      "keywords": ["speaker tags", "narrator", "alice", "paralinguistic", "laugh", "sigh"],
+      "keywords": ["speaker tags", "narrator", "alice", "paralinguistic", "laugh", "sigh", "insert tag", "tag issues", "auto-fix"],
       "related": ["text-statistics", "assign-voices", "engine-chatterbox"]
     },
     {
@@ -226,7 +226,7 @@
       "file": "create-audio/text-statistics.md",
       "title": "Analyze Text and Review Statistics",
       "summary": "Use automatic analysis to confirm speaker count, chunks, word count, and duration before generating.",
-      "keywords": ["analyze", "statistics", "speakers", "chunks", "duration"],
+      "keywords": ["analyze", "statistics", "speakers", "chunks", "duration", "word count", "cast", "footer"],
       "related": ["speaker-tags", "assign-voices", "generation-times"]
     },
     {
@@ -234,7 +234,7 @@
       "file": "create-audio/assign-voices.md",
       "title": "Assign and Test Voices",
       "summary": "Build individual speaker profiles and assign each detected speaker a compatible, tested voice.",
-      "keywords": ["voice assignment", "speaker", "speaker properties", "Build Profile", "quick test", "pitch", "speed", "FX"],
+      "keywords": ["voice assignment", "speaker", "cast", "edit speaker", "drawer", "speaker properties", "Build Profile", "quick test", "mark as ready", "pitch", "speed", "FX"],
       "related": ["available-voices", "voice-prompts", "auto-assign-voices"]
     },
     {
@@ -242,7 +242,7 @@
       "file": "create-audio/generation-options.md",
       "title": "Generation and Output Options",
       "summary": "Choose the job engine, format, bitrate, ACX processing, and chapter behavior.",
-      "keywords": ["MP3", "WAV", "OGG", "bitrate", "ACX", "generate", "output"],
+      "keywords": ["MP3", "WAV", "OGG", "bitrate", "ACX", "generate", "output", "generate audio", "separate file per chapter"],
       "related": ["chapters-and-sections", "audiobook-exports", "settings-audio"]
     },
     {
@@ -258,7 +258,7 @@
       "file": "create-audio/projects.md",
       "title": "Save and Restore Projects",
       "summary": "Preserve in-progress text, assignments, and generation choices before experimenting.",
-      "keywords": ["project", "save", "load", "restore", "draft"],
+      "keywords": ["project", "save", "load", "restore", "draft", "project switcher", "manage projects"],
       "related": ["data-storage", "input-text", "quick-start"]
     },
 
@@ -336,8 +336,8 @@
     {
       "id": "engine-index-tts",
       "file": "engines/index-tts.md",
-      "title": "IndexTTS",
-      "summary": "Run IndexTTS-2 zero-shot cloning in its isolated environment and tune sampling conservatively.",
+      "title": "IndexTTS 2.5",
+      "summary": "Run IndexTTS 2.5 (or 2) zero-shot cloning in its isolated environment and tune sampling and emotion guidance conservatively.",
       "keywords": ["IndexTTS", "IndexTTS-2", "clone", "FP16", "diffusion", "beam"],
       "related": ["voice-prompts", "gpu-cpu-errors", "performance-tuning"],
       "engine_ids": ["index_tts"]
@@ -487,7 +487,7 @@
       "file": "library/audio-library.md",
       "title": "Use the Audio Library",
       "summary": "Play full stories or chapters, rename collections, inspect metrics, and download completed work.",
-      "keywords": ["library", "play", "chapter", "download", "metrics", "time codes", "alt words"],
+      "keywords": ["library", "play", "chapter", "download", "metrics", "time codes", "alt words", "review chunks", "rebuild", "edit metadata"],
       "related": ["job-review", "library-editing-repair", "audiobook-exports"]
     },
     {
@@ -560,7 +560,7 @@
       "id": "settings",
       "file": "settings/settings.md",
       "title": "Settings Reference",
-      "summary": "Understand global defaults, engine tabs, save behavior, and when per-job choices override settings.",
+      "summary": "Understand the Settings sections, the Engines list, save behavior, and when per-job choices override settings.",
       "keywords": ["settings", "default engine", "save", "reset", "configuration"],
       "related": ["settings-audio", "engine-overview", "data-storage"]
     },
@@ -569,7 +569,7 @@
       "file": "settings/engine-management.md",
       "title": "Install, Remove, and Reinstall TTS Engines",
       "summary": "Manage optional local engines, isolated environments, first-run downloads, live progress, restarts, and safe removal.",
-      "keywords": ["install engine", "uninstall engine", "reinstall", "isolated environment", "venv", "model download", "restart", "red chip", "green chip"],
+      "keywords": ["install engine", "remove engine", "uninstall engine", "repair", "reinstall", "isolated environment", "venv", "model download", "restart", "status dot", "remote admin"],
       "related": ["engine-overview", "first-run", "gpu-cpu-errors", "engine-localai-tts"]
     },
     {

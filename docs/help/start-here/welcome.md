@@ -11,24 +11,24 @@ The program can work entirely on your computer, use online speech services, or c
 | **Generate** | Enter or import text, optionally prepare it with an LLM, review speakers and sections, assign voices, and submit an audio job. |
 | **Job Queue** | Monitor queued and active work, inspect progress, and respond to a paused, failed, or cancelled job. |
 | **Library** | Play completed stories and chapters, review or regenerate chunks, repair saved work, and download final audio. |
-| **Available Voices** | Browse built-in voices, make Kokoro blends, create voices, and manage reference recordings for cloning engines. |
+| **Voices** | Browse built-in Kokoro voices, make Kokoro blends, design voices, and manage the reference recordings (Voice prompts) used by cloning engines. |
 | **Settings** | Choose saved defaults, configure individual engines, enter cloud credentials, and tune audio or LLM behavior. |
-| **Help** | Read this guide or open a contextual article from a **?** button elsewhere in the interface. |
+| **Help Center** | Read this guide (bottom of the left sidebar) or open a contextual article from a **?** button elsewhere in the interface. |
 
-![TTS-Story Generate page with application status, navigation tabs, input text, and preparation controls](../../../static/help/screenshots/generate-overview.png)
+![TTS-Story Generate page with the left sidebar, the Manuscript editor, and the Cast, Output and Chapters column](../../../static/help/screenshots/generate-overview.png)
 
-*The Generate page is the starting point; the top tabs lead to the queue, Library, voices, Settings, and this guide.*
+*The Generate page is the starting point; the left sidebar leads to Job Queue, Library, Voices, Settings, and Help Center.*
 
-Open any page directly: [Generate](app:generate), [Job Queue](app:queue), [Library](app:library), [Available Voices](app:voices), or [Settings](app:settings).
+Open any page directly: [Generate](app:generate), [Job Queue](app:queue), [Library](app:library), [Voices](app:voices), or [Settings](app:settings).
 
 ## A dependable production workflow
 
 1. Keep an untouched copy of the manuscript outside TTS-Story.
 2. Choose and configure one TTS engine.
 3. Enter or import a short representative passage.
-4. Wait for **Text Statistics** to appear; analysis happens automatically after you edit the input.
+4. Wait for the counts under the manuscript (speakers, chunks, words, ≈ duration) and the **Cast** list to appear; analysis happens automatically after you edit the manuscript.
 5. Correct speaker tags and review the detected speakers and sections.
-6. Assign and **Quick Test** every important voice.
+6. Assign a voice to every speaker in the **Cast** list and check it with **Quick test** in the Edit speaker drawer.
 7. Generate a short job before committing to a full book.
 8. Monitor the job in **Job Queue**.
 9. Review the completed audio in **Library**, correcting only the chunks that need attention.
@@ -46,7 +46,7 @@ See [Choose the Right Engine](help:choose-engine) and [Configure Online Services
 
 ## Three ideas that prevent most mistakes
 
-> **Protect the source.** **Prep Text** replaces the text currently in the input field. Document imports append to existing input. Projects are shared within one TTS-Story installation, but they are not portable backup files.
+> **Protect the source.** **Prep text** replaces the whole manuscript. Document imports append to the existing manuscript. Projects are shared within one TTS-Story installation, but they are not portable backup files.
 
 > **Test small.** A few paragraphs containing narration, dialogue, difficult names, and chapter headings reveal more than a generic one-line sample.
 

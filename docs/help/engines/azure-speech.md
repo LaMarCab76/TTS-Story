@@ -14,23 +14,23 @@ No local inference GPU or model download is required. Every synthesis request ne
 
 ## Create and connect a resource
 
-![Azure Speech settings with credential, region, voice, and connection controls](../../../static/help/screenshots/azure-speech-settings.png)
+![Microsoft Azure Speech panel in Settings → Engines with the speech resource key, region, default voice, request settings, Save provider, and Test connection & load voices](../../../static/help/screenshots/azure-speech-settings.png)
 
 *Enter the matching Azure key and region, then load the regional voice catalog before saving.*
 
 1. In Azure, create an Azure AI Speech resource and review its pricing tier.
 2. Open that resource's **Keys and Endpoint** page.
-3. In [Settings → Engine Settings](app:settings/azure-speech), select **Azure Speech** and enter one resource key and the exact region shown by Azure, such as `eastus`.
-4. Select **Test Connection & Load Voices**. A successful response replaces the initial fallback entry with voices returned for that region.
-5. Choose a default voice, save settings, and make a short Quick Test before starting a job.
+3. In [Settings → Engines](app:settings/azure-speech), select **Azure Speech**, enter the **Speech resource key** and the exact **Region** shown by Azure, such as `eastus`.
+4. Click **Test connection & load voices**. A successful response replaces the initial fallback entry with voices returned for that region.
+5. Choose a default voice, click **Save provider**, and run a short **Quick test** before starting a job.
 
 The key and region must belong to the same resource. A copied endpoint URL is not a substitute for the Region field. TTS-Story stores the credential in local configuration; do not share that file or include it in an issue report.
 
 ## Controls TTS-Story exposes
 
-- **Default Voice:** `en-US-AvaMultilingualNeural` until a catalog is loaded or another voice is saved
+- **Default voice:** `en-US-AvaMultilingualNeural` until a catalog is loaded or another voice is saved
 - **Azure WAV Quality:** 24 kHz or 48 kHz, 16-bit mono PCM; this is provider/intermediate quality, while the final MP3/WAV/OGG choice is separate
-- **Chunk Size:** 1000 characters by default; larger sentence-aware chunks reduce request count
+- **Chunk size (chars):** 1000 characters by default; larger sentence-aware chunks reduce request count
 - **Request Limit per Minute:** 20 by default, matching the conservative Azure F0 transaction limit; `0` disables TTS-Story's local throttle
 - **Request Timeout:** 60 seconds by default
 - **Default Style, Role, and Style Intensity:** populated only when supported by the selected voice
