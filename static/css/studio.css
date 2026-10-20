@@ -1274,7 +1274,8 @@ input[type="checkbox"].switch:focus-visible {
     grid-template-columns: 224px minmax(0, 1fr);
     height: 100vh;
     min-width: 1180px;
-    min-height: 720px;
+    /* The design frame is 720px tall; 600px keeps "Generate audio" on screen on 768px laptops. */
+    min-height: 600px;
     overflow: hidden;
     background: var(--st-bg);
     color: var(--st-text);
