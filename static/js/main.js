@@ -3982,6 +3982,17 @@ function hideAnalysis() {
     if (chapterInfo) {
         chapterInfo.style.display = 'none';
     }
+    // The stat values live in the always-visible manuscript footer bar, so reset them.
+    ['stat-speakers', 'stat-chunks', 'stat-words'].forEach(id => {
+        const statEl = document.getElementById(id);
+        if (statEl) {
+            statEl.textContent = '0';
+        }
+    });
+    const durationStat = document.getElementById('stat-duration');
+    if (durationStat) {
+        durationStat.textContent = '0:00';
+    }
     currentStats = null;
     updateSectionReviewButton(false);
     refreshChapterHint();

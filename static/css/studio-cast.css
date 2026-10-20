@@ -1,2 +1,33 @@
 /* studio-cast.css — Cast list + Edit-speaker drawer (Generate screen).
    Owned by the cast screen agent of the "Estudio" redesign. Loaded after studio.css. */
+
+/* --------------------------------------------------------------------------
+   #cast-section is styled HERE (not in studio-generate.css).
+
+   Markup (templates/index.html, inside #generate-tab > aside.generate-aside >
+   .generate-aside-scroll, first child):
+
+     section#cast-section.cast-section
+       .cast-header                      "Cast" title (count / List·Details toggle go here)
+       div#stats-section.cast-body       display toggled inline by main.js
+                                         (displayStatistics → block; hideAnalysis → none)
+         .speakers-header-row
+           #speakers-list                rebuilt by displayStatistics (.speaker-tag[data-speaker])
+           .speakers-actions             #build-speaker-profiles-btn, #generate-voices-btn,
+                                         #generate-voices-unavailable, #auto-assign-voices-btn
+         #speakers-duplicates            display toggled by renderSpeakerDuplicates
+         #inline-voice-assignments       always display:none; holds the hidden
+           #inline-voice-assignment-list per-speaker rows (.speaker-assignment-host)
+
+   The Output and Chapters sections that follow are styled in studio-generate.css.
+   -------------------------------------------------------------------------- */
+
+/* Provisional skeleton spacing so the aside is usable before the cast restyle;
+   replace freely. */
+#cast-section {
+    padding: 18px 20px;
+}
+
+#cast-section .cast-header {
+    margin-bottom: 10px;
+}

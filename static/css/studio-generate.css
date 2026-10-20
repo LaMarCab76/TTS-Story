@@ -1,2 +1,279 @@
 /* studio-generate.css — Generate screen (manuscript + output aside).
    Owned by the generate screen agent of the "Estudio" redesign. Loaded after studio.css. */
+
+/* --------------------------------------------------------------------------
+   Region skeleton (layout only; region contents are restyled by the
+   generate agent here and by the cast agent in studio-cast.css)
+
+   #generate-tab.generate-screen            grid: manuscript | 340px aside
+     section.manuscript-pane                flex column
+       .manuscript-header                   60px bar
+       .manuscript-toolbar                  44px bar
+       .manuscript-strips                   tag errors / prep progress / resume
+       #text-input-wrapper.manuscript-editor  flex:1
+       .manuscript-footer                   34px stats bar
+     aside.generate-aside                   flex column
+       .generate-aside-scroll               #cast-section, .output-section, .chapters-section
+       .generate-aside-footer               sticky: pending review, Generate, queue, latest audio
+   -------------------------------------------------------------------------- */
+.app-main > #generate-tab.tab-content.active {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-rows: minmax(0, 1fr);
+}
+
+#generate-tab .manuscript-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+#generate-tab .manuscript-header {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 60px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--st-border);
+}
+
+#generate-tab .manuscript-title-group {
+    display: flex;
+    flex: none;
+    align-items: baseline;
+    gap: 12px;
+    max-width: 50%;
+    white-space: nowrap;
+}
+
+#generate-tab .manuscript-title-group > :not(.manuscript-subtitle) {
+    flex: none;
+}
+
+#generate-tab .manuscript-subtitle {
+    display: flex;
+    gap: 10px;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--st-text-muted);
+    text-overflow: ellipsis;
+}
+
+#generate-tab .manuscript-subtitle > * {
+    margin: 0;
+}
+
+#generate-tab .manuscript-actions {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+#generate-tab .manuscript-actions > * {
+    flex: none;
+}
+
+/* Until Load document / Alt word registry become 32px icon buttons, let them
+   give way (clipped, never overlapping) on narrow windows. */
+#generate-tab .manuscript-actions > .manuscript-upload,
+#generate-tab .manuscript-actions > #alt-word-registry-btn {
+    flex: 0 1 auto;
+    min-width: 44px;
+}
+
+#generate-tab .manuscript-actions > #alt-word-registry-btn {
+    justify-content: flex-start;
+    overflow: hidden;
+}
+
+#generate-tab .manuscript-upload {
+    display: flex;
+}
+
+#generate-tab .manuscript-upload > .btn {
+    justify-content: flex-start;
+    min-width: 0;
+    overflow: hidden;
+}
+
+#generate-tab .manuscript-actions > .manuscript-prep {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+#generate-tab .manuscript-prep > button {
+    flex: none;
+}
+
+#generate-tab .manuscript-prep select {
+    flex: 0 1 auto;
+    width: auto;
+    min-width: 72px;
+    max-width: 220px;
+}
+
+#generate-tab .manuscript-header-divider {
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background: var(--st-border-control);
+}
+
+#generate-tab .manuscript-toolbar {
+    position: relative;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--st-border-soft);
+}
+
+#generate-tab .manuscript-insert-tag {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+#generate-tab .manuscript-insert-tag .paralinguistic-tags-bar,
+#generate-tab .manuscript-insert-tag .tags-buttons {
+    flex-wrap: nowrap;
+    margin: 0;
+    white-space: nowrap;
+}
+
+#generate-tab .manuscript-insert-tag .btn-tag {
+    flex: none;
+}
+
+#generate-tab .manuscript-toolbar-spacer,
+#generate-tab .manuscript-footer-spacer {
+    flex: 1;
+}
+
+#generate-tab .manuscript-toolbar .clear-text-btn {
+    position: static;
+    flex: none;
+}
+
+#generate-tab .manuscript-strips {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+}
+
+#generate-tab .manuscript-editor {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto;
+}
+
+#generate-tab .manuscript-editor #input-text {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    resize: none;
+}
+
+#generate-tab .manuscript-footer {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 18px;
+    height: 34px;
+    padding: 0 28px;
+    border-top: 1px solid var(--st-border);
+    color: var(--st-text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#generate-tab .manuscript-stats {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+#generate-tab .manuscript-stats .stat-value {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+#generate-tab .manuscript-footer #chapter-detection-info {
+    min-width: 0;
+    margin: 0 !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#generate-tab .generate-aside {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--st-border);
+    background: var(--st-panel);
+}
+
+#generate-tab .generate-aside-scroll {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto;
+}
+
+#generate-tab .output-section,
+#generate-tab .chapters-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--st-border);
+}
+
+#generate-tab .aside-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#generate-tab .output-section .form-group {
+    margin: 0;
+}
+
+#generate-tab .output-section .compact-field {
+    flex: 1;
+    min-width: 0;
+}
+
+#generate-tab .generate-aside-footer {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 20px 18px;
+    border-top: 1px solid var(--st-border);
+}
+
+#generate-tab .generate-aside-footer > * {
+    margin: 0;
+}

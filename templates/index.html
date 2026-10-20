@@ -42,29 +42,117 @@
 
         <main class="app-main">
         <!-- Generate Tab -->
-        <div id="generate-tab" class="tab-content screen active">
-            <div class="screen-body">
-            <div class="section">
-                <div class="section-title-row">
-                    <div class="section-title-inline">
-                        <h2>Input Text</h2>
+        <div id="generate-tab" class="tab-content screen generate-screen active">
+            <section class="manuscript-pane" aria-label="Manuscript">
+                <div class="manuscript-header">
+                    <div class="manuscript-title-group">
+                        <h1 class="screen-title manuscript-title">Manuscript</h1>
                         <button type="button" class="help-icon" data-help-id="input-text" aria-label="Help: Input Text">?</button>
-                    </div>
-                    <div class="project-controls project-controls-inline">
-                        <div class="project-controls-actions">
+                        <div class="manuscript-subtitle">
                             <span id="project-status" class="help-text"></span>
+                            <span id="document-upload-status" class="upload-status"></span>
                         </div>
                     </div>
+                    <div class="manuscript-actions">
+                        <div class="manuscript-upload" title="Load document · Supports: TXT, PDF, Word (.doc/.docx), RTF, EPUB, ODT, Markdown, HTML">
+                            <button type="button" id="browse-document-btn" class="btn btn-secondary btn-sm">
+                                📁 Load Document
+                            </button>
+                            <input type="file" id="document-file-input" accept=".txt,.pdf,.doc,.docx,.rtf,.epub,.odt,.md,.html,.htm" style="display: none;">
+                        </div>
+                        <button type="button" id="alt-word-registry-btn" class="btn btn-secondary btn-sm">
+                            🔤 Alt Word Registry
+                        </button>
+                        <span class="manuscript-header-divider" aria-hidden="true"></span>
+                        <div class="manuscript-prep" title="Prep with your selected prompt before generating audio.">
+                            <select id="gemini-preset-select" class="select-compact">
+                                <option value="">Use default prompt</option>
+                            </select>
+                            <button id="gemini-process-btn" class="btn btn-secondary">Prep Text</button>
+                        </div>
+                        <button type="button" class="help-icon" data-help-id="prep-text" aria-label="Help: Prep Text">?</button>
+                    </div>
                 </div>
-                <p class="help-text">
-                    Enter your text below. Use speaker tags like <code>[narrator]text[/narrator]</code> or 
-                    <code>[speaker1]text[/speaker1]</code> for multi-voice stories, or plain text for single voice.
-                    You can use any name: <code>[alice]</code>, <code>[bob]</code>, <code>[narrator]</code>, etc.
-                </p>
-                <div class="text-input-wrapper" id="text-input-wrapper">
+                <div class="manuscript-toolbar">
+                    <div class="manuscript-view-toggle"></div>
+                    <div class="manuscript-insert-tag">
+                        <div class="paralinguistic-tags-bar" id="paralinguistic-tags-bar">
+                            <span class="tags-label">
+                                Insert paralinguistic tag:
+                                <button type="button" class="help-icon" data-help-id="paralinguistic-tags" aria-label="Help: Paralinguistic Tags">?</button>
+                            </span>
+                            <div class="tags-buttons" id="paralinguistic-tags-kokoro">
+                                <button type="button" class="btn btn-tag" data-tag="[clear throat]">[clear throat]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[sush]">[sush]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[cough]">[cough]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[groan]">[groan]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[sniff]">[sniff]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[gasp]">[gasp]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[chuckle]">[chuckle]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[laugh]">[laugh]</button>
+                            </div>
+                            <div class="tags-buttons" id="paralinguistic-tags-omnivoice" style="display:none">
+                                <button type="button" class="btn btn-tag" data-tag="[laughter]">[laughter]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[confirmation-en]">[confirmation-en]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[question-en]">[question-en]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[question-ah]">[question-ah]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[question-oh]">[question-oh]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[question-ei]">[question-ei]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[question-yi]">[question-yi]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[surprise-ah]">[surprise-ah]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[surprise-oh]">[surprise-oh]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[surprise-wa]">[surprise-wa]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[surprise-yo]">[surprise-yo]</button>
+                                <button type="button" class="btn btn-tag" data-tag="[dissatisfaction-hnn]">[dissatisfaction-hnn]</button>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="manuscript-toolbar-spacer"></span>
+                    <div class="manuscript-tag-status"></div>
                     <button type="button" id="clear-text-btn" class="clear-text-btn" title="Clear text">C</button>
-                    <textarea 
-                        id="input-text" 
+                </div>
+                <div class="manuscript-strips">
+                    <div id="tag-error-banner" class="tag-error-banner hidden">
+                        <div class="tag-error-banner-left">
+                            <span class="tag-error-icon">⚠</span>
+                            <span id="tag-error-summary"></span>
+                        </div>
+                        <div class="tag-error-banner-actions">
+                            <button type="button" id="tag-error-prev-btn" class="btn btn-sm btn-ghost" title="Jump to previous issue">&#8593; Prev</button>
+                            <button type="button" id="tag-error-next-btn" class="btn btn-sm btn-ghost" title="Jump to next issue">Next &#8595;</button>
+                            <button type="button" id="tag-error-fix-btn" class="btn btn-sm btn-primary">Auto-Fix</button>
+                        </div>
+                    </div>
+                    <div id="gemini-progress" class="gemini-progress" style="display: none;">
+                        <div class="progress-label">
+                            <span id="gemini-progress-text">Preparing LLM request…</span>
+                            <span id="gemini-progress-count"></span>
+                            <button id="gemini-pause-btn" class="btn btn-secondary btn-sm" style="margin-left:auto;padding:2px 10px;font-size:0.8rem;">Pause</button>
+                            <button id="gemini-abort-btn" class="btn btn-danger btn-sm" style="display:none;padding:2px 10px;font-size:0.8rem;">Abort</button>
+                        </div>
+                        <div class="progress-bar">
+                            <div id="gemini-progress-fill" class="progress-bar-fill"></div>
+                        </div>
+                    </div>
+                    <div id="gemini-resume-panel" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.4);border-radius:6px;">
+                        <span id="gemini-resume-label" style="font-size:0.88rem;margin-right:10px;"></span>
+                        <button id="gemini-resume-btn" class="btn btn-primary btn-sm">Resume</button>
+                        <button id="gemini-restart-btn" class="btn btn-secondary btn-sm" style="margin-left:6px;">Restart</button>
+                        <button id="gemini-abort-panel-btn" class="btn btn-danger btn-sm" style="margin-left:6px;">Abort</button>
+                    </div>
+                </div>
+                <div class="text-input-wrapper manuscript-editor" id="text-input-wrapper">
+                    <div class="manuscript-help" hidden>
+                        <p class="help-text">
+                            Enter your text below. Use speaker tags like <code>[narrator]text[/narrator]</code> or
+                            <code>[speaker1]text[/speaker1]</code> for multi-voice stories, or plain text for single voice.
+                            You can use any name: <code>[alice]</code>, <code>[bob]</code>, <code>[narrator]</code>, etc.
+                        </p>
+                    </div>
+                    <textarea
+                        id="input-text"
                         placeholder="[narrator]Once upon a time...[/narrator]&#10;[alice]Hello, I'm Alice![/alice]&#10;[bob]And I'm Bob![/bob]&#10;&#10;Or drag & drop documents here (Word, PDF, TXT, RTF, EPUB)"
                         rows="15"
                     ></textarea>
@@ -75,286 +163,171 @@
                         </div>
                     </div>
                 </div>
-                <div id="tag-error-banner" class="tag-error-banner hidden">
-                    <div class="tag-error-banner-left">
-                        <span class="tag-error-icon">⚠</span>
-                        <span id="tag-error-summary"></span>
-                    </div>
-                    <div class="tag-error-banner-actions">
-                        <button type="button" id="tag-error-prev-btn" class="btn btn-sm btn-ghost" title="Jump to previous issue">&#8593; Prev</button>
-                        <button type="button" id="tag-error-next-btn" class="btn btn-sm btn-ghost" title="Jump to next issue">Next &#8595;</button>
-                        <button type="button" id="tag-error-fix-btn" class="btn btn-sm btn-primary">Auto-Fix</button>
-                    </div>
-                </div>
-                <div class="text-input-toolbar">
-                    <div class="document-upload-bar">
-                        <button type="button" id="browse-document-btn" class="btn btn-secondary btn-sm">
-                            📁 Load Document
-                        </button>
-                        <button type="button" id="alt-word-registry-btn" class="btn btn-secondary btn-sm">
-                            🔤 Alt Word Registry
-                        </button>
-                        <input type="file" id="document-file-input" accept=".txt,.pdf,.doc,.docx,.rtf,.epub,.odt,.md,.html,.htm" style="display: none;">
-                        <span class="upload-hint">Supports: TXT, PDF, Word (.doc/.docx), RTF, EPUB, ODT, Markdown, HTML</span>
-                        <span id="document-upload-status" class="upload-status"></span>
-                    </div>
-                    <div class="gemini-section gemini-section-inline">
-                        <div class="gemini-preset-control">
-                            <div class="gemini-preset-row">
-                                <select id="gemini-preset-select" class="select-compact">
-                                    <option value="">Use default prompt</option>
-                                </select>
-                                <button id="gemini-process-btn" class="btn btn-secondary">Prep Text</button>
-                                <button type="button" class="help-icon" data-help-id="prep-text" aria-label="Help: Prep Text">?</button>
-                            </div>
-                        </div>
-                        <p class="help-text" style="margin-top: 8px;">
-                            ✨ Prep with your selected prompt before generating audio.
-                        </p>
-                        <div id="gemini-progress" class="gemini-progress" style="display: none;">
-                            <div class="progress-label">
-                                <span id="gemini-progress-text">Preparing LLM request…</span>
-                                <span id="gemini-progress-count"></span>
-                                <button id="gemini-pause-btn" class="btn btn-secondary btn-sm" style="margin-left:auto;padding:2px 10px;font-size:0.8rem;">Pause</button>
-                                <button id="gemini-abort-btn" class="btn btn-danger btn-sm" style="display:none;padding:2px 10px;font-size:0.8rem;">Abort</button>
-                            </div>
-                            <div class="progress-bar">
-                                <div id="gemini-progress-fill" class="progress-bar-fill"></div>
-                            </div>
-                        </div>
-                        <div id="gemini-resume-panel" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.4);border-radius:6px;">
-                            <span id="gemini-resume-label" style="font-size:0.88rem;margin-right:10px;"></span>
-                            <button id="gemini-resume-btn" class="btn btn-primary btn-sm">Resume</button>
-                            <button id="gemini-restart-btn" class="btn btn-secondary btn-sm" style="margin-left:6px;">Restart</button>
-                            <button id="gemini-abort-panel-btn" class="btn btn-danger btn-sm" style="margin-left:6px;">Abort</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="paralinguistic-tags-bar" id="paralinguistic-tags-bar">
-                    <span class="tags-label">
-                        Insert paralinguistic tag:
-                        <button type="button" class="help-icon" data-help-id="paralinguistic-tags" aria-label="Help: Paralinguistic Tags">?</button>
-                    </span>
-                    <div class="tags-buttons" id="paralinguistic-tags-kokoro">
-                        <button type="button" class="btn btn-tag" data-tag="[clear throat]">[clear throat]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[sush]">[sush]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[cough]">[cough]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[groan]">[groan]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[sniff]">[sniff]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[gasp]">[gasp]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[chuckle]">[chuckle]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[laugh]">[laugh]</button>
-                    </div>
-                    <div class="tags-buttons" id="paralinguistic-tags-omnivoice" style="display:none">
-                        <button type="button" class="btn btn-tag" data-tag="[laughter]">[laughter]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[sigh]">[sigh]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[confirmation-en]">[confirmation-en]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[question-en]">[question-en]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[question-ah]">[question-ah]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[question-oh]">[question-oh]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[question-ei]">[question-ei]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[question-yi]">[question-yi]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[surprise-ah]">[surprise-ah]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[surprise-oh]">[surprise-oh]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[surprise-wa]">[surprise-wa]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[surprise-yo]">[surprise-yo]</button>
-                        <button type="button" class="btn btn-tag" data-tag="[dissatisfaction-hnn]">[dissatisfaction-hnn]</button>
-                    </div>
-                </div>
-                
-                <div id="stats-section" class="section" style="display: none;">
-                    <div class="section-title-inline">
-                        <h2>Text Statistics</h2>
+                <div class="manuscript-footer">
+                    <div class="manuscript-stats">
+                        <span class="manuscript-stat"><span class="stat-value" id="stat-speakers">0</span> speakers</span>
+                        <span class="manuscript-stat"><span class="stat-value" id="stat-chunks">0</span> chunks</span>
+                        <span class="manuscript-stat"><span class="stat-value" id="stat-words">0</span> words</span>
+                        <span class="manuscript-stat">≈ <span class="stat-value" id="stat-duration">0:00</span></span>
                         <button type="button" class="help-icon" data-help-id="text-statistics" aria-label="Help: Text Statistics">?</button>
                     </div>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <div class="stat-label">Speakers</div>
-                            <div class="stat-value" id="stat-speakers">0</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Total Chunks</div>
-                            <div class="stat-value" id="stat-chunks">0</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Word Count</div>
-                            <div class="stat-value" id="stat-words">0</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-label">Est. Duration</div>
-                            <div class="stat-value" id="stat-duration">0:00</div>
-                        </div>
-                    </div>
-                    <div class="speakers-header-row">
-                        <div id="speakers-list"></div>
-                        <div class="speakers-actions">
-                            <button type="button" id="build-speaker-profiles-btn" class="btn btn-secondary btn-sm" disabled>Build Profiles</button>
-                            <button type="button" id="generate-voices-btn" class="btn btn-secondary btn-sm" disabled title="Checking voice-design engine availability…">Generate Voices</button>
-                            <span id="generate-voices-unavailable" class="help-text hidden">Install Qwen3-TTS or Breeze TTS 2 under Settings → Engine Settings to generate voices.</span>
-                            <button type="button" id="auto-assign-voices-btn" class="btn btn-secondary btn-sm">Auto Assign</button>
-                        </div>
-                    </div>
-                    <div id="speakers-duplicates" class="speakers-duplicates" style="display: none;"></div>
+                    <span class="manuscript-footer-spacer"></span>
                     <div id="chapter-detection-info" class="help-text" style="display: none; margin-top: 10px;"></div>
-                    <div id="inline-voice-assignments" style="display: none; margin-top: 20px;">
-                        <h3>
-                        Assign Voices
-                        <button type="button" class="help-icon" data-help-id="assign-voices" aria-label="Help: Assign Voices">?</button>
-                    </h3>
-                    <div id="inline-voice-assignment-list" class="speaker-assignment-host"></div>
                 </div>
-            </div>
+            </section>
 
-                <div class="generate-cards-row">
-                    <div class="section generate-card-right">
-                        <div class="default-voice-header">
-                            <div>
-                                <div class="section-title-inline">
-                                    <h3>🎬 Generation Options</h3>
-                                    <button type="button" class="help-icon" data-help-id="generation-options" aria-label="Help: Generation Options">?</button>
-                                    <span class="section-title-note">Configure output format and generation settings.</span>
+            <aside class="generate-aside" aria-label="Cast and output settings">
+                <div class="generate-aside-scroll">
+                    <!-- Cast block: owned by the cast screen (styled in static/css/studio-cast.css). -->
+                    <section id="cast-section" class="cast-section">
+                        <div class="cast-header">
+                            <h3 class="panel-title">Cast</h3>
+                        </div>
+                        <div id="stats-section" class="cast-body" style="display: none;">
+                            <div class="speakers-header-row">
+                                <div id="speakers-list"></div>
+                                <div class="speakers-actions">
+                                    <button type="button" id="build-speaker-profiles-btn" class="btn btn-secondary btn-sm" disabled>Build Profiles</button>
+                                    <button type="button" id="generate-voices-btn" class="btn btn-secondary btn-sm" disabled title="Checking voice-design engine availability…">Generate Voices</button>
+                                    <span id="generate-voices-unavailable" class="help-text hidden">Install Qwen3-TTS or Breeze TTS 2 under Settings → Engine Settings to generate voices.</span>
+                                    <button type="button" id="auto-assign-voices-btn" class="btn btn-secondary btn-sm">Auto Assign</button>
                                 </div>
                             </div>
-                        </div>
-
-                        <div class="generation-options-content">
-                            <div class="generation-options-grid">
-                                <div class="generation-options-column">
-                                    <div class="engine-select-grid" style="display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-                                        <div class="form-group">
-                                            <label for="job-tts-engine">Engine</label>
-                                            <select id="job-tts-engine">
-                                                <option value="kokoro">Kokoro · Local GPU</option>
-                                                <option value="kokoro_replicate">Kokoro · Replicate</option>
-                                                <option value="chatterbox_turbo_local">Chatterbox · Local GPU</option>
-                                                <option value="chatterbox_turbo_replicate">Chatterbox · Replicate</option>
-                                                <option value="voxcpm_local">VoxCPM 1.5 · Local GPU</option>
-                                                <option value="pocket_tts">Pocket TTS · Clone Voices</option>
-                                                <option value="pocket_tts_preset">Pocket TTS · Preset Voices</option>
-                                                <option value="qwen3_custom">Qwen3-TTS · Custom Voice</option>
-                                                <option value="qwen3_clone">Qwen3-TTS · Voice Clone</option>
-                                                <option value="omnivoice_clone">OmniVoice · Voice Clone</option>
-                                                <option value="kitten_tts">KittenTTS · CPU Lightweight</option>
-                                                <option value="index_tts">IndexTTS · Zero-Shot Clone</option>
-                                                <option value="dots_tts">Dot.TTS · Voice Clone</option>
-                                                <option value="audio8_tts">Audio8 TTS · Voice Clone</option>
-                                                <option value="breeze_tts_2">Breeze TTS 2 · Design / Clone / Direction</option>
-                                                <option value="azure_speech">Microsoft Azure Speech · Cloud</option>
-                                                <option value="edge_tts">Microsoft Edge TTS · Experimental Cloud</option>
-                                                <option value="elevenlabs">ElevenLabs · Cloud</option>
-                                    <option value="gemini_tts">Gemini 3.8 Flash TTS · Cloud</option>
-                                    <option value="gemini_tts_lite">Gemini 3.8 Flash-Lite TTS · Cloud</option>
-                                    <option value="openai_tts">OpenAI-compatible TTS · Cloud</option>
-                                                <option value="localai_tts">LocalAI TTS · Self-hosted</option>
-                                                <option value="breeze_api">Breeze API · Hosted</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="output-format-section">
-                                        <div class="format-controls-row">
-                                            <div class="compact-field" id="job-output-format-wrapper">
-                                                <label for="job-output-format">Format</label>
-                                                <select id="job-output-format" class="select-compact">
-                                                    <option value="mp3">MP3</option>
-                                                    <option value="wav">WAV</option>
-                                                    <option value="ogg">OGG</option>
-                                                </select>
-                                            </div>
-                                            <div class="compact-field bitrate-field" id="job-output-bitrate-wrapper">
-                                                <label for="job-output-bitrate">MP3 Bitrate</label>
-                                                <select id="job-output-bitrate" class="select-compact">
-                                                    <option value="64">64 kbps</option>
-                                                    <option value="96">96 kbps</option>
-                                                    <option value="128">128 kbps</option>
-                                                    <option value="160">160 kbps</option>
-                                                    <option value="192">192 kbps</option>
-                                                    <option value="224">224 kbps</option>
-                                                    <option value="256">256 kbps</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="acx-compliance-row" style="margin-top: 8px;">
-                                            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;" title="Enforces ACX audiobook standards on export: MP3 192kbps CBR, 44.1kHz, loudness normalized to -19dB integrated (ACX range: -23 to -18dB), true peak ≤ -3dBTP">
-                                                <input type="checkbox" id="acx-compliance-checkbox">
-                                                ACX Compliant Output
-                                            </label>
-                                            <p class="help-text" style="margin: 3px 0 0 24px; font-size: 11px;">MP3 192kbps · 44.1kHz · loudnorm -19dB · peak ≤ -3dBTP</p>
-                                        </div>
-                                    </div>
-                                    <div class="generate-button-section">
-                                        <button id="generate-btn" class="btn btn-primary btn-large">🎙️ Generate Audio</button>
-                                        <div id="queue-indicator" class="queue-indicator" style="display: none;">
-                                            0 processing, 0 queued
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="generation-options-column">
-                                    <div class="chapter-split-section">
-                                        <label style="display: flex; align-items: center; gap: 10px; font-size: 15px;">
-                                            <input type="checkbox" id="split-chapters-checkbox" checked>
-                                            Intelligently create separate audio files for each book, chapter, or section
-                                        </label>
-                                        <p id="chapter-detection-hint" class="help-text" style="margin-top: 8px; margin-bottom: 0;">
-                                            Sections not analyzed yet.
-                                        </p>
-                                        <div class="chapter-review-row" style="margin-top: 10px;">
-                                            <button type="button" id="review-sections-btn" class="btn btn-secondary btn-sm" disabled>
-                                                Review detected sections
-                                            </button>
-                                        </div>
-                                        <div class="chapter-custom-heading" style="margin-top: 10px;">
-                                            <label>Section headings to detect</label>
-                                            <div id="default-heading-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
-                                                <!-- Default heading chips will be generated by JavaScript -->
-                                            </div>
-                                            <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
-                                                <input type="text" id="custom-heading-input" placeholder="Add custom heading (e.g., Episode, Volume)" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border-color, #4a5568); border-radius: 4px; background: var(--bg-color, #1a202c); color: var(--text-color, #e2e8f0);">
-                                                <button type="button" id="add-custom-heading-btn" style="padding: 6px 12px; border: 1px solid var(--primary-color, #6366f1); background: var(--primary-color, #6366f1); color: var(--st-accent-ink); border-radius: 4px; cursor: pointer;">Add</button>
-                                            </div>
-                                            <div id="custom-heading-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
-                                                <!-- Custom heading chips will be generated by JavaScript -->
-                                            </div>
-                                            <p class="help-text" style="margin-top: 6px;">
-                                                Toggle default headings on/off. Add custom headings to detect additional section markers.
-                                            </p>
-                                            <p class="help-text" style="margin-top: 6px;">
-                                                Need a deliberate pause? Use <code>***</code> for 0.25 seconds of silence or <code>******</code> for 0.5 seconds. Put the marker on its own line or directly after punctuation, such as <code>The room fell silent.***</code>
-                                            </p>
-                                        </div>
-                                        <div id="full-story-option" class="chapter-sub-option" style="display: none;">
-                                            <label>
-                                                <input type="checkbox" id="full-story-checkbox" checked>
-                                                Also create a single full-length audiobook after section exports
-                                            </label>
-                                            <p class="help-text" style="margin-top: 6px;">
-                                                When enabled, TTS-Story keeps the per-chapter files and adds one combined file to the library.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div id="speakers-duplicates" class="speakers-duplicates" style="display: none;"></div>
+                            <div id="inline-voice-assignments" style="display: none; margin-top: 20px;">
+                                <h3>
+                                    Assign Voices
+                                    <button type="button" class="help-icon" data-help-id="assign-voices" aria-label="Help: Assign Voices">?</button>
+                                </h3>
+                                <div id="inline-voice-assignment-list" class="speaker-assignment-host"></div>
                             </div>
-
                         </div>
+                    </section>
+
+                    <section class="output-section">
+                        <div class="aside-section-header">
+                            <h3 class="panel-title">Output</h3>
+                            <button type="button" class="help-icon" data-help-id="generation-options" aria-label="Help: Generation Options">?</button>
+                        </div>
+                        <div class="form-group">
+                            <label for="job-tts-engine">Engine</label>
+                            <select id="job-tts-engine">
+                                <option value="kokoro">Kokoro · Local GPU</option>
+                                <option value="kokoro_replicate">Kokoro · Replicate</option>
+                                <option value="chatterbox_turbo_local">Chatterbox · Local GPU</option>
+                                <option value="chatterbox_turbo_replicate">Chatterbox · Replicate</option>
+                                <option value="voxcpm_local">VoxCPM 1.5 · Local GPU</option>
+                                <option value="pocket_tts">Pocket TTS · Clone Voices</option>
+                                <option value="pocket_tts_preset">Pocket TTS · Preset Voices</option>
+                                <option value="qwen3_custom">Qwen3-TTS · Custom Voice</option>
+                                <option value="qwen3_clone">Qwen3-TTS · Voice Clone</option>
+                                <option value="omnivoice_clone">OmniVoice · Voice Clone</option>
+                                <option value="kitten_tts">KittenTTS · CPU Lightweight</option>
+                                <option value="index_tts">IndexTTS · Zero-Shot Clone</option>
+                                <option value="dots_tts">Dot.TTS · Voice Clone</option>
+                                <option value="audio8_tts">Audio8 TTS · Voice Clone</option>
+                                <option value="breeze_tts_2">Breeze TTS 2 · Design / Clone / Direction</option>
+                                <option value="azure_speech">Microsoft Azure Speech · Cloud</option>
+                                <option value="edge_tts">Microsoft Edge TTS · Experimental Cloud</option>
+                                <option value="elevenlabs">ElevenLabs · Cloud</option>
+                                <option value="gemini_tts">Gemini 3.8 Flash TTS · Cloud</option>
+                                <option value="gemini_tts_lite">Gemini 3.8 Flash-Lite TTS · Cloud</option>
+                                <option value="openai_tts">OpenAI-compatible TTS · Cloud</option>
+                                <option value="localai_tts">LocalAI TTS · Self-hosted</option>
+                                <option value="breeze_api">Breeze API · Hosted</option>
+                            </select>
+                        </div>
+                        <div class="format-controls-row">
+                            <div class="compact-field" id="job-output-format-wrapper">
+                                <label for="job-output-format">Format</label>
+                                <select id="job-output-format" class="select-compact">
+                                    <option value="mp3">MP3</option>
+                                    <option value="wav">WAV</option>
+                                    <option value="ogg">OGG</option>
+                                </select>
+                            </div>
+                            <div class="compact-field bitrate-field" id="job-output-bitrate-wrapper">
+                                <label for="job-output-bitrate">MP3 Bitrate</label>
+                                <select id="job-output-bitrate" class="select-compact">
+                                    <option value="64">64 kbps</option>
+                                    <option value="96">96 kbps</option>
+                                    <option value="128">128 kbps</option>
+                                    <option value="160">160 kbps</option>
+                                    <option value="192">192 kbps</option>
+                                    <option value="224">224 kbps</option>
+                                    <option value="256">256 kbps</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="acx-compliance-row" style="margin-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;" title="Enforces ACX audiobook standards on export: MP3 192kbps CBR, 44.1kHz, loudness normalized to -19dB integrated (ACX range: -23 to -18dB), true peak ≤ -3dBTP">
+                                <input type="checkbox" id="acx-compliance-checkbox">
+                                ACX Compliant Output
+                            </label>
+                            <p class="help-text" style="margin: 3px 0 0 24px; font-size: 11px;">MP3 192kbps · 44.1kHz · loudnorm -19dB · peak ≤ -3dBTP</p>
+                        </div>
+                    </section>
+
+                    <section class="chapters-section">
+                        <div class="aside-section-header">
+                            <h3 class="panel-title">Chapters</h3>
+                            <button type="button" id="review-sections-btn" class="btn btn-secondary btn-sm" disabled>
+                                Review detected sections
+                            </button>
+                        </div>
+                        <label style="display: flex; align-items: center; gap: 10px; font-size: 15px;">
+                            <input type="checkbox" id="split-chapters-checkbox" checked>
+                            Intelligently create separate audio files for each book, chapter, or section
+                        </label>
+                        <div id="full-story-option" class="chapter-sub-option" style="display: none;">
+                            <label>
+                                <input type="checkbox" id="full-story-checkbox" checked>
+                                Also create a single full-length audiobook after section exports
+                            </label>
+                            <p class="help-text" style="margin-top: 6px;">
+                                When enabled, TTS-Story keeps the per-chapter files and adds one combined file to the library.
+                            </p>
+                        </div>
+                        <p id="chapter-detection-hint" class="help-text" style="margin-top: 8px; margin-bottom: 0;">
+                            Sections not analyzed yet.
+                        </p>
+                        <div class="chapter-custom-heading" style="margin-top: 10px;">
+                            <label>Section headings to detect</label>
+                            <div id="default-heading-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                                <!-- Default heading chips will be generated by JavaScript -->
+                            </div>
+                            <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                                <input type="text" id="custom-heading-input" placeholder="Add custom heading (e.g., Episode, Volume)" style="flex: 1; padding: 6px 10px; border: 1px solid var(--border-color, #4a5568); border-radius: 4px; background: var(--bg-color, #1a202c); color: var(--text-color, #e2e8f0);">
+                                <button type="button" id="add-custom-heading-btn" style="padding: 6px 12px; border: 1px solid var(--primary-color, #6366f1); background: var(--primary-color, #6366f1); color: var(--st-accent-ink); border-radius: 4px; cursor: pointer;">Add</button>
+                            </div>
+                            <div id="custom-heading-chips" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                                <!-- Custom heading chips will be generated by JavaScript -->
+                            </div>
+                            <p class="help-text" style="margin-top: 6px;">
+                                Toggle default headings on/off. Add custom headings to detect additional section markers.
+                            </p>
+                        </div>
+                        <p class="help-text" style="margin-top: 6px;">
+                            Need a deliberate pause? Use <code>***</code> for 0.25 seconds of silence or <code>******</code> for 0.5 seconds. Put the marker on its own line or directly after punctuation, such as <code>The room fell silent.***</code>
+                        </p>
+                    </section>
+                </div>
+
+                <div class="generate-aside-footer">
+                    <div id="generate-pending-review" class="generate-pending-review" hidden></div>
+                    <button id="generate-btn" class="btn btn-primary btn-large">🎙️ Generate Audio</button>
+                    <div id="queue-indicator" class="queue-indicator" style="display: none;">
+                        0 processing, 0 queued
+                    </div>
+                    <div id="latest-audio-container" class="section" style="margin-top: 20px; display: none;">
+                        <h2>Latest Audio</h2>
+                        <p id="latest-audio-label" class="help-text">
+                            Most recently completed job.
+                        </p>
+                        <audio id="latest-audio-player" controls style="width: 100%; max-width: 600px;"></audio>
                     </div>
                 </div>
-            </div>
-
-            <div class="section" style="margin-top: 20px; padding: 15px; background: rgba(236, 230, 220, 0.03); border-radius: 8px;">
-                <p style="margin: 0; color: var(--text-muted); text-align: center;">
-                    💡 <strong>Tip:</strong> You can submit multiple jobs! Check the <strong>Job Queue</strong> tab to monitor all your generations.
-                </p>
-            </div>
-
-            <div id="latest-audio-container" class="section" style="margin-top: 20px; display: none;">
-                <h2>Latest Audio</h2>
-                <p id="latest-audio-label" class="help-text">
-                    Most recently completed job.
-                </p>
-                <audio id="latest-audio-player" controls style="width: 100%; max-width: 600px;"></audio>
-            </div>
-            </div>
+            </aside>
         </div>
 
         <!-- Job Queue Tab -->
