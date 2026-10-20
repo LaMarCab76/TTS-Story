@@ -12,6 +12,8 @@ const REVIEW_CHATTERBOX_EVENT_NAME = window.CHATTERBOX_VOICES_EVENT || 'chatterb
 window.CHATTERBOX_VOICES_EVENT = REVIEW_CHATTERBOX_EVENT_NAME;
 
 // Shared timing helpers — used by both queue job details and library metrics modal
+let queueChartSeq = 0;
+
 function fmtDuration(secs) {
     if (secs == null) return 'N/A';
     const rounded = Math.round(secs);
@@ -21,7 +23,7 @@ function fmtDuration(secs) {
     return s > 0 ? `${m}m ${s}s` : `${m}m`;
 }
 
-function buildChunkChart(chunkTimes, chunkCount, totalSeconds) {
+function buildChunkChart(chunkTimes, chunkCount, totalSeconds, options = {}) {
     let times = Array.isArray(chunkTimes) && chunkTimes.length > 0 ? chunkTimes : null;
     let estimated = false;
     if (!times && chunkCount > 0 && totalSeconds > 0) {
@@ -48,6 +50,12 @@ function buildChunkChart(chunkTimes, chunkCount, totalSeconds) {
     }
     const isDownsampled = bucketSize > 1;
     const n = downsampled.length;
+    // Unique gradient id per chart: several charts can coexist (inline row, modal, library).
+    queueChartSeq += 1;
+    const gradientSuffix = String(options && options.idSuffix ? options.idSuffix : queueChartSeq).replace(/[^A-Za-z0-9_-]/g, '');
+    const gradientId = `chunk-chart-gradient-${gradientSuffix || queueChartSeq}`;
+    const accent = '#e2a04f';
+    const labelColor = '#8f877b';
 
     const W = 480, H = 90, padL = 38, padR = 10, padT = 8, padB = 24;
     function fmtT(t) { return t >= 60 ? `${Math.floor(t/60)}m${Math.round(t%60)>0?Math.round(t%60)+'s':''}` : `${Math.round(t)}s`; }
@@ -65,7 +73,7 @@ function buildChunkChart(chunkTimes, chunkCount, totalSeconds) {
     if (isDownsampled) {
         const topPts = downsampled.map((d, i) => `${xPos(i).toFixed(1)},${yPos(d.max).toFixed(1)}`).join(' ');
         const botPts = downsampled.slice().reverse().map((d, i) => `${xPos(n - 1 - i).toFixed(1)},${yPos(d.min).toFixed(1)}`).join(' ');
-        rangeBand = `<polygon points="${topPts} ${botPts}" fill="rgba(126,184,247,0.10)" stroke="none"/>`;
+        rangeBand = `<polygon points="${topPts} ${botPts}" fill="rgba(226,160,79,0.10)" stroke="none"/>`;
     }
 
     const pts = downsampled.map((d, i) => `${xPos(i).toFixed(1)},${yPos(d.avg).toFixed(1)}`).join(' ');
@@ -74,40 +82,40 @@ function buildChunkChart(chunkTimes, chunkCount, totalSeconds) {
         ` L${xPos(n-1).toFixed(1)},${(H - padB).toFixed(1)} Z`;
 
     const dots = !isDownsampled
-        ? downsampled.map((d, i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.avg).toFixed(1)}" r="3.5" fill="var(--accent,#7eb8f7)" stroke="rgba(15,18,32,0.8)" stroke-width="1.5"><title>Chunk ${d.startChunk}: ${fmtT(d.avg)}</title></circle>`).join('')
-        : downsampled.map((d, i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.avg).toFixed(1)}" r="2" fill="var(--accent,#7eb8f7)" opacity="0.7"><title>Chunks ${d.startChunk}–${d.endChunk}: avg ${fmtT(d.avg)}, min ${fmtT(d.min)}, max ${fmtT(d.max)}</title></circle>`).join('');
+        ? downsampled.map((d, i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.avg).toFixed(1)}" r="3.5" fill="${accent}" stroke="#1f1c19" stroke-width="1.5"><title>Chunk ${d.startChunk}: ${fmtT(d.avg)}</title></circle>`).join('')
+        : downsampled.map((d, i) => `<circle cx="${xPos(i).toFixed(1)}" cy="${yPos(d.avg).toFixed(1)}" r="2" fill="${accent}" opacity="0.7"><title>Chunks ${d.startChunk}–${d.endChunk}: avg ${fmtT(d.avg)}, min ${fmtT(d.min)}, max ${fmtT(d.max)}</title></circle>`).join('');
 
     const MAX_XLABELS = 8;
     const xLabelStep = Math.max(1, Math.ceil(n / MAX_XLABELS));
     const xLabels = downsampled.map((d, i) => {
         if (i % xLabelStep !== 0 && i !== n - 1) return '';
-        return `<text x="${xPos(i).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="9" fill="rgba(180,190,210,0.6)">${d.startChunk}</text>`;
+        return `<text x="${xPos(i).toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="9" fill="${labelColor}">${d.startChunk}</text>`;
     }).join('');
 
-    const yLabelMax = `<text x="${padL - 4}" y="${(padT + 4).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(180,190,210,0.6)">${fmtT(yMax)}</text>`;
-    const yLabelMid = `<text x="${padL - 4}" y="${((padT + H - padB) / 2 + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(180,190,210,0.6)">${fmtT(yMax / 2)}</text>`;
-    const yLabelMin2 = `<text x="${padL - 4}" y="${(H - padB).toFixed(1)}" text-anchor="end" font-size="9" fill="rgba(180,190,210,0.6)">0s</text>`;
+    const yLabelMax = `<text x="${padL - 4}" y="${(padT + 4).toFixed(1)}" text-anchor="end" font-size="9" fill="${labelColor}">${fmtT(yMax)}</text>`;
+    const yLabelMid = `<text x="${padL - 4}" y="${((padT + H - padB) / 2 + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="${labelColor}">${fmtT(yMax / 2)}</text>`;
+    const yLabelMin2 = `<text x="${padL - 4}" y="${(H - padB).toFixed(1)}" text-anchor="end" font-size="9" fill="${labelColor}">0s</text>`;
 
     const midY = ((padT + H - padB) / 2).toFixed(1);
-    const grid = `<line x1="${padL}" y1="${midY}" x2="${W - padR}" y2="${midY}" stroke="rgba(99,102,241,0.12)" stroke-dasharray="3,3"/>`;
+    const grid = `<line x1="${padL}" y1="${midY}" x2="${W - padR}" y2="${midY}" stroke="rgba(236,230,220,0.08)" stroke-dasharray="3,3"/>`;
 
     const downsampleNote = isDownsampled
         ? `<div class="chunk-chart-estimated">averaged over ${bucketSize}-chunk windows · shaded band = min/max range</div>`
         : (estimated ? `<div class="chunk-chart-estimated">* estimated (equal distribution)</div>` : '');
 
     return `<div class="chunk-chart">
-        <div class="chunk-chart-title">Chunk Duration Over Time</div>
+        <div class="chunk-chart-title">Chunk duration over time</div>
         <svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
             <defs>
-                <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--accent,#7eb8f7)" stop-opacity="0.25"/>
-                    <stop offset="100%" stop-color="var(--accent,#7eb8f7)" stop-opacity="0.02"/>
+                <linearGradient id="${gradientId}" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="${accent}" stop-opacity="0.25"/>
+                    <stop offset="100%" stop-color="${accent}" stop-opacity="0.02"/>
                 </linearGradient>
             </defs>
             ${grid}
             ${rangeBand}
-            <path d="${areaD}" fill="url(#cg)"/>
-            <polyline points="${pts}" fill="none" stroke="var(--accent,#7eb8f7)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+            <path d="${areaD}" fill="url(#${gradientId})"/>
+            <polyline points="${pts}" fill="none" stroke="${accent}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
             ${dots}
             ${xLabels}
             ${yLabelMax}
@@ -155,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initQueue();
 
     ensureJobDetailModalHandlers();
+    initQueueScreenEvents();
 
     if (queueTabButton) {
         queueTabButton.addEventListener('click', () => {
@@ -841,10 +850,178 @@ function resumeQueueAutoRefreshIfIdle() {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Job Queue screen ("Estudio" redesign): keyed row rendering, inline details,
+// focus handling. Everything below only touches the DOM from handlers.
+// ---------------------------------------------------------------------------
+const QUEUE_STATUS_LABELS = {
+    queued: 'Queued',
+    processing: 'Processing',
+    pausing: 'Pausing',
+    paused: 'Paused',
+    completed: 'Completed',
+    interrupted: 'Interrupted',
+    failed: 'Failed',
+    cancelled: 'Cancelled',
+};
+const QUEUE_LIVE_STATUSES = new Set(['processing', 'pausing']);
+const QUEUE_ROW_CELLS = ['status', 'job', 'progress', 'output', 'created', 'actions'];
+const QUEUE_DETAILS_MIN_REFRESH_MS = 5000;
+const QUEUE_DETAILS_MAX_AGE_MS = 20000;
+const QUEUE_DETAILS_RETRY_MS = 15000;
+const QUEUE_FOCUS_TIMEOUT_MS = 60000;
+let queueLoadInFlight = false;
+let queueReloadRequested = false;
+let queueHasLoaded = false;
+let queueLastData = null;
+let queueExpandedJobId = null;
+let queuePendingFocusJobId = null;
+let queuePendingFocusSince = 0;
+let queueModalJobId = null;
+const queueLatestJobs = new Map();
+const queueJobDetailsCache = new Map();
+const queueDetailsInFlight = new Set();
+
+function queueEscapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function queueStatusLabel(status) {
+    const key = String(status || '').toLowerCase();
+    if (QUEUE_STATUS_LABELS[key]) return QUEUE_STATUS_LABELS[key];
+    if (!key) return 'Unknown';
+    return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+}
+
+function queueParseDate(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function queueFormatDateTime(value) {
+    const date = queueParseDate(value);
+    if (!date) return value ? String(value) : '—';
+    return date.toLocaleString([], {
+        year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit',
+    });
+}
+
+function queueFormatCreated(value) {
+    const date = queueParseDate(value);
+    if (!date) return { label: value ? String(value) : '—', full: '' };
+    const full = date.toLocaleString();
+    const diff = Date.now() - date.getTime();
+    if (diff > -30000 && diff < 60000) return { label: 'Just now', full };
+    return { label: queueFormatDateTime(date), full };
+}
+
+function queueFormatSeconds(seconds) {
+    const value = Number(seconds);
+    if (seconds === null || seconds === undefined || !Number.isFinite(value)) return '—';
+    if (value < 60) return `${value.toFixed(1)} s`;
+    return fmtDuration(value);
+}
+
+function queueOrdinal(value) {
+    const n = Math.round(Number(value));
+    const mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+    const suffix = { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th';
+    return `${n}${suffix}`;
+}
+
+function queueEngineLabel(engine) {
+    if (!engine) return '—';
+    const select = document.getElementById('job-tts-engine');
+    if (select && select.options) {
+        const match = Array.from(select.options).find(option => option.value === engine);
+        if (match && match.textContent.trim()) return match.textContent.trim();
+    }
+    if (typeof formatEngineName === 'function') {
+        const label = formatEngineName(engine);
+        if (label) return label;
+    }
+    return String(engine);
+}
+
+function queueFormatOutputSummary(format, bitrate, acx) {
+    if (!format) return acx ? 'ACX' : '';
+    const fmt = String(format).toLowerCase();
+    const parts = [fmt.toUpperCase()];
+    const kbps = Number(bitrate);
+    if (fmt === 'mp3' && kbps > 0) parts.push(`${kbps} kbps`);
+    if (acx) parts.push('ACX');
+    return parts.join(' · ');
+}
+
+function queueOutputLabel(job) {
+    const fullStory = job.full_story_requested ? ' + full story' : '';
+    if (job.chapter_mode) {
+        const chapters = Number(job.chapter_count);
+        const books = Number(job.book_count);
+        const bookPart = job.book_mode && books > 1 ? `${books} books · ` : '';
+        const chapterPart = chapters > 0
+            ? `${chapters} chapter${chapters === 1 ? '' : 's'} · per-chapter merge`
+            : 'Per-chapter merge';
+        return `${bookPart}${chapterPart}${fullStory}`;
+    }
+    return `Single output file${fullStory}`;
+}
+
+function queueDeriveTitle(text) {
+    if (!text) return '';
+    const cleaned = String(text)
+        .replace(/\[direction\][\s\S]*?\[\/direction\]/gi, ' ')
+        .replace(/\[\/?[^\]\r\n]*\]/g, ' ')
+        .replace(/\[[^\]\r\n]*$/, ' ');
+    const line = cleaned.split(/\r?\n/).map(part => part.replace(/\s+/g, ' ').trim()).find(part => /\w/.test(part));
+    if (!line) return '';
+    return line.length > 80 ? `${line.slice(0, 79).trimEnd()}…` : line;
+}
+
+function queueJobTitleParts(job) {
+    const title = String(job.title || '').trim();
+    const textTitle = String(job.text_title || '').trim();
+    if (title) {
+        const sub = textTitle && textTitle.toLowerCase() !== title.toLowerCase() ? textTitle : '';
+        return { main: title, sub };
+    }
+    if (textTitle) return { main: textTitle, sub: '' };
+    return { main: queueDeriveTitle(job.text_preview) || 'Untitled job', sub: '' };
+}
+
+function queueSummaryText(jobs) {
+    const counts = {};
+    jobs.forEach(job => {
+        const status = String(job.status || '');
+        counts[status] = (counts[status] || 0) + 1;
+    });
+    const parts = [];
+    const running = (counts.processing || 0) + (counts.pausing || 0);
+    if (running) parts.push(`${running} running`);
+    ['queued', 'paused', 'interrupted', 'failed', 'completed', 'cancelled'].forEach(status => {
+        if (counts[status]) parts.push(`${counts[status]} ${status}`);
+    });
+    return parts.length ? parts.join(' · ') : 'No jobs';
+}
+
 function initQueue() {
     const refreshBtn = document.getElementById('refresh-queue-btn');
     if (refreshBtn) {
-        refreshBtn.addEventListener('click', loadQueue);
+        refreshBtn.addEventListener('click', async () => {
+            refreshBtn.classList.add('is-loading');
+            try {
+                await loadQueue();
+            } finally {
+                setTimeout(() => refreshBtn.classList.remove('is-loading'), 400);
+            }
+        });
     }
 
     const clearQueueBtn = document.getElementById('clear-queue-btn');
@@ -854,6 +1031,7 @@ function initQueue() {
                 return;
             }
             clearQueueBtn.disabled = true;
+            clearQueueBtn.dataset.busy = 'true';
             clearQueueBtn.textContent = 'Clearing…';
             try {
                 const response = await fetch('/api/jobs/clear-all', { method: 'DELETE' });
@@ -870,13 +1048,31 @@ function initQueue() {
                 alert('Failed to clear queue: ' + (err.message || 'Network error'));
             } finally {
                 clearQueueBtn.disabled = false;
-                clearQueueBtn.textContent = 'Clear Queue';
+                delete clearQueueBtn.dataset.busy;
+                clearQueueBtn.textContent = 'Clear queue';
+                queueJobDetailsCache.clear();
                 loadQueue();
             }
         });
     }
 
+    const list = document.getElementById('queue-list');
+    if (list && !list.dataset.queueBound) {
+        list.addEventListener('click', handleQueueListClick);
+        list.dataset.queueBound = 'true';
+    }
+
     loadQueue();
+}
+
+function initQueueScreenEvents() {
+    // Generate dispatches this right after a successful submit (it has already switched tabs).
+    document.addEventListener('queue:focus-job', (event) => {
+        const jobId = event && event.detail ? event.detail.jobId : null;
+        if (jobId) {
+            focusQueueJob(String(jobId));
+        }
+    });
 }
 
 function isQueueTabActive() {
@@ -902,31 +1098,198 @@ function stopQueueAutoRefresh() {
 }
 
 async function loadQueue() {
+    // In-flight guard: overlapping polls (3 s timer, tab click, Refresh, focus) collapse
+    // into one follow-up request so an older response can never overwrite a newer one.
+    if (queueLoadInFlight) {
+        queueReloadRequested = true;
+        return;
+    }
+    queueLoadInFlight = true;
     try {
         const response = await fetch('/api/queue');
         const data = await response.json();
 
         if (data.success) {
+            queueHasLoaded = true;
             displayQueue(data);
         } else {
             console.error('Error loading queue:', data.error);
+            renderQueueLoadError();
         }
     } catch (error) {
         console.error('Error loading queue:', error);
+        renderQueueLoadError();
+    } finally {
+        queueLoadInFlight = false;
+        if (queueReloadRequested) {
+            queueReloadRequested = false;
+            loadQueue();
+        }
+    }
+}
+
+function renderQueueLoadError() {
+    if (queueHasLoaded) return;
+    const container = document.getElementById('queue-list');
+    if (!container) return;
+    container.removeAttribute('aria-busy');
+    container.innerHTML = `
+        <div class="queue-loading is-error">
+            Couldn't load the queue.
+            <button type="button" class="btn-link" data-queue-action="retry">Try again</button>
+        </div>`;
+    const summary = document.getElementById('queue-summary');
+    // aria-live region: only write when the text changes so it isn't re-announced.
+    if (summary && summary.textContent !== 'Unavailable') summary.textContent = 'Unavailable';
+    const footnote = document.getElementById('queue-footnote');
+    if (footnote) footnote.hidden = true;
+}
+
+function renderQueueEmptyState() {
+    return `
+        <div class="queue-empty">
+            <span class="ms queue-empty-icon" aria-hidden="true">queue_music</span>
+            <div class="queue-empty-title">No jobs in the queue</div>
+            <p class="queue-empty-text">Audio you generate shows up here while it renders.</p>
+            <button type="button" class="btn-link" data-queue-action="go-generate">Go to Generate</button>
+        </div>`;
+}
+
+function ensureQueueTable(container) {
+    let rows = null;
+    for (const child of Array.from(container.children)) {
+        if (child.classList && child.classList.contains('queue-board')) {
+            rows = child.querySelector('.queue-rows');
+        }
+    }
+    if (rows) return rows;
+    container.innerHTML = `
+        <div class="queue-board">
+            <div class="queue-grid queue-grid-head" aria-hidden="true">
+                <span>Status</span><span>Job</span><span>Progress</span><span>Output</span><span>Created</span><span class="queue-col-actions">Actions</span>
+            </div>
+            <div class="queue-rows" role="list" aria-label="Jobs"></div>
+        </div>`;
+    return container.querySelector('.queue-rows');
+}
+
+function findQueueItem(jobId) {
+    const container = document.getElementById('queue-list');
+    const rows = container ? container.querySelector('.queue-rows') : null;
+    if (!rows) return null;
+    return Array.from(rows.children).find(child => child.dataset && child.dataset.jobId === jobId) || null;
+}
+
+function createQueueItem(jobId) {
+    const item = document.createElement('div');
+    item.className = 'queue-item';
+    item.setAttribute('role', 'listitem');
+    item.dataset.jobId = jobId;
+    const cells = QUEUE_ROW_CELLS
+        .map(key => `<div class="queue-cell queue-cell-${key}" data-cell="${key}"></div>`)
+        .join('');
+    item.innerHTML = `
+        <div class="queue-grid queue-row">${cells}</div>
+        <div class="queue-details" id="queue-job-details-${queueEscapeHtml(jobId)}" hidden></div>`;
+    return item;
+}
+
+function renderQueueRowCells(job) {
+    const jobId = String(job.job_id || '');
+    const status = String(job.status || 'unknown');
+    const title = queueJobTitleParts(job);
+    const fullTitle = title.sub ? `${title.main} · ${title.sub}` : title.main;
+    const error = String(job.error || '').trim();
+    const created = queueFormatCreated(job.created_at);
+    const outputLabel = queueEscapeHtml(queueOutputLabel(job));
+    return {
+        status: `
+            <span class="queue-status" data-status="${queueEscapeHtml(status)}">
+                <span class="queue-status-dot" aria-hidden="true"></span>${queueEscapeHtml(queueStatusLabel(status))}
+            </span>`,
+        job: `
+            <div class="queue-job">
+                <span class="queue-job-title" title="${queueEscapeHtml(fullTitle)}"><span class="queue-job-name">${queueEscapeHtml(title.main)}</span>${title.sub ? `<span class="queue-job-sub"> · ${queueEscapeHtml(title.sub)}</span>` : ''}</span>
+                <span class="queue-job-id" title="Job ID ${queueEscapeHtml(jobId)}">${queueEscapeHtml(jobId.substring(0, 8))}</span>
+                ${status === 'failed' && error ? `<span class="queue-job-error" title="${queueEscapeHtml(error)}">${queueEscapeHtml(error.split(/\r?\n/)[0])}</span>` : ''}
+            </div>`,
+        progress: renderJobProgress(job),
+        output: `<span class="queue-output" title="${outputLabel}">${outputLabel}</span>`,
+        created: `<span class="queue-created"${created.full ? ` title="${queueEscapeHtml(created.full)}"` : ''}>${queueEscapeHtml(created.label)}</span>`,
+        actions: renderQueueActions(job),
+    };
+}
+
+function renderQueueActions(job) {
+    const jobId = String(job.job_id || '');
+    const status = job.status;
+    // Availability is unchanged from the table version of the queue.
+    const canPause = status === 'queued' || status === 'processing';
+    const canResume = status === 'paused'
+        || status === 'interrupted'
+        || (status === 'failed' && (Number(job.processed_chunks || 0) > 0 || job.engine === 'breeze_api'));
+    const canDownload = status === 'completed';
+    const canCancel = status === 'queued' || status === 'processing';
+    const canDelete = status !== 'processing' && status !== 'pausing';
+    const button = (action, label, variant, extra = '') =>
+        `<button type="button" class="btn btn-sm ${variant} queue-action-${action}" data-queue-action="${action}"${extra}>${label}</button>`;
+    return `
+        <div class="queue-actions">
+            ${button('details', 'Details', 'btn-secondary', ` aria-controls="queue-job-details-${queueEscapeHtml(jobId)}"`)}
+            ${canPause ? button('pause', 'Pause', 'btn-ghost') : ''}
+            ${canResume ? button('resume', 'Resume', 'btn-primary') : ''}
+            ${canDownload ? button('download', 'Download', 'btn-primary') : ''}
+            ${canCancel ? button('cancel', 'Cancel', 'btn-danger') : ''}
+            ${canDelete ? button('remove', 'Remove', 'btn-ghost', ' title="Remove from the queue (audio files are kept)"') : ''}
+        </div>`;
+}
+
+function patchQueueItem(item, job, isCurrent) {
+    const jobId = item.dataset.jobId;
+    const status = String(job.status || 'unknown');
+    if (item.dataset.status !== status) {
+        item.dataset.status = status;
+    }
+    item.classList.toggle('is-current', !!isCurrent);
+
+    const row = item.firstElementChild;
+    const cells = renderQueueRowCells(job);
+    Array.from(row.children).forEach(cell => {
+        const html = cells[cell.dataset.cell];
+        // Only replace cells whose markup changed: keeps hover/focus stable across polls.
+        if (html !== undefined && cell._queueHtml !== html) {
+            cell.innerHTML = html;
+            cell._queueHtml = html;
+        }
+    });
+
+    const expanded = queueExpandedJobId === jobId;
+    item.classList.toggle('is-expanded', expanded);
+    const detailsBtn = row.querySelector('[data-queue-action="details"]');
+    if (detailsBtn) {
+        detailsBtn.setAttribute('aria-expanded', String(expanded));
+        detailsBtn.classList.toggle('is-active', expanded);
+    }
+    const panel = item.querySelector('.queue-details');
+    if (panel) {
+        panel.hidden = !expanded;
+        if (expanded) {
+            renderQueueInlineDetails(item, job);
+            maybeRefreshExpandedDetails(job);
+        }
     }
 }
 
 function displayQueue(data) {
     const container = document.getElementById('queue-list');
     if (!container) return;
+    container.removeAttribute('aria-busy');
+    queueLastData = data;
 
-    if (!data.jobs || data.jobs.length === 0) {
-        container.innerHTML = '<p><em>No jobs in queue</em></p>';
-        return;
-    }
+    const jobs = (Array.isArray(data.jobs) ? data.jobs : []).filter(job => job && job.job_id);
 
     let hasNewCompletion = false;
-    data.jobs.forEach(job => {
+    jobs.forEach(job => {
         if (job.status === 'completed' && !completedJobIds.has(job.job_id)) {
             completedJobIds.add(job.job_id);
             hasNewCompletion = true;
@@ -936,77 +1299,391 @@ function displayQueue(data) {
         document.dispatchEvent(new CustomEvent('library:refresh'));
     }
 
-    let html = `
-        <div style="margin-bottom: 15px;">
-            <strong>Queue Size:</strong> ${data.queue_size} pending |
-            <strong>Current Jobs:</strong> ${Array.isArray(data.current_jobs) && data.current_jobs.length
-                ? data.current_jobs.join(', ')
-                : (data.current_job || 'None')}
-        </div>
-        <table class="queue-table">
-            <thead>
-                <tr>
-                    <th>Status</th>
-                    <th>Job ID</th>
-                    <th>Progress</th>
-                    <th>Text Preview</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-    `;
+    queueLatestJobs.clear();
+    jobs.forEach(job => queueLatestJobs.set(String(job.job_id), job));
 
-    data.jobs.forEach(job => {
-        const statusClass = getStatusClass(job.status);
-        const statusIcon = getStatusIcon(job.status);
-        const createdTime = job.created_at ? new Date(job.created_at).toLocaleString() : '';
-        const currentJobs = Array.isArray(data.current_jobs) ? data.current_jobs : [data.current_job];
-        const isCurrentJob = currentJobs.includes(job.job_id);
-        const canPause = job.status === 'queued' || job.status === 'processing';
-        const canResume = job.status === 'paused'
-            || job.status === 'interrupted'
-            || (job.status === 'failed' && (Number(job.processed_chunks || 0) > 0 || job.engine === 'breeze_api'));
-        const canDelete = job.status !== 'processing' && job.status !== 'pausing';
+    const summary = document.getElementById('queue-summary');
+    if (summary) {
+        // #queue-summary is an aria-live region and this runs on every poll:
+        // only write when the text changes so screen readers don't re-announce it.
+        const summaryText = queueSummaryText(jobs);
+        if (summary.textContent !== summaryText) summary.textContent = summaryText;
+        const currentIds = Array.isArray(data.current_jobs) && data.current_jobs.length
+            ? data.current_jobs
+            : (data.current_job ? [data.current_job] : []);
+        const summaryTitle = currentIds.length ? `Current jobs: ${currentIds.join(', ')}` : '';
+        if (summaryTitle) {
+            if (summary.getAttribute('title') !== summaryTitle) summary.setAttribute('title', summaryTitle);
+        } else if (summary.hasAttribute('title')) {
+            summary.removeAttribute('title');
+        }
+    }
+    const footnote = document.getElementById('queue-footnote');
+    if (footnote) footnote.hidden = jobs.length === 0;
+    const clearBtn = document.getElementById('clear-queue-btn');
+    if (clearBtn && clearBtn.dataset.busy !== 'true') {
+        clearBtn.disabled = jobs.length === 0;
+    }
 
-        html += `
-            <tr class="${isCurrentJob ? 'current-job' : ''}">
-                <td><span class="status-badge ${statusClass}">${statusIcon} ${job.status}</span></td>
-                <td><code>${job.job_id.substring(0, 8)}</code></td>
-                <td>${renderJobProgress(job)}</td>
-                <td class="text-preview">${job.text_preview || 'N/A'}</td>
-                <td>${createdTime}</td>
-                <td>
-                    <button class="btn-small btn-secondary" onclick="openJobDetailsModal('${job.job_id}')">Details</button>
-                    ${canPause ?
-                        `<button class="btn-small btn-warning" onclick="pauseQueueJob('${job.job_id}')">Pause</button>` :
-                        ''}
-                    ${canResume ?
-                        `<button class="btn-small btn-primary" onclick="resumeQueueJob('${job.job_id}')">Resume</button>` :
-                        ''}
-                    ${job.status === 'completed' ?
-                        `<button class="btn-small btn-primary" onclick="downloadJobAudio('${job.job_id}')">Download</button>` :
-                        ''}
-                    ${(job.status === 'queued' || job.status === 'processing') ?
-                        `<button class="btn-small btn-danger" onclick="cancelQueueJob('${job.job_id}')">Cancel</button>` :
-                        ''}
-                    ${canDelete ?
-                        `<button class="btn-small btn-outline" onclick="deleteQueueJob('${job.job_id}')">Remove</button>` :
-                        ''}
-                    ${job.status === 'failed' ?
-                        `<span class="error-text" title="${job.error || 'Unknown error'}">Failed</span>` :
-                        ''}
-                </td>
-            </tr>
-        `;
+    if (jobs.length === 0) {
+        if (!container.querySelector('.queue-empty')) {
+            container.innerHTML = renderQueueEmptyState();
+        }
+        queueJobDetailsCache.clear();
+        if (queueExpandedJobId !== queuePendingFocusJobId) queueExpandedJobId = null;
+        return;
+    }
+
+    const rows = ensureQueueTable(container);
+    const currentJobs = new Set(
+        (Array.isArray(data.current_jobs) ? data.current_jobs : [data.current_job]).filter(Boolean)
+    );
+    if (queueExpandedJobId && !queueLatestJobs.has(queueExpandedJobId) && queueExpandedJobId !== queuePendingFocusJobId) {
+        queueExpandedJobId = null;
+    }
+
+    const existing = new Map();
+    Array.from(rows.children).forEach(child => existing.set(child.dataset.jobId, child));
+    jobs.forEach((job, index) => {
+        const jobId = String(job.job_id);
+        let item = existing.get(jobId);
+        if (!item) {
+            item = createQueueItem(jobId);
+        }
+        existing.delete(jobId);
+        patchQueueItem(item, job, currentJobs.has(jobId));
+        const current = rows.children[index] || null;
+        if (current !== item) {
+            rows.insertBefore(item, current);
+        }
+    });
+    existing.forEach(item => item.remove());
+
+    Array.from(queueJobDetailsCache.keys()).forEach(jobId => {
+        if (!queueLatestJobs.has(jobId)) queueJobDetailsCache.delete(jobId);
     });
 
-    html += `
-            </tbody>
-        </table>
-    `;
+    applyPendingQueueFocus();
+}
 
-    container.innerHTML = html;
+function handleQueueListClick(event) {
+    const target = event.target;
+    const button = target && typeof target.closest === 'function' ? target.closest('[data-queue-action]') : null;
+    if (!button) return;
+    const action = button.dataset.queueAction;
+    if (action === 'go-generate') {
+        if (typeof window.studioGoToTab === 'function') window.studioGoToTab('generate');
+        return;
+    }
+    if (action === 'retry') {
+        loadQueue();
+        return;
+    }
+    const item = button.closest('.queue-item');
+    const jobId = item ? item.dataset.jobId : '';
+    if (!jobId) return;
+    switch (action) {
+        case 'details':
+            toggleQueueJobDetails(jobId);
+            break;
+        case 'full-details':
+            openJobDetailsModal(jobId);
+            break;
+        case 'pause':
+            pauseQueueJob(jobId);
+            break;
+        case 'resume':
+            resumeQueueJob(jobId);
+            break;
+        case 'download':
+            downloadJobAudio(jobId);
+            break;
+        case 'cancel':
+            cancelQueueJob(jobId);
+            break;
+        case 'remove':
+            deleteQueueJob(jobId);
+            break;
+        default:
+            break;
+    }
+}
+
+function toggleQueueJobDetails(jobId) {
+    if (!jobId) return;
+    queueExpandedJobId = queueExpandedJobId === jobId ? null : jobId;
+    if (queuePendingFocusJobId && queuePendingFocusJobId !== queueExpandedJobId) {
+        queuePendingFocusJobId = null;
+    }
+    if (queueLastData) {
+        displayQueue(queueLastData);
+    }
+}
+
+function focusQueueJob(jobId) {
+    if (!jobId) return;
+    queuePendingFocusJobId = jobId;
+    queuePendingFocusSince = Date.now();
+    queueExpandedJobId = jobId;
+    if (queueLastData) {
+        displayQueue(queueLastData);
+    }
+    loadQueue();
+}
+
+function applyPendingQueueFocus() {
+    const jobId = queuePendingFocusJobId;
+    if (!jobId) return;
+    const item = findQueueItem(jobId);
+    if (!item) {
+        if (Date.now() - queuePendingFocusSince > QUEUE_FOCUS_TIMEOUT_MS) {
+            queuePendingFocusJobId = null;
+            if (queueExpandedJobId === jobId) queueExpandedJobId = null;
+        }
+        return;
+    }
+    if (!isQueueTabActive()) return;
+    queuePendingFocusJobId = null;
+    if (typeof item.scrollIntoView === 'function') {
+        item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    item.classList.remove('is-flash');
+    void item.offsetWidth;
+    item.classList.add('is-flash');
+    setTimeout(() => item.classList.remove('is-flash'), 1800);
+}
+
+async function fetchJobDetails(jobId, { includeText = true } = {}) {
+    const url = `/api/jobs/${encodeURIComponent(jobId)}/details${includeText ? '' : '?include_text=0'}`;
+    const response = await fetch(url);
+    const payload = await response.json();
+    if (!payload.success) {
+        throw new Error(payload.error || 'Failed to load job details');
+    }
+    return payload.job || {};
+}
+
+function maybeRefreshExpandedDetails(job) {
+    const jobId = String(job.job_id || '');
+    if (!jobId || queueDetailsInFlight.has(jobId)) return;
+    const entry = queueJobDetailsCache.get(jobId);
+    const live = QUEUE_LIVE_STATUSES.has(job.status);
+    let stale = !entry;
+    if (entry) {
+        const age = Date.now() - entry.fetchedAt;
+        if (entry.status !== job.status) {
+            stale = true;
+        } else if (entry.error) {
+            stale = age >= QUEUE_DETAILS_RETRY_MS;
+        } else if (live) {
+            // Timing only changes once per finished chunk; never refetch more than every 5 s.
+            stale = (entry.processed !== job.processed_chunks && age >= QUEUE_DETAILS_MIN_REFRESH_MS)
+                || age >= QUEUE_DETAILS_MAX_AGE_MS;
+        }
+    }
+    if (stale) {
+        refreshQueueJobDetails(jobId, job);
+    }
+}
+
+async function refreshQueueJobDetails(jobId, job) {
+    if (queueDetailsInFlight.has(jobId)) return;
+    queueDetailsInFlight.add(jobId);
+    const previous = queueJobDetailsCache.get(jobId);
+    try {
+        const details = await fetchJobDetails(jobId, { includeText: false });
+        queueJobDetailsCache.set(jobId, {
+            payload: details,
+            fetchedAt: Date.now(),
+            status: job.status,
+            processed: job.processed_chunks,
+            error: null,
+        });
+    } catch (error) {
+        queueJobDetailsCache.set(jobId, {
+            payload: previous ? previous.payload : null,
+            fetchedAt: Date.now(),
+            status: job.status,
+            processed: job.processed_chunks,
+            error: error.message || 'Failed to load job details',
+        });
+    } finally {
+        queueDetailsInFlight.delete(jobId);
+    }
+    // Patch only this job's details panel; the row itself is untouched.
+    const latest = queueLatestJobs.get(jobId);
+    const item = findQueueItem(jobId);
+    if (latest && item && queueExpandedJobId === jobId) {
+        renderQueueInlineDetails(item, latest);
+    }
+}
+
+function buildJobDetailCardList(details, queueJob, options = {}) {
+    const d = details || {};
+    const j = queueJob || {};
+    const extended = !!options.extended;
+    const loadState = options.loadState || (details ? 'loaded' : 'loading');
+    const pending = loadState === 'loading' ? '…' : '—';
+    const loaded = !!details;
+    const pick = (key) => (j[key] !== undefined && j[key] !== null ? j[key] : d[key]);
+    const status = String(pick('status') || '');
+    const live = QUEUE_LIVE_STATUSES.has(status);
+    const tm = d.timing_metrics || {};
+    const total = Number(pick('total_chunks')) || 0;
+    const estimated = Number(j.estimated_total_chunks) || 0;
+    const processed = Number(pick('processed_chunks')) || 0;
+    const engine = pick('engine');
+    const speakers = loaded
+        ? (Array.isArray(d.speakers) && d.speakers.length ? d.speakers.join(', ') : 'default')
+        : pending;
+    const output = queueFormatOutputSummary(pick('output_format'), pick('output_bitrate_kbps'), pick('acx_compliance'));
+    const chapterCount = Number(pick('chapter_count'));
+    const chapters = pick('chapter_mode')
+        ? `${chapterCount > 0 ? chapterCount : 'Per chapter'}${pick('full_story_requested') ? ' + full story' : ''}`
+        : (extended ? 'Single file' : '');
+    const created = queueFormatCreated(pick('created_at'));
+    const elapsed = tm.total_seconds != null ? fmtDuration(tm.total_seconds) : (loaded ? '—' : pending);
+    const average = tm.avg_chunk_seconds != null ? queueFormatSeconds(tm.avg_chunk_seconds) : (loaded ? '—' : pending);
+    const eta = pick('eta_seconds');
+    let remaining = 'Calculating…';
+    if (status === 'pausing') remaining = 'Pausing…';
+    else if (typeof eta === 'number' && eta > 0) remaining = `≈ ${fmtDuration(eta)}`;
+    else if (eta === 0) remaining = 'Finishing up…';
+    const resumeIndex = Number(pick('resume_from_chunk_index'));
+    // The modal shows the checkpoint for every unfinished job (as before the
+    // redesign); the inline row only where it is actionable or about to be used.
+    const resumeChunk = status !== 'completed' && Number.isFinite(resumeIndex) && resumeIndex > 0
+        && (extended || ['queued', 'paused', 'interrupted', 'failed'].includes(status))
+        ? `Chunk ${resumeIndex + 1}`
+        : '';
+    const error = String(pick('error') || '').trim();
+
+    const cards = [];
+    const add = (label, value, extra = {}) => {
+        if (value === null || value === undefined || value === '') return;
+        cards.push({ label, value: String(value), ...extra });
+    };
+    if (error && status !== 'completed') {
+        add(status === 'failed' ? 'Error' : 'Last error', error, { tone: 'danger', wide: true });
+    }
+    if (status === 'queued') {
+        const position = Number(j.queue_position);
+        add('Position', position > 0 ? `${queueOrdinal(position)} in queue` : 'Waiting');
+        add('Chunks', total || estimated ? String(total || estimated) : 'Estimating…');
+        add('Resume from', resumeChunk);
+        add('Engine', queueEngineLabel(engine));
+        add('Speakers', speakers);
+        add('Output', output);
+        add('Chapters', chapters);
+        add('Created', created.label, { title: created.full });
+    } else if (live) {
+        add('Elapsed', elapsed);
+        add('Remaining', remaining);
+        add('Avg per chunk', average);
+        add('Engine', queueEngineLabel(engine));
+        add('Speakers', speakers);
+        add('Output', output);
+        add('Chapters', chapters);
+        if (extended) {
+            add('Chunks', total ? `${Math.min(processed, total)} of ${total}` : 'Estimating…');
+            add('Resume from', resumeChunk);
+            add('Created', created.label, { title: created.full });
+        }
+    } else {
+        add('Chunks', total ? `${Math.min(processed, total)} of ${total}` : (processed ? String(processed) : '—'));
+        if (tm.total_seconds != null || !loaded) add(extended ? 'Active time' : 'Elapsed', elapsed);
+        if (tm.avg_chunk_seconds != null || !loaded) add('Avg per chunk', average);
+        add('Engine', queueEngineLabel(engine));
+        add('Speakers', speakers);
+        add('Output', output);
+        add('Chapters', chapters);
+        add('Resume from', resumeChunk);
+        add('Created', created.label, { title: created.full });
+    }
+    if (extended && loaded) {
+        const started = d.started_at || tm.started_at;
+        const completed = d.completed_at || tm.completed_at;
+        if (started) add('Started', queueFormatDateTime(started));
+        add('Completed', completed ? queueFormatDateTime(completed) : (live ? 'In progress…' : ''));
+        if (tm.min_chunk_seconds != null || tm.max_chunk_seconds != null) {
+            add('Fastest / slowest', `${queueFormatSeconds(tm.min_chunk_seconds)} · ${queueFormatSeconds(tm.max_chunk_seconds)}`);
+        }
+    }
+    return cards;
+}
+
+function renderJobDetailCards(details, queueJob, options = {}) {
+    const cards = buildJobDetailCardList(details, queueJob, options);
+    return `
+        <div class="job-detail-cards">
+            ${cards.map(card => `
+                <div class="job-detail-card${card.wide ? ' is-wide' : ''}${card.tone === 'danger' ? ' is-danger' : ''}"${card.title ? ` title="${queueEscapeHtml(card.title)}"` : ''}>
+                    <span class="job-detail-card-label">${queueEscapeHtml(card.label)}</span>
+                    <span class="job-detail-card-value">${queueEscapeHtml(card.value)}</span>
+                </div>`).join('')}
+            ${options.trailingHtml || ''}
+        </div>`;
+}
+
+function renderJobDetailChart(details, idSuffix) {
+    const tm = details && details.timing_metrics ? details.timing_metrics : null;
+    if (!tm || tm.total_seconds == null) return '';
+    const chunkCount = tm.chunk_count || details.total_chunks || 0;
+    return buildChunkChart(tm.chunk_times, chunkCount, tm.total_seconds, { idSuffix });
+}
+
+function renderQueueInlineDetails(item, job) {
+    const panel = item.querySelector('.queue-details');
+    if (!panel) return;
+    const jobId = String(job.job_id || '');
+    const entry = queueJobDetailsCache.get(jobId) || null;
+    const details = entry && entry.payload ? entry.payload : null;
+    const loadState = details ? 'loaded' : (entry && entry.error ? 'error' : 'loading');
+    const facts = [];
+    let note = '';
+    if (!details && loadState === 'loading') {
+        note = 'Loading timing details…';
+    } else if (entry && entry.error) {
+        note = `Couldn't refresh timing details: ${entry.error}`;
+    }
+    if (details) {
+        const tm = details.timing_metrics || {};
+        const started = details.started_at || tm.started_at;
+        const completed = details.completed_at || tm.completed_at;
+        if (started) facts.push(['Started', queueFormatDateTime(started)]);
+        if (completed) facts.push(['Finished', queueFormatDateTime(completed)]);
+        if (tm.min_chunk_seconds != null) facts.push(['Fastest chunk', queueFormatSeconds(tm.min_chunk_seconds)]);
+        if (tm.max_chunk_seconds != null) facts.push(['Slowest chunk', queueFormatSeconds(tm.max_chunk_seconds)]);
+    }
+    const chart = renderJobDetailChart(details, `q-${jobId}`);
+    const factsHtml = facts.map(([label, value]) =>
+        `<span class="queue-detail-fact"><span class="queue-detail-fact-label">${queueEscapeHtml(label)}</span> ${queueEscapeHtml(value)}</span>`
+    ).join('');
+    const fullDetailsButton = '<button type="button" class="btn btn-xs btn-ghost queue-full-details-btn" data-queue-action="full-details"><span class="ms" aria-hidden="true">open_in_full</span>Full details</button>';
+    // Nothing to show under the cards (e.g. a queued job): keep the button in the
+    // card grid, bottom-right, instead of on a line of its own.
+    const buttonInGrid = !chart && !factsHtml && !note;
+    const html = buttonInGrid
+        ? renderJobDetailCards(details, job, {
+            loadState,
+            trailingHtml: `<div class="queue-detail-grid-action">${fullDetailsButton}</div>`,
+        })
+        : `
+        ${renderJobDetailCards(details, job, { loadState })}
+        <div class="queue-detail-extra${chart ? ' has-chart' : ''}">
+            ${chart ? `<div class="queue-detail-chart">${chart}</div>` : ''}
+            <div class="queue-detail-side">
+                <div class="queue-detail-facts">
+                    ${note ? `<span class="queue-detail-note${entry && entry.error ? ' is-error' : ''}">${queueEscapeHtml(note)}</span>` : ''}
+                    ${factsHtml}
+                </div>
+                ${fullDetailsButton}
+            </div>
+        </div>`;
+    if (panel._queueHtml !== html) {
+        panel.innerHTML = html;
+        panel._queueHtml = html;
+    }
 }
 
 function getStatusClass(status) {
@@ -1059,6 +1736,7 @@ function ensureJobDetailModalHandlers() {
     const overlay = document.getElementById('job-detail-modal-overlay');
     const closeBtn = document.getElementById('job-detail-modal-close');
     const footerBtn = document.getElementById('job-detail-modal-close-btn');
+    const modal = document.getElementById('job-detail-modal');
     if (overlay && !overlay.dataset.bound) {
         overlay.addEventListener('click', (event) => {
             if (event.target === overlay) {
@@ -1075,6 +1753,14 @@ function ensureJobDetailModalHandlers() {
         footerBtn.addEventListener('click', closeJobDetailModal);
         footerBtn.dataset.bound = 'true';
     }
+    if (modal && !modal.dataset.escBound) {
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeJobDetailModal();
+            }
+        });
+        modal.dataset.escBound = 'true';
+    }
 }
 
 function closeJobDetailModal() {
@@ -1082,6 +1768,27 @@ function closeJobDetailModal() {
     const modal = document.getElementById('job-detail-modal');
     if (overlay) overlay.classList.add('hidden');
     if (modal) modal.classList.add('hidden');
+    queueModalJobId = null;
+}
+
+function renderJobDetailModalBody(details, queueJob) {
+    const d = details || {};
+    const status = String((queueJob && queueJob.status) || d.status || '');
+    const live = QUEUE_LIVE_STATUSES.has(status);
+    const chart = renderJobDetailChart(d, `m-${d.job_id || ''}`);
+    const text = String(d.text || '').trim();
+    return `
+        <div class="job-detail-status-line">
+            <span class="queue-status" data-status="${queueEscapeHtml(status)}"><span class="queue-status-dot" aria-hidden="true"></span>${queueEscapeHtml(queueStatusLabel(status))}</span>
+            ${live ? '<span class="pill pill-amber">Live</span>' : ''}
+            <span class="job-detail-id" title="Job ID">${queueEscapeHtml(d.job_id || (queueJob && queueJob.job_id) || '')}</span>
+        </div>
+        ${renderJobDetailCards(d, queueJob, { extended: true, loadState: 'loaded' })}
+        ${chart ? `<div class="queue-detail-chart">${chart}</div>` : ''}
+        <div class="job-detail-text">
+            <span class="job-detail-text-label">Job text</span>
+            <textarea readonly rows="10" aria-label="Job text">${queueEscapeHtml(text)}</textarea>
+        </div>`;
 }
 
 async function openJobDetailsModal(jobId) {
@@ -1089,100 +1796,31 @@ async function openJobDetailsModal(jobId) {
     const overlay = document.getElementById('job-detail-modal-overlay');
     const modal = document.getElementById('job-detail-modal');
     const body = document.getElementById('job-detail-modal-body');
+    const subtitle = document.getElementById('job-detail-modal-subtitle');
+    const queueJob = queueLatestJobs.get(jobId) || null;
+    const setSubtitle = (job) => {
+        if (!subtitle) return;
+        const parts = job ? queueJobTitleParts(job) : { main: '', sub: '' };
+        const label = parts.sub ? `${parts.main} · ${parts.sub}` : parts.main;
+        subtitle.textContent = label || jobId.substring(0, 8);
+        subtitle.title = label || '';
+    };
+    queueModalJobId = jobId;
+    setSubtitle(queueJob);
     if (overlay) overlay.classList.remove('hidden');
     if (modal) modal.classList.remove('hidden');
-    if (body) body.innerHTML = '<div class="chunk-review-loading">Loading job details...</div>';
+    if (body) body.innerHTML = '<div class="job-detail-loading">Loading job details…</div>';
     try {
-        const response = await fetch(`/api/jobs/${jobId}/details`);
-        const payload = await response.json();
-        if (!payload.success) {
-            throw new Error(payload.error || 'Failed to load job details');
-        }
-        const job = payload.job || {};
-        const speakers = Array.isArray(job.speakers) ? job.speakers : [];
-        const speakerList = speakers.length ? speakers.map(s => `<span class="speaker-tag">${s}</span>`).join('') : '<span class="speaker-tag">default</span>';
-        const text = (job.text || '').trim();
-        const resumeFrom = (job.status !== 'completed' && Number.isFinite(Number(job.resume_from_chunk_index)) && Number(job.resume_from_chunk_index) > 0)
-            ? Number(job.resume_from_chunk_index) + 1
-            : null;
-        const resumeLine = resumeFrom ? `<div><strong>Resume from:</strong> chunk ${resumeFrom}</div>` : '';
-
-        // Timing metrics
-        const tm = job.timing_metrics || {};
-        function fmtTime(iso) {
-            if (!iso) return 'N/A';
-            return new Date(iso).toLocaleString();
-        }
-        const isLive = ['processing', 'pausing'].includes(job.status);
-        const startedAt = fmtTime(job.started_at || tm.started_at);
-        const completedAt = (job.completed_at || tm.completed_at)
-            ? fmtTime(job.completed_at || tm.completed_at)
-            : (isLive ? '<span style="color:var(--accent,#7eb8f7);font-style:italic">In progress…</span>' : 'N/A');
-        const totalTimeLabel = 'Active Time (all runs)';
-        const totalTime = fmtDuration(tm.total_seconds);
-        const avgChunk = tm.avg_chunk_seconds != null ? fmtDuration(tm.avg_chunk_seconds) : 'N/A';
-        const minChunk = tm.min_chunk_seconds != null ? fmtDuration(tm.min_chunk_seconds) : 'N/A';
-        const maxChunk = tm.max_chunk_seconds != null ? fmtDuration(tm.max_chunk_seconds) : 'N/A';
-        const chunkCount = job.total_chunks != null ? job.total_chunks : (tm.chunk_count != null ? tm.chunk_count : 'N/A');
-        const processedChunks = job.processed_chunks != null ? job.processed_chunks : 'N/A';
-        const liveBadge = isLive ? '<span style="margin-left:8px;font-size:0.7rem;padding:2px 7px;border-radius:10px;background:rgba(126,184,247,0.15);color:var(--accent,#7eb8f7);vertical-align:middle">live</span>' : '';
-
-        const hasTimingData = tm.total_seconds != null;
-
-        const chunkChart = hasTimingData
-            ? buildChunkChart(tm.chunk_times, tm.chunk_count || chunkCount, tm.total_seconds)
-            : '';
-
-        const timingSection = hasTimingData ? `
-            <div class="job-detail-timing">
-                <h4 style="margin:0 0 10px 0; font-size:0.95rem; color:var(--accent, #7eb8f7);">Timing${liveBadge}</h4>
-                <div class="job-detail-timing-grid">
-                    <div class="timing-row"><span class="timing-label">Started</span><span class="timing-value">${startedAt}</span></div>
-                    <div class="timing-row"><span class="timing-label">Completed</span><span class="timing-value">${completedAt}</span></div>
-                    <div class="timing-row timing-highlight"><span class="timing-label">${totalTimeLabel}</span><span class="timing-value">${totalTime}</span></div>
-                    <div class="timing-row"><span class="timing-label">Chunks</span><span class="timing-value">${processedChunks} / ${chunkCount}</span></div>
-                    <div class="timing-row timing-highlight"><span class="timing-label">Avg Chunk Time</span><span class="timing-value">${avgChunk}</span></div>
-                    <div class="timing-row"><span class="timing-label">Fastest Chunk</span><span class="timing-value">${minChunk}</span></div>
-                    <div class="timing-row"><span class="timing-label">Slowest Chunk</span><span class="timing-value">${maxChunk}</span></div>
-                </div>
-                ${chunkChart}
-            </div>` : (job.started_at ? `
-            <div class="job-detail-timing">
-                <h4 style="margin:0 0 10px 0; font-size:0.95rem; color:var(--accent, #7eb8f7);">Timing</h4>
-                <div class="job-detail-timing-grid">
-                    <div class="timing-row"><span class="timing-label">Started</span><span class="timing-value">${startedAt}</span></div>
-                    <div class="timing-row"><span class="timing-label">Chunks</span><span class="timing-value">${processedChunks} / ${chunkCount}</span></div>
-                </div>
-            </div>` : '');
-
-        if (body) {
-            body.innerHTML = `
-                <div class="job-detail-grid">
-                    <div>
-                        <strong>Engine:</strong> ${job.engine || 'Unknown'}
-                    </div>
-                    <div>
-                        <strong>Status:</strong> ${job.status || 'Unknown'}
-                    </div>
-                    <div>
-                        <strong>Created:</strong> ${job.created_at ? new Date(job.created_at).toLocaleString() : 'N/A'}
-                    </div>
-                    ${resumeLine}
-                    <div class="job-detail-speakers">
-                        <strong>Speakers:</strong>
-                        <div class="speaker-tags-wrap">${speakerList}</div>
-                    </div>
-                </div>
-                ${timingSection}
-                <div class="job-detail-text">
-                    <label>Job Text</label>
-                    <textarea readonly rows="10">${text}</textarea>
-                </div>
-            `;
-        }
+        const details = await fetchJobDetails(jobId, { includeText: true });
+        if (queueModalJobId !== jobId) return;
+        const latest = queueLatestJobs.get(jobId) || queueJob;
+        setSubtitle(latest || details);
+        if (body) body.innerHTML = renderJobDetailModalBody(details, latest);
     } catch (error) {
-        if (body) body.innerHTML = '<div class="chunk-review-empty">Failed to load job details.</div>';
-        alert(error.message || 'Failed to load job details');
+        if (queueModalJobId !== jobId) return;
+        if (body) {
+            body.innerHTML = `<div class="job-detail-loading is-error">Couldn't load job details. ${queueEscapeHtml(error.message || '')}</div>`;
+        }
     }
 }
 
@@ -1226,6 +1864,8 @@ async function deleteQueueJob(jobId) {
             throw new Error(data.error || 'Failed to delete job');
         }
         completedJobIds.delete(jobId);
+        queueJobDetailsCache.delete(jobId);
+        if (queueExpandedJobId === jobId) queueExpandedJobId = null;
         loadQueue();
         document.dispatchEvent(new CustomEvent('library:refresh'));
     } catch (error) {
@@ -1233,69 +1873,88 @@ async function deleteQueueJob(jobId) {
     }
 }
 
+function queueProgressRightLabel(job) {
+    switch (job.status) {
+        case 'queued':
+            return 'Waiting';
+        case 'processing':
+            return formatEta(job.eta_seconds, job.status);
+        case 'pausing':
+            return 'Pausing…';
+        case 'paused':
+            return 'Paused';
+        case 'completed':
+            return 'Done';
+        case 'interrupted':
+        case 'failed':
+            return 'Stopped';
+        case 'cancelled':
+            return 'Cancelled';
+        default:
+            return '';
+    }
+}
+
 function renderJobProgress(job) {
-    const total = job.total_chunks || 0;
-    const processed = Math.min(job.processed_chunks || 0, total || Infinity);
-    const percent = total > 0 ? Math.round((processed / total) * 100) : (job.status === 'completed' ? 100 : 0);
-    const chunkLabel = total ? `${processed} / ${total} chunk${total === 1 ? '' : 's'}` : 'Estimating…';
-    const etaLabel = formatEta(job.eta_seconds, job.status);
-    const chapterLabel = job.chapter_mode
-        ? `${job.chapter_count || '?'} chapter${(job.chapter_count || 0) === 1 ? '' : 's'} (per chapter merge)`
-        : 'Single output file';
+    const status = String(job.status || '');
+    const knownTotal = Number(job.total_chunks) || 0;
+    const total = knownTotal || Number(job.estimated_total_chunks) || 0;
+    const processed = Math.min(Number(job.processed_chunks) || 0, total || Infinity);
+    const percent = total > 0 ? Math.round((processed / total) * 100) : (status === 'completed' ? 100 : 0);
+    let chunkLabel = total ? `${processed} / ${total} chunk${total === 1 ? '' : 's'}` : 'Estimating…';
+    if (!total && status === 'completed') {
+        chunkLabel = 'Complete';
+    } else if (!total && !QUEUE_LIVE_STATUSES.has(status) && status !== 'queued') {
+        const done = Number(job.processed_chunks) || 0;
+        chunkLabel = done > 0 ? `${done} chunk${done === 1 ? '' : 's'}` : 'Not started';
+    }
+    const rightLabel = queueProgressRightLabel(job);
     const postTotal = Number(job.post_process_total || 0);
     const postDone = Math.min(Number(job.post_process_done || 0), postTotal || Infinity);
     const postPercent = Number.isFinite(Number(job.post_process_percent))
         ? Math.max(0, Math.min(Math.round(Number(job.post_process_percent)), 100))
         : (postTotal > 0 ? Math.round((postDone / postTotal) * 100) : 0);
-    const isFinishing = job.status === 'processing'
-        && total > 0
-        && processed >= total
+    const isFinishing = status === 'processing'
+        && knownTotal > 0
+        && processed >= knownTotal
         && (job.eta_seconds === 0 || job.eta_seconds === null || typeof job.eta_seconds !== 'number');
     const showPost = (postTotal > 0 && (job.post_process_active || postDone > 0)) || isFinishing;
     const postLabel = postTotal > 0
         ? `Post-processing ${postDone} / ${postTotal}`
         : 'Post-processing…';
-    const postFillClass = postTotal > 0 ? 'progress-bar-fill' : 'progress-bar-fill indeterminate';
-    const interruptedChip = job.status === 'interrupted'
-        ? '<span class="review-chip warning">Interrupted</span>'
-        : '';
-    const resumeHint = job.status === 'interrupted' && Number.isFinite(Number(job.resume_from_chunk_index))
-        ? `<span class="review-chip muted">Resume from chunk ${Number(job.resume_from_chunk_index) + 1}</span>`
-        : '';
+    const postFillClass = postTotal > 0 ? 'queue-bar-fill' : 'queue-bar-fill is-indeterminate';
+    const resumeIndex = Number(job.resume_from_chunk_index);
+    const showResume = Number.isFinite(resumeIndex)
+        && job.resume_from_chunk_index !== null
+        && (status === 'interrupted' || (status === 'paused' && resumeIndex > 0));
+    const width = Math.min(Math.max(percent, 0), 100);
 
     return `
         <div class="queue-progress">
-            ${job.status === 'processing' && job.breeze_voice_status ? `<div>${escapeHtml(job.breeze_voice_status)}</div>` : ''}
-            <div class="queue-progress-header">
-                <span>${chunkLabel}</span>
-                <span>${etaLabel}</span>
+            <div class="queue-progress-head">
+                <span class="queue-progress-count"${!knownTotal && total ? ' title="Estimated before processing"' : ''}>${queueEscapeHtml(chunkLabel)}</span>
+                <span class="queue-progress-eta">${queueEscapeHtml(rightLabel)}</span>
             </div>
-            <div class="progress-bar">
-                <div class="progress-bar-fill" style="width: ${Math.min(Math.max(percent, 0), 100)}%;"></div>
+            <div class="queue-bar" role="progressbar" aria-label="Chunks rendered" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${width}">
+                <div class="queue-bar-fill" style="width: ${width}%;"></div>
             </div>
-            <div class="queue-progress-footer">
-                <span>${chapterLabel}</span>
-                <span>${job.status === 'completed' ? 'Done' : job.status}</span>
-            </div>
-            ${interruptedChip || resumeHint ? `
-                <div class="queue-progress-footer">
-                    <span>${interruptedChip}</span>
-                    <span>${resumeHint}</span>
-                </div>
-            ` : ''}
+            ${status === 'processing' && job.breeze_voice_status ? `<div class="queue-progress-note" title="${queueEscapeHtml(job.breeze_voice_status)}">${queueEscapeHtml(job.breeze_voice_status)}</div>` : ''}
+            ${status === 'interrupted' || showResume ? `
+                <div class="queue-progress-chips">
+                    ${status === 'interrupted' ? '<span class="pill pill-red">Interrupted</span>' : ''}
+                    ${showResume ? `<span class="pill">Resume from chunk ${resumeIndex + 1}</span>` : ''}
+                </div>` : ''}
             ${showPost ? `
-                <div class="queue-post-progress">
-                    <div class="queue-progress-header">
-                        <span>${postLabel}</span>
-                        <span>${postPercent}%</span>
+                <div class="queue-post">
+                    <div class="queue-progress-head">
+                        <span>${queueEscapeHtml(postLabel)}</span>
+                        ${postTotal > 0 ? `<span>${postPercent}%</span>` : ''}
                     </div>
-                    <div class="progress-bar">
+                    <div class="queue-bar queue-bar-slim">
                         <div class="${postFillClass}" style="width: ${Math.min(Math.max(postPercent, 0), 100)}%;"></div>
                     </div>
-                </div>
-            ` : ''}
-        </div>
-    `;
+                </div>` : ''}
+        </div>`;
 }
 
 function formatEta(seconds, status) {

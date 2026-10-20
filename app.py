@@ -10341,12 +10341,15 @@ def resume_job(job_id: str):
 
 @app.route('/api/jobs/<job_id>/details', methods=['GET'])
 def get_job_details(job_id: str):
+    # ?include_text=0 skips the (possibly large) manuscript for live polling of the queue row.
+    include_text = str(request.args.get("include_text", "1")).strip().lower() not in {"0", "false", "no"}
     try:
         with queue_lock:
             job_entry = jobs.get(job_id)
             if not job_entry:
                 return jsonify({"success": False, "error": "Job not found"}), 404
-            text = _load_job_text(job_entry.get("text_path"))
+            stored_speakers = job_entry.get("speakers")
+            text = _load_job_text(job_entry.get("text_path")) if (include_text or not stored_speakers) else ""
             payload = {
                 "job_id": job_id,
                 "status": job_entry.get("status"),
@@ -10354,8 +10357,14 @@ def get_job_details(job_id: str):
                 "started_at": job_entry.get("started_at"),
                 "completed_at": job_entry.get("completed_at"),
                 "engine": job_entry.get("engine"),
-                "speakers": job_entry.get("speakers") or _extract_speakers_for_text(text),
-                "text": text,
+                "speakers": stored_speakers or _extract_speakers_for_text(text),
+                "text": text if include_text else None,
+                "title": job_entry.get("_queue_title") or _queue_title_hint_from_entry(job_entry) or _queue_title_from_text(job_entry.get("text_preview", "")),
+                "text_title": _queue_title_from_text(job_entry.get("text_preview", "")),
+                "error": job_entry.get("error") or "",
+                "eta_seconds": job_entry.get("eta_seconds"),
+                "chapter_count": job_entry.get("chapter_count"),
+                **_queue_output_summary(job_entry),
                 "voice_assignments": job_entry.get("voice_assignments") or {},
                 "chapter_mode": bool(job_entry.get("chapter_mode")),
                 "full_story_requested": bool(job_entry.get("full_story_requested")),
@@ -11091,6 +11100,7 @@ def generate_audio():
                 "engine": config.get("tts_engine"),
                 "resume_from_chunk_index": 0,
                 "word_replacements": word_replacements,
+                **_submitted_queue_title_hints(data, text),
             }
             jobs[job_id]["job_payload"] = _build_job_payload(job_id, text, jobs[job_id])
         
@@ -13211,23 +13221,193 @@ def cancel_job(job_id):
         }), 500
 
 
+QUEUE_HIDDEN_JOB_TYPES = frozenset({
+    "qwen3_voice_design_preview",
+    "qwen3_voice_design_save",
+    "breeze_voice_design_preview",
+    "breeze_voice_design_save",
+    "omnivoice_design_preview",
+    "omnivoice_design_save",
+})
+QUEUE_TITLE_MAX_CHARS = 80
+# A sentence break shorter than this ("Yes.", "Mr.") is not used as a title on its own.
+QUEUE_TITLE_MIN_SENTENCE_CHARS = 12
+# Words whose trailing period does not end a sentence ("Mr. Holmes", "St. Ives").
+QUEUE_TITLE_ABBREVIATIONS = frozenset({
+    "mr", "mrs", "ms", "mx", "dr", "st", "sr", "jr", "prof", "rev", "hon", "gen",
+    "col", "capt", "cpt", "lt", "sgt", "mt", "ft", "vs", "vol", "ch", "fig", "approx",
+})
+_QUEUE_TITLE_SENTENCE_END = re.compile(r"([.!?…]+)[\"'”’)]*(?=\s|$)")
+
+
+def _queue_title_sentence_end(line: str) -> Optional[int]:
+    """Index just past the first real sentence break in ``line``, or None.
+
+    Skips periods after abbreviations, single-letter initials and dotted
+    abbreviations ("a.m.", "U.S."), and breaks that would leave a very short title."""
+    for match in _QUEUE_TITLE_SENTENCE_END.finditer(line):
+        end = match.end()
+        candidate = line[:end].strip()
+        if len(candidate) < QUEUE_TITLE_MIN_SENTENCE_CHARS:
+            continue
+        if match.group(1) == ".":
+            words = line[: match.start()].split()
+            word = re.sub(r"^\W+", "", words[-1]) if words else ""
+            if word.lower() in QUEUE_TITLE_ABBREVIATIONS or len(word) == 1 or "." in word:
+                continue
+        return end
+    return None
+
+
+def _truncate_queue_title(value: str, limit: int = QUEUE_TITLE_MAX_CHARS) -> str:
+    text = " ".join(str(value or "").split())
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1]
+    space = cut.rfind(" ")
+    if space >= limit // 2:
+        cut = cut[:space]
+    return cut.rstrip(" ,;:-–—") + "…"
+
+
+def _queue_title_from_text(text: Optional[str]) -> str:
+    """First heading/sentence of a manuscript with speaker tags and directions stripped."""
+    if not isinstance(text, str) or not text.strip():
+        return ""
+    cleaned = re.sub(r"\[direction\].*?\[/direction\]", " ", text, flags=re.I | re.S)
+    # text_preview is cut at 200 chars: drop a direction or tag left open by the cut.
+    cleaned = re.sub(r"\[direction\](?:(?!\[/direction\]).)*$", " ", cleaned, flags=re.I | re.S)
+    cleaned = re.sub(r"\[/?[^\]\r\n]*\]", " ", cleaned)
+    cleaned = re.sub(r"\[[^\]\r\n]*$", " ", cleaned)
+    for raw_line in cleaned.splitlines():
+        line = " ".join(raw_line.split()).lstrip("#").strip()
+        if not re.search(r"\w", line):
+            continue
+        end = _queue_title_sentence_end(line)
+        return _truncate_queue_title(line[:end] if end else line)
+    return ""
+
+
+def _queue_title_hint_from_entry(job_info: Dict[str, Any]) -> str:
+    """Production/collection title stored on the job at submit time, if any."""
+    for key in ("collection_title", "production_title"):
+        value = job_info.get(key)
+        if isinstance(value, str) and value.strip():
+            return _truncate_queue_title(value)
+    return ""
+
+
+def _submitted_queue_title_hints(data: Dict[str, Any], text: str) -> Dict[str, str]:
+    """Title hints kept on a new job entry: collection title (book/project/Title line)
+    and an explicit Breeze production title (ignored when it is only the text's opening)."""
+    try:
+        collection_title = resolve_new_collection_title(data) or ""
+    except Exception:
+        collection_title = ""
+    production_title = data.get("production_title") if isinstance(data, dict) else ""
+    production_title = production_title.strip() if isinstance(production_title, str) else ""
+    if production_title and (text or "").startswith(production_title):
+        production_title = ""
+    return {"collection_title": collection_title, "production_title": production_title}
+
+
+def _queue_title_hint_from_metadata(job_dir: Optional[str]) -> str:
+    """Collection title written to metadata.json at submit (jobs restored after a restart)."""
+    if not job_dir:
+        return ""
+    try:
+        metadata = load_job_metadata(Path(job_dir)) or {}
+    except Exception:
+        return ""
+    value = metadata.get("collection_title") if isinstance(metadata, dict) else None
+    return _truncate_queue_title(value) if isinstance(value, str) and value.strip() else ""
+
+
+def _queue_output_summary(job_info: Dict[str, Any]) -> Dict[str, Any]:
+    """Output format, bitrate and ACX flag from the job's merge options (config snapshot fallback)."""
+    merge_options = job_info.get("merge_options")
+    merge_options = merge_options if isinstance(merge_options, dict) else {}
+    snapshot = job_info.get("config_snapshot")
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+    output_format = merge_options.get("output_format") or snapshot.get("output_format") or None
+    try:
+        bitrate = int(merge_options.get("output_bitrate_kbps") or snapshot.get("output_bitrate_kbps") or 0)
+    except (TypeError, ValueError):
+        bitrate = 0
+    acx = merge_options.get("acx_compliance")
+    if acx is None:
+        acx = snapshot.get("acx_compliance", False)
+    return {
+        "output_format": str(output_format).lower() if output_format else None,
+        "output_bitrate_kbps": bitrate or None,
+        "acx_compliance": bool(acx),
+    }
+
+
+def _snapshot_job_queue() -> Tuple[List[str], Dict[str, int]]:
+    """Job ids waiting in job_queue in dispatch order (first occurrence wins), plus the
+    chunk estimate each queued payload carries (job entries only learn total_chunks
+    once processing starts)."""
+    with job_queue.mutex:
+        items = list(job_queue.queue)
+    ordered: List[str] = []
+    estimates: Dict[str, int] = {}
+    seen = set()
+    for item in items:
+        job_id = item.get("job_id") if isinstance(item, dict) else None
+        if not job_id or job_id in seen:
+            continue
+        seen.add(job_id)
+        ordered.append(job_id)
+        try:
+            estimate = int(item.get("total_chunks") or 0)
+        except (TypeError, ValueError):
+            estimate = 0
+        if estimate > 0:
+            estimates[job_id] = estimate
+    return ordered, estimates
+
+
+def _compute_queue_positions(pending_ids: List[str], jobs_map: Dict[str, Dict[str, Any]]) -> Dict[str, int]:
+    """1-based position of every visible ``queued`` job in real dispatch order.
+
+    Jobs already taken off ``job_queue`` by the dispatcher but still ``queued``
+    (e.g. waiting for a cloud slot) run next, so they come first.
+    """
+    def visible_queued(job_id: str) -> bool:
+        info = jobs_map.get(job_id)
+        return bool(info) and info.get("status") == "queued" and info.get("job_type") not in QUEUE_HIDDEN_JOB_TYPES
+
+    pending_set = set(pending_ids)
+    dispatched = sorted(
+        (job_id for job_id in jobs_map if job_id not in pending_set and visible_queued(job_id)),
+        key=lambda job_id: jobs_map[job_id].get("created_at") or "",
+    )
+    ordered = dispatched + [job_id for job_id in pending_ids if visible_queued(job_id)]
+    return {job_id: index + 1 for index, job_id in enumerate(ordered)}
+
+
 @app.route('/api/queue', methods=['GET'])
 def get_queue():
     """Get current job queue and all jobs"""
     try:
         with log_request_timing("GET /api/queue"):
+            pending_ids, chunk_estimates = _snapshot_job_queue()
+            titles_to_resolve = []
             with queue_lock:
+                queue_positions = _compute_queue_positions(pending_ids, jobs)
                 all_jobs = []
                 for job_id, job_info in jobs.items():
-                    if job_info.get("job_type") in {
-                        "qwen3_voice_design_preview",
-                        "qwen3_voice_design_save",
-                        "breeze_voice_design_preview",
-                        "breeze_voice_design_save",
-                        "omnivoice_design_preview",
-                        "omnivoice_design_save",
-                    }:
+                    if job_info.get("job_type") in QUEUE_HIDDEN_JOB_TYPES:
                         continue
+                    text_title = _queue_title_from_text(job_info.get("text_preview", ""))
+                    cached_title = job_info.get("_queue_title")
+                    if cached_title is None:
+                        cached_title = _queue_title_hint_from_entry(job_info)
+                        if cached_title:
+                            job_info["_queue_title"] = cached_title
+                        else:
+                            titles_to_resolve.append((job_id, job_info.get("job_dir")))
                     all_jobs.append({
                         "job_id": job_id,
                         "status": job_info.get("status", "unknown"),
@@ -13259,10 +13439,27 @@ def get_queue():
                         "post_process_done": job_info.get("post_process_done", 0),
                         "post_process_active": job_info.get("post_process_active", False),
                         "post_process_percent": job_info.get("post_process_percent", 0),
+                        "title": cached_title or text_title,
+                        "text_title": text_title,
+                        "queue_position": queue_positions.get(job_id),
+                        "estimated_total_chunks": chunk_estimates.get(job_id),
+                        **_queue_output_summary(job_info),
                     })
-                
+
                 all_jobs.sort(key=lambda x: x.get("created_at") or "", reverse=True)
-            
+
+            if titles_to_resolve:
+                # metadata.json reads happen outside queue_lock, once per job (then cached).
+                resolved = {job_id: _queue_title_hint_from_metadata(job_dir) for job_id, job_dir in titles_to_resolve}
+                for job in all_jobs:
+                    hint = resolved.get(job["job_id"])
+                    if hint:
+                        job["title"] = hint
+                with queue_lock:
+                    for job_id, hint in resolved.items():
+                        if job_id in jobs:
+                            jobs[job_id]["_queue_title"] = hint
+
             return jsonify({
                 "success": True,
                 "jobs": all_jobs,
