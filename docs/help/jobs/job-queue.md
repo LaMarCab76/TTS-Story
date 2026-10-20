@@ -23,7 +23,7 @@ Progress may show processed chunks, total chunks, post-processing, and an ETA. I
 
 ## Available actions
 
-**Details** shows the engine, creation time, speakers, source text, progress, and available timing information.
+**Details** expands the job in place with timing cards (elapsed, remaining, average per chunk), the engine, speakers, output format, chapters, the queue position of waiting jobs, any error message, and a chunk-duration chart. Choose **Full details** there to open a window that also shows the full source text.
 
 **Pause** is available for queued or processing work. A processing job may remain in Pausing until its current safe unit finishes.
 
@@ -35,11 +35,11 @@ Progress may show processed chunks, total chunks, post-processing, and an ETA. I
 
 **Remove** removes the queue record when allowed. It does not delete completed Library audio. To delete generated files, use Delete in [Audio Library](app:library).
 
-**Clear Queue** removes eligible queue records and skips an actively processing job. Read the confirmation before proceeding.
+**Clear queue** removes eligible queue records and skips an actively processing job. Read the confirmation before proceeding.
 
 ## Review happens in Library
 
-The current Queue page is for monitoring and job control. Chunk editing and regeneration are not performed in the queue. When a job completes, open [Audio Library](app:library), choose a chapter or Full Story, and select **Review Chunks**. See [Review and Regenerate Chunks](help:job-review).
+The current Queue page is for monitoring and job control. Chunk editing and regeneration are not performed in the queue. When a job completes, open [Audio Library](app:library), expand the production, and click **Review chunks** on a chapter row or on the **Full story** row. See [Review and Regenerate Chunks](help:job-review).
 
 ## If progress stops
 

@@ -13,13 +13,13 @@ Use [Azure AI Speech](help:engine-azure-speech) or another contracted provider w
 
 ## Requirements and setup
 
-![Edge TTS settings with voice catalog and request controls](../../../static/help/screenshots/edge-tts-settings.png)
+![Microsoft Edge TTS panel in Settings → Engines with the default voice, request controls, Save provider, and Test connection & load voices](../../../static/help/screenshots/edge-tts-settings.png)
 
 *Load the current Edge voice catalog, choose a default voice, and keep parallel requests conservative.*
 
 The normal TTS-Story setup installs `edge-tts>=7.2.8,<8` in the main project environment and installs FFmpeg for conversion. A fresh computer therefore needs only the normal `setup.bat` or `install-update.bat` process; there is no separate Edge model, account, key, or GPU setup.
 
-Edge TTS does require internet access every time it lists voices or generates speech. Open [Settings → Engine Settings](app:settings/edge-tts), select **Edge TTS**, and choose **Test Connection & Load Voices**. The current catalog is retrieved dynamically. Save a default voice and make a short test.
+Edge TTS does require internet access every time it lists voices or generates speech. Open [Settings → Engines](app:settings/edge-tts), select **Edge TTS**, and click **Test connection & load voices**. The current catalog is retrieved dynamically. Save a default voice with **Save provider** and make a short test.
 
 If the engine is reported as unavailable after an update, rerun setup and verify:
 
@@ -29,8 +29,8 @@ venv\Scripts\python.exe -m pip show edge-tts
 
 ## Controls TTS-Story exposes
 
-- **Default Voice:** `en-US-AriaNeural` until another catalog voice is selected
-- **Chunk Size:** 1000 characters by default
+- **Default voice:** `en-US-AriaNeural` until another catalog voice is selected
+- **Chunk size (chars):** 1000 characters by default
 - **Request Timeout:** 60 seconds by default
 - **Maximum Parallel Requests:** 2 by default; the UI permits 1–8
 - **Default Volume:** provider-side adjustment from -100% to +100%

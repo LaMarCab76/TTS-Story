@@ -2,19 +2,19 @@
 
 A custom Kokoro voice combines one or more built-in voice packs. One component creates a reusable custom alias for that voice; two or more components create an actual blend. It is reusable anywhere a Kokoro voice can be selected and requires no reference recording.
 
-![Custom Kokoro Voice Blend editor with component voices and weight controls](../../../static/help/screenshots/kokoro-blend.png)
+![New blend dialog with name, language, weighted component voices, Add component, notes, and Save blend](../../../static/help/screenshots/kokoro-blend.png)
 
 *Build a reusable blend by choosing same-language components and adjusting their relative weights.*
 
 ## Create a blend
 
-1. Open [Available Voices](app:voices).
-2. Expand **Custom Kokoro Voice Blends**.
-3. Click **New Custom Voice**.
-4. Enter a short, descriptive Voice Name.
+1. Open [Voices](app:voices/custom).
+2. Select the **Kokoro blends** sub-tab.
+3. Click **New blend**.
+4. Enter a short, descriptive Name.
 5. Select the Language.
-6. Add one or more component voices and assign each a positive weight.
-7. Add optional notes and click **Save Voice**.
+6. Use **Add component** to add one or more component voices and assign each a positive weight.
+7. Add optional notes and click **Save blend**.
 
 Only voices from the selected language are available as components. Supported groups are American English, British English, Spanish, French, Hindi, Japanese, Mandarin Chinese, and Brazilian Portuguese.
 
@@ -36,12 +36,12 @@ The blend is computed from Kokoro voice data, so it does not clone a real speake
 
 ## Edit or delete a blend
 
-Use **Edit** on its card to change the name, language, components, weights, or notes. Changing the language rebuilds the component choices because cross-language blends are rejected.
+Use the edit (pencil) icon on its row to change the name, language, components, weights, or notes. Changing the language rebuilds the component choices because cross-language blends are rejected.
 
-Use **Delete** only after checking saved Projects and planned jobs. A project may retain the deleted custom voice code and require a new assignment when loaded.
+Use the delete icon only after checking saved Projects and planned jobs. A project may retain the deleted custom voice code and require a new assignment when loaded.
 
 ## Assign and test
 
-Open [Generate](app:generate), select a Kokoro engine, click the speaker chip, and choose the custom name from the appropriate language group. Run **Quick Test** with the manuscript's actual language and punctuation.
+Open [Generate](app:generate), select a Kokoro engine in **Output**, click the speaker in the **Cast** list, and choose the blend in **Voice** (blends are listed with the built-in voices of their language). Click **Test** under **Quick test** with the manuscript's actual language and punctuation.
 
 For built-in catalog guidance, see [Kokoro Voices and Previews](help:kokoro-voices).

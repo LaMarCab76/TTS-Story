@@ -1,15 +1,14 @@
 # Save and Restore Projects
 
-**Manage Projects** saves a snapshot of Generate-page preparation so you can resume or reuse it. Projects are convenient working copies, but they are not portable project files and not a complete backup of TTS-Story.
+The **Projects** window saves a snapshot of Generate-page preparation so you can resume or reuse it. Open it with the **Project** switcher at the top of the left sidebar, which shows the current project name. The text next to the Manuscript title shows whether the current state is saved (*Not saved*, *Unsaved changes*, or *Saved …*). Projects are convenient working copies, but they are not portable project files and not a complete backup of TTS-Story.
 
 ## Save a project
 
-1. Open [Generate](app:generate).
-2. Select **Manage Projects**.
-3. Enter a clear **Project name**.
-4. Select **Save**.
+1. Click the **Project** switcher at the top of the left sidebar.
+2. In **Projects**, enter a clear **Project name**.
+3. Click **Save**.
 
-![Manage Projects dialog with several clearly named preparation checkpoints](../../../static/help/screenshots/project-manager.png)
+![Projects dialog with several clearly named preparation checkpoints](../../../static/help/screenshots/project-manager.png)
 
 *Use stage-specific names so imported, LLM-prepared, and voice-approved snapshots remain easy to distinguish.*
 
@@ -26,7 +25,7 @@ Useful names include a title and stage, for example:
 
 The current snapshot includes much of the Generate-page state, including:
 
-- Input text
+- Manuscript text
 - Job engine
 - Default or reference voice choices where applicable
 - Per-speaker assignments
@@ -93,7 +92,7 @@ For a long audiobook:
 1. Keep the source document outside TTS-Story.
 2. Save an `imported source` snapshot after document cleanup.
 3. Save a separate `LLM prepared` snapshot after reviewing model output.
-4. Save `voices approved` after Quick Tests.
+4. Save `voices approved` after Quick tests.
 5. Submit a representative chapter.
 6. Preserve final manuscripts and exported audio in your normal backup system.
 

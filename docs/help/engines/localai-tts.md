@@ -17,30 +17,30 @@ LocalAI may run in Docker on the same computer, on another trusted computer, or 
 
 ## Connect LocalAI
 
-![Engine settings navigation used to select a TTS provider](../../../static/help/screenshots/engine-settings-navigation.png)
+![Settings → Engines list used to select a TTS provider](../../../static/help/screenshots/engine-settings-navigation.png)
 
-*Open Engine Settings, choose LocalAI TTS, and load the live model and voice-profile catalog.*
+*Open Settings → Engines, choose LocalAI TTS, and discover the live model and voice-profile catalog.*
 
 1. Start LocalAI and confirm its web API is reachable.
-2. Open [Settings → Engine Settings](app:settings/localai-tts) and select **LocalAI TTS**.
-3. Enter the server address. The normal Docker default is `http://localhost:8080/v1`.
+2. Open [Settings → Engines](app:settings/localai-tts) and select **LocalAI TTS**.
+3. Enter the server address in **LocalAI base URL**. The normal Docker default is `http://localhost:8080/v1`.
 4. Enter an API key only if authentication is enabled on that LocalAI server.
-5. Select **Test Connection & Load Catalog**.
-6. Choose a discovered TTS model and voice profile, then save Settings.
+5. Click **Discover models**.
+6. Choose a discovered TTS model and voice profile, then click **Save provider**.
 
-After saving, the LocalAI chip turns green and **LocalAI TTS · Self-hosted** appears in Generate. TTS-Story does not show an Install/Uninstall action for LocalAI because its container, models, and dependencies are managed outside this project.
+After saving, the LocalAI TTS entry's dot turns green and **LocalAI TTS · Self-hosted** appears in Generate. TTS-Story does not show an Install engine or Remove engine action for LocalAI because its container, models, and dependencies are managed outside this project.
 
 TTS-Story queries LocalAI's model-capability endpoint and lists only TTS-capable models when that endpoint is available. It also reads saved voice profiles and passes the selected `localai://voice-profiles/...` URI to the speech request. The exact voices and cloning controls therefore change with the selected LocalAI model.
 
-Some LocalAI backends accept built-in voice names or speaker IDs but do not publish them through the voice-profile catalog. The catalog is therefore a suggestion list, not a restriction. In Settings or Speaker Properties, type the exact voice/speaker value required by the selected model. You may also supply an optional freeform language value (for example `en`, `fr-FR`, or `Japanese`); TTS-Story sends it as LocalAI's `language` request field. Leave it blank when the model uses a fixed language or automatic detection.
+Some LocalAI backends accept built-in voice names or speaker IDs but do not publish them through the voice-profile catalog. The catalog is therefore a suggestion list, not a restriction. In Settings or in the speaker's Edit speaker drawer (**LocalAI Voice / Speaker ID**, **Language (optional)**), type the exact voice/speaker value required by the selected model. You may also supply an optional freeform language value (for example `en`, `fr-FR`, or `Japanese`); TTS-Story sends it as LocalAI's `language` request field. Leave it blank when the model uses a fixed language or automatic detection.
 
 ## Voice profiles and TTS-Story samples
 
-The catalog includes profiles already managed by LocalAI. When the selected model advertises voice cloning, the main-page Speaker Properties selector also includes transcript-ready samples from TTS-Story's **Voice Prompts** library. Samples without transcripts are omitted from that selector until their text is entered or generated.
+The catalog includes profiles already managed by LocalAI. When the selected model advertises voice cloning, the Edit speaker drawer's voice selector also includes transcript-ready samples from TTS-Story's voice prompts library (**Voices → Voice prompts**). Samples without transcripts are omitted from that selector until their text is entered or generated.
 
 To use a TTS-Story sample:
 
-1. Make sure the sample has an exact transcript in **Available Voices → Voice Prompts → Edit**. Generated samples are filled automatically when their original preview text is available. For missing text, use **Generate Transcript** on one sample or **Generate Transcripts** for a selected batch, then review the result.
+1. Make sure the sample has an exact transcript in **Voices → Voice prompts** (pencil/Edit icon). Generated samples are filled automatically when their original preview text is available. For missing text, use **More actions (…) → Generate transcript** on one sample or **Generate transcripts** in the selection bar for a selected batch, then review the result.
 2. In LocalAI TTS Settings, confirm that you have the rights or permission to use the sample for voice cloning.
 3. Reload the catalog and select the TTS-Story sample as a default or speaker voice.
 
@@ -61,11 +61,11 @@ Increase **Maximum Parallel Requests** only after a short test. LocalAI jobs are
 - **No models:** Confirm the model is loaded in LocalAI and advertises the `tts` capability.
 - **0 voice options:** This only means LocalAI did not advertise saved profiles. Type the model's voice name or speaker ID manually; use its model documentation or configuration as the source of truth.
 - **No TTS-Story samples:** The selected model must advertise voice cloning. Add exact transcripts, confirm cloning rights in Settings, and reload the catalog.
-- **Transcript required:** Edit the sample under Voice Prompts and enter exactly what is spoken in the clip.
+- **Transcript required:** Edit the sample on Voices → Voice prompts and enter exactly what is spoken in the clip.
 - **Connection refused:** Start the LocalAI container and verify its published port. Docker commonly publishes port 8080.
 - **Docker is running but unreachable:** Confirm the container publishes its API port to the host. The TTS-Story backend—not the browser alone—must be able to reach the configured address.
 - **404:** Use the LocalAI server root or `/v1` base, not an unrelated dashboard URL.
 - **Slow or failed concurrent generation:** Return parallel requests to 1 and inspect the LocalAI container log.
 - **Remote server:** Replace `localhost` with the host's reachable address and configure LocalAI authentication before exposing it beyond a trusted network.
 
-LocalAI TTS is separate from the **LM Studio** and **Ollama** choices under LLM Pre-Processing. Those options prepare or tag manuscript text. LocalAI TTS generates the final speech audio.
+LocalAI TTS is separate from the **LM Studio** and **Ollama** choices under **Settings → Text prep (LLM)**. Those options prepare or tag manuscript text. LocalAI TTS generates the final speech audio.

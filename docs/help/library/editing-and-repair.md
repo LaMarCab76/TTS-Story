@@ -2,9 +2,9 @@
 
 TTS-Story preserves individual chunk audio and review metadata so many completed jobs can be repaired without starting from the manuscript. The available repair depends on which source files still exist.
 
-![Chunk Review controls for editing text and regenerating selected audio](../../../static/help/screenshots/chunk-review.png)
+![Inline chunk review panel under a chapter row with speaker regeneration, chunk rows, and rebuild controls](../../../static/help/screenshots/chunk-review.png)
 
-*The review modal keeps the saved text, voice, engine, effects, and playback controls together for targeted repairs.*
+*The inline chunk review panel keeps the saved text, voice, engine, effects, and playback controls together for targeted repairs.*
 
 ## Know the three operations
 
@@ -19,21 +19,20 @@ This distinction prevents the most common repair mistake: regenerating a chunk, 
 ## Correct a completed item
 
 1. Open [Audio Library](app:library).
-2. Expand the item and choose a chapter or **Full Story**.
-3. Select **Review Chunks**.
-4. Locate and play the faulty chunk.
-5. Edit its text or adjust its engine, voice, speed, pitch, or silence.
-6. Click **Regenerate** and listen to the replacement.
-7. Rebuild the affected chapter.
-8. If a Full Story exists, use the card's **Rebuild** action to update all compiled outputs.
+2. Expand the production and click **Review chunks** on a chapter row or on the **Full story** row.
+3. Locate and play the faulty chunk.
+4. Click **Edit** on the chunk, then edit its text or adjust its engine, voice, speed, pitch, or silence.
+5. Click **Regenerate** and listen to the replacement.
+6. Rebuild the affected chapter.
+7. If a Full story exists, use the production row's **Rebuild** action to update all compiled outputs.
 
 Bulk speaker regeneration is available, but first prove the chosen settings on one chunk. Cloud bulk regeneration can consume quota quickly.
 
-Full Story review automatically restores the completed item to the internal review state when regeneration is requested. This is background bookkeeping; the current interface keeps you in the Library modal rather than sending you back to the Queue page.
+Full story review automatically restores the completed item to the internal review state when regeneration is requested. This is background bookkeeping; the current interface keeps you in the Library review panel rather than sending you back to the Queue page.
 
 ## Use targeted rebuild controls
 
-Inside chunk review, you can rebuild the current chapter or selected chapters. The Library card's **Rebuild** action rebuilds each chapter from its saved chapter chunks and independently rebuilds the Full Story from its saved full-story chunks. It does not use the newly compiled chapter files as the Full Story source.
+Inside chunk review, **Rebuild chapter audio file** (single-chapter review) or **Rebuild chapter** on each chapter (Full story review) rebuilds one chapter, and **Recompile audio** in the panel footer recompiles the production. The production row's **Rebuild** action rebuilds each chapter from its saved chapter chunks and independently rebuilds the Full story from its saved full-story chunks. It does not use the newly compiled chapter files as the Full story source.
 
 Use Rebuild when:
 
@@ -46,13 +45,13 @@ Rebuild can succeed only when the required chunk files still exist. It cannot re
 
 ## Repair pronunciation without editing every chunk
 
-Open **Alt Words** on the Library card, add the source and spoken replacement, save, then regenerate affected chunks. Because matching is a case-insensitive substring operation, verify that the source does not also occur inside unrelated words.
+Open **… → Alt words** on the production row, add the source and spoken replacement, save, then regenerate affected chunks. Because matching is a case-insensitive substring operation, verify that the source does not also occur inside unrelated words.
 
 ## Metadata and names
 
-- Click the card title to rename the collection.
-- Use a chapter's menu to rename that chapter.
-- Use **Edit Metadata** for Title, Author, Genre, Year, and Description.
+- Choose **Rename title** in the production's **…** menu.
+- Use **Rename chapter** in a chapter row's **…** menu (or in the chunk review header).
+- Use **Edit metadata** for Title, Author, Genre, Year, and Description.
 
 Metadata edits affect packaging and display. They do not change speaker tags, chunk text, or audio by themselves.
 

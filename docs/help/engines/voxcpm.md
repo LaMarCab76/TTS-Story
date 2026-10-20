@@ -8,25 +8,25 @@ TTS-Story integrates **VoxCPM 1.5**, a local English-and-Chinese continuation mo
 - Expressive speech conditioned by a reference recording
 - Users with an NVIDIA GPU who want prompts and manuscript text to remain local
 
-VoxCPM 1.5 is not a preset-voice engine. Assign a reference prompt for each cloned speaker, or configure a Default Prompt.
+VoxCPM 1.5 is not a preset-voice engine. Assign a reference prompt for each cloned speaker, or configure a **Default prompt**.
 
 ## Requirements and setup
 
-![Voice Prompts library used to manage cloning reference recordings](../../../static/help/screenshots/voice-prompts.png)
+![Voice prompts sub-tab used to manage cloning reference recordings](../../../static/help/screenshots/voice-prompts.png)
 
-*Upload a clean VoxCPM reference here, then select it in the speaker assignment or engine defaults.*
+*Upload a clean VoxCPM reference here, then select it in the speaker's Edit speaker drawer or the engine defaults.*
 
 The main setup installs the VoxCPM runtime and SenseVoice transcription dependency. The model and transcription files can download on first use. Upstream reports roughly 6 GB of VRAM for VoxCPM 1.5; available memory also depends on the rest of the application and the selected chunk.
 
-Open [Settings → Engine Settings](app:settings/voxcpm), choose **VoxCPM 1.5**, leave **Device** at `auto`, and keep the model ID at `openbmb/VoxCPM1.5`. Select a clean prompt in the speaker assignment or enter a fallback Default Prompt.
+Open [Settings → Engines](app:settings/voxcpm), choose **VoxCPM 1.5**, leave **Device** at `auto`, and keep the model ID at `openbmb/VoxCPM1.5`. Select a clean prompt in **Voice Sample** in the speaker's Edit speaker drawer, or enter a fallback **Default prompt**.
 
 The prompt transcript is optional because TTS-Story can transcribe it with SenseVoice and cache the result. A manually verified, exact transcript is still preferable when names, accents, or noisy audio could confuse ASR.
 
 ## Controls TTS-Story exposes
 
 - **Model ID** and **Device** (`auto`, `cuda`, or `cpu`)
-- **Chunk Size:** 550 characters by default; approximately 400–600 is a practical range
-- **Default Prompt** and **Prompt Transcript**
+- **Chunk size (chars):** 550 characters by default; approximately 400–600 is a practical range
+- **Default prompt** and **Prompt transcript**
 - **CFG Guidance:** controls conditioning strength; the application starts conservatively
 - **Timesteps:** more sampling work generally costs more time; lower values should be evaluated by listening
 - **Normalize numbers/abbreviations:** helpful for dates, quantities, and abbreviations, but review text whose literal form matters

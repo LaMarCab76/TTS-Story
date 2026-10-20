@@ -13,25 +13,25 @@ This integration is English-only. Do not assume capabilities from other Chatterb
 
 ## Local requirements and setup
 
-![Voice Prompts library with upload controls and saved reference voices](../../../static/help/screenshots/voice-prompts.png)
+![Voice prompts sub-tab with upload controls and saved reference voices](../../../static/help/screenshots/voice-prompts.png)
 
-*Add and review Chatterbox reference recordings in Voice Prompts before assigning them to speakers.*
+*Add and review Chatterbox reference recordings on the Voice prompts sub-tab of Voices before assigning them to speakers.*
 
-Install Chatterbox Local from **Settings → Engine Settings**. TTS-Story creates a dedicated `engines/chatterbox/.venv` environment because Chatterbox requires an older Transformers version than Qwen3. The Turbo model downloads on first use. TTS-Story presents the local engine as requiring roughly 8 GB of VRAM; a supported NVIDIA CUDA GPU is strongly recommended. Although the Device field accepts `cpu`, long CPU jobs can be very slow. Uninstalling Chatterbox removes this isolated environment and its model cache without changing Qwen3 or other local engines.
+Install Chatterbox Local from **Settings → Engines → Chatterbox Local** (**Install engine**). TTS-Story creates a dedicated `engines/chatterbox/.venv` environment because Chatterbox requires an older Transformers version than Qwen3. The Turbo model downloads on first use. TTS-Story presents the local engine as requiring roughly 8 GB of VRAM; a supported NVIDIA CUDA GPU is strongly recommended. Although the Device field accepts `cpu`, long CPU jobs can be very slow. Removing Chatterbox (**Remove engine**) deletes this isolated environment and its model cache without changing Qwen3 or other local engines.
 
-Under [Settings → Engine Settings](app:settings/chatterbox-local), leave **Device** at `auto`, assign a Default Prompt only if one voice should be the fallback, and test the defaults before tuning. A clean reference of roughly ten seconds is a sensible starting point: one speaker, steady volume, no music, and little room echo.
+Under [Settings → Engines](app:settings/chatterbox-local), leave **Device** at `auto`, assign a **Default prompt** only if one voice should be the fallback, and test the defaults before tuning. A clean reference of roughly ten seconds is a sensible starting point: one speaker, steady volume, no music, and little room echo.
 
 ## Replicate requirements and setup
 
-Enter a Replicate token directly under **Engine Settings → Chatterbox Cloud**. The token and Replicate parallel-request limit are shared with Kokoro Cloud. The cloud adapter uses a pinned `resemble-ai/chatterbox-turbo` version. It can use the configured provider voice, or upload the assigned reference prompt for cloning.
+Enter a Replicate token directly under **Settings → Engines → Chatterbox Cloud**. The token and Replicate parallel-request limit are shared with Kokoro Cloud. The cloud adapter uses a pinned `resemble-ai/chatterbox-turbo` version. It can use the configured provider voice, or upload the assigned reference prompt for cloning.
 
 Do not replace the pinned model string casually. A different Replicate version may expose a different input schema and fail even when it belongs to the same model page.
 
 ## Controls TTS-Story exposes
 
-Local controls include **Device**, **Chunk Size** (450 by default), **Default Prompt**, temperature, top-p, top-k, repetition penalty, CFG weight, exaggeration, and prompt/output loudness normalization.
+Local controls include **Device**, **Chunk size (chars)** (450 by default), **Default prompt**, temperature, top-p, top-k, repetition penalty, CFG weight, exaggeration, and prompt/output loudness normalization.
 
-Replicate controls include the pinned **Model Version**, provider **Default Voice**, temperature, top-p, top-k, repetition penalty, and an optional seed. The Replicate API token is shared with Kokoro Replicate.
+Replicate controls include the pinned **Model version**, provider **Default voice**, temperature, top-p, top-k, repetition penalty, and an optional seed. The Replicate API token is shared with Kokoro Cloud (Kokoro · Replicate).
 
 Keep the supplied sampling defaults for a baseline. Change only one of temperature, top-p, or top-k at a time. A fixed seed can make cloud comparisons easier, but it does not guarantee identical output if the hosted implementation changes.
 
