@@ -507,6 +507,55 @@ function manuscriptRowForOffset(container, offset) {
     return found || rows[0] || null;
 }
 
+function manuscriptIsSpokenRow(row) {
+    return row.classList.contains('mv-para') && !row.classList.contains('is-unvoiced');
+}
+
+/** Rows of the Script view that are on screen (binary search, so long books stay cheap). */
+function manuscriptVisibleRows(container) {
+    const rows = container.querySelectorAll('.mv-row[data-start]');
+    const view = container.getBoundingClientRect();
+    let lo = 0;
+    let hi = rows.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (rows[mid].getBoundingClientRect().bottom <= view.top) lo = mid + 1; else hi = mid;
+    }
+    const visible = [];
+    for (let i = lo; i < rows.length; i += 1) {
+        if (rows[i].getBoundingClientRect().top >= view.bottom) break;
+        visible.push(rows[i]);
+    }
+    return { rows, first: lo, visible };
+}
+
+/**
+ * Where a tag inserted from Script view goes. Script view has no caret, and after a
+ * load the textarea caret sits at the very end (outside every speaker tag, so the
+ * cue would never be narrated). Keep the caret only when it is inside a narrated
+ * paragraph that is on screen (e.g. the paragraph last clicked); otherwise use the
+ * end of the first narrated paragraph on screen, which is inside its speaker block.
+ */
+function manuscriptScriptInsertOffset(container, textarea) {
+    manuscriptRender(); // no-op unless a debounced re-render is still pending (offsets must match the text)
+    const caretStart = textarea.selectionStart || 0;
+    const caretEnd = Math.max(caretStart, textarea.selectionEnd || 0);
+    const { rows, first, visible } = manuscriptVisibleRows(container);
+    const holding = visible.find(row => manuscriptIsSpokenRow(row)
+        && Number(row.dataset.start) <= caretStart
+        && caretEnd <= Number(row.dataset.end));
+    // A selection is invisible from Script view, so never replace it: insert after it.
+    if (holding) return caretEnd;
+    let target = visible.find(manuscriptIsSpokenRow) || null;
+    for (let i = first + visible.length; !target && i < rows.length; i += 1) {
+        if (manuscriptIsSpokenRow(rows[i])) target = rows[i];
+    }
+    for (let i = first - 1; !target && i >= 0; i -= 1) {
+        if (manuscriptIsSpokenRow(rows[i])) target = rows[i];
+    }
+    return target ? Number(target.dataset.end) : caretEnd;
+}
+
 function manuscriptScrollTextareaTo(textarea, offset, context = 0.25) {
     if (typeof _computeScrollTopForChar !== 'function') return;
     const top = _computeScrollTopForChar(textarea, offset);
@@ -688,11 +737,16 @@ function manuscriptRenderProjectStatus() {
     status.title = title;
 }
 
-function manuscriptMarkSaved(savedAt) {
+/**
+ * `savedText` is the text that was actually written (saves are async, so the
+ * user may have typed meanwhile); without it the current textarea is the snapshot.
+ */
+function manuscriptMarkSaved(savedAt, savedText) {
     const textarea = manuscriptGetTextarea();
     manuscriptViewState.savedAt = savedAt || new Date().toISOString();
-    manuscriptViewState.savedText = textarea ? textarea.value : null;
-    manuscriptViewState.dirty = false;
+    manuscriptViewState.savedText = typeof savedText === 'string' ? savedText : (textarea ? textarea.value : null);
+    manuscriptViewState.dirty = Boolean(textarea) && manuscriptViewState.savedText !== null
+        && textarea.value !== manuscriptViewState.savedText;
     manuscriptRenderProjectStatus();
 }
 
@@ -707,8 +761,8 @@ function manuscriptMarkDirtyFromText() {
 }
 
 window.studioProjectStatus = {
-    markSaved(savedAt) {
-        manuscriptMarkSaved(savedAt);
+    markSaved(savedAt, savedText) {
+        manuscriptMarkSaved(savedAt, savedText);
     },
     markLoaded(savedAt) {
         manuscriptMarkSaved(savedAt);
@@ -934,12 +988,17 @@ function initManuscriptView() {
     manuscriptWrapGlobal('_updateTagErrorBanner', { after: manuscriptUpdateTagStatus });
     // Actions that need a visible, focusable textarea switch to Raw first.
     manuscriptWrapGlobal('_scrollToTagIssue', { before: () => manuscriptSetView('raw', { syncScroll: false }) });
-    // Tags go in at the textarea's caret; when inserted from Script view, show where they landed.
+    // Tags go in at the textarea's caret. From Script view the caret is first moved into the
+    // narrated paragraph on screen (see manuscriptScriptInsertOffset); then show where it landed.
     let insertedFromScript = false;
     manuscriptWrapGlobal('insertTextAtCursor', {
         before: target => {
             insertedFromScript = target === textarea && manuscriptViewState.view === 'script';
+            const offset = insertedFromScript && textarea.value.trim()
+                ? manuscriptScriptInsertOffset(container, textarea)
+                : null;
             if (target === textarea) manuscriptSetView('raw', { syncScroll: false });
+            if (offset !== null) textarea.setSelectionRange(offset, offset);
         },
         after: target => {
             manuscriptSetTagMenuOpen(false);

@@ -242,15 +242,24 @@
     --ms-wght: 300;
 }
 
+/* The design draws these icons at the font's default weight (400), not the .ms default 300. */
+#generate-tab .manuscript-insert-trigger .ms,
+#generate-tab .manuscript-tag-status .ms,
+#generate-tab .generate-pending-review .ms,
+#generate-tab .generate-audio-btn > .ms {
+    --ms-wght: 400;
+}
+
+/* The popover is placed from the toolbar (design: top 40px, left 150px), not from the trigger. */
 #generate-tab .manuscript-insert-tag {
-    position: relative;
+    position: static;
     flex: none;
 }
 
 #generate-tab .manuscript-tag-menu {
     position: absolute;
-    top: calc(100% + 5px);
-    left: -4px;
+    top: 40px;
+    left: 150px;
     z-index: 30;
     display: flex;
     flex-direction: column;

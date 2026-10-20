@@ -1310,6 +1310,10 @@ async function saveProject(project, { render = true } = {}) {
     if (matchIndex >= 0) savedProjects[matchIndex] = saved;
     else savedProjects.push(saved);
     if (render) renderProjectList();
+    // Any save of the active project (manual or an autosave) refreshes the manuscript header status.
+    if (saved && activeProjectId !== null && String(activeProjectId) === String(saved.id)) {
+        window.studioProjectStatus?.markSaved?.(saved.saved_at || project.saved_at, project.text);
+    }
     return saved;
 }
 
@@ -3070,7 +3074,7 @@ function refreshChapterHint() {
     if (chapterCheckbox.checked) {
         chapterHint.textContent = `Splitting enabled: ${summary} will become individual audio files.`;
     } else {
-        chapterHint.textContent = `Detected ${summary}. Enable the checkbox to create separate audio files.`;
+        chapterHint.textContent = `Detected ${summary}. Turn on "Separate file per chapter" to create separate audio files.`;
     }
 }
 
@@ -4713,7 +4717,7 @@ function setupEventListeners() {
                 activeProjectId = saved?.id || project.id;
                 setCurrentProjectLabel(saved?.name || name);
                 if (window.studioProjectStatus?.markSaved) {
-                    window.studioProjectStatus.markSaved(saved?.saved_at || project.saved_at);
+                    window.studioProjectStatus.markSaved(saved?.saved_at || project.saved_at, project.text);
                 } else if (projectStatus) {
                     projectStatus.textContent = `Saved ${name}`;
                 }
