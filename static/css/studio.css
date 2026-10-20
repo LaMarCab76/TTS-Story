@@ -1274,7 +1274,7 @@ input[type="checkbox"].switch:focus-visible {
     grid-template-columns: 224px minmax(0, 1fr);
     height: 100vh;
     min-width: 1180px;
-    min-height: 600px;
+    min-height: 720px;
     overflow: hidden;
     background: var(--st-bg);
     color: var(--st-text);

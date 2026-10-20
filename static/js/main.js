@@ -2138,12 +2138,12 @@ function populateReferenceDropdown(selectEl, placeholderText = 'Use preset voice
         // Check if duration meets minimum requirement for current engine
         if (minDuration > 0 && duration !== null && duration < minDuration) {
             option.disabled = true;
-            option.style.color = '#ff6b6b';
+            option.style.color = 'var(--st-red)';
             option.textContent = `${entry?.name || promptPath}${metaLabel}${durationLabel} (too short)`;
         }
         if (['audio8_tts', 'breeze_tts_2'].includes((currentEngine || '').toLowerCase()) && !entry?.transcript) {
             option.disabled = true;
-            option.style.color = '#ff6b6b';
+            option.style.color = 'var(--st-red)';
             option.textContent = `${entry?.name || promptPath}${metaLabel}${durationLabel} (transcript required)`;
             option.title = 'Generate or enter this sample\'s exact transcript in Voices → Voice prompts first.';
         }

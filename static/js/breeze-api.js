@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     document.getElementById('breeze-api-catalog').addEventListener('click', event => busy(event.currentTarget, async () => {
         const result = await window.loadBreezeApiCatalog(true);
-        status.textContent = result ? `Loaded ${result.voices.length} voices. Save Settings to use this account.` : 'Catalog unavailable. Check your API key.';
+        status.textContent = result ? `Loaded ${result.voices.length} voices. Save settings to use this account.` : 'Catalog unavailable. Check your API key.';
     }));
     document.getElementById('breeze-api-load-samples').addEventListener('click', event => busy(event.currentTarget, async () => {
         const data = await breezeFetch('/api/voice-prompts');

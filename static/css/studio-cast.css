@@ -443,6 +443,7 @@
 }
 
 #cast-section #auto-assign-voices-btn > .ms {
+    --ms-wght: 400;
     font-size: 16px;
     color: var(--st-accent);
 }
@@ -463,6 +464,8 @@
 #cast-section #generate-voices-btn::before {
     content: 'more_horiz';
     font-size: 17px;
+    /* The design draws this icon at the font's default weight (400). */
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
 #cast-section #generate-voices-btn:hover:not(:disabled) {
@@ -532,6 +535,7 @@
 }
 
 #speaker-edit-modal #speaker-edit-modal-close > .ms {
+    --ms-wght: 400;
     font-size: 22px;
 }
 
@@ -1118,6 +1122,8 @@
     margin: 0;
     color: var(--st-accent);
     font-size: 18px;
+    /* The design draws this icon at the font's default weight (400). */
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
 }
 
 #speaker-edit-modal-body [data-role="fx-preview-btn"]:hover:not(:disabled) {

@@ -4108,7 +4108,7 @@ async function populateLibraryVoiceSelects(engine) {
             // Disable if duration is too short for this engine
             if (minDuration > 0 && v.duration != null && v.duration < minDuration) {
                 opt.disabled = true;
-                opt.style.color = '#ff6b6b';
+                opt.style.color = 'var(--st-red)';
                 opt.textContent = `${displayName}${durationLabel} (too short)`;
             }
             
@@ -4289,7 +4289,7 @@ async function populateLibraryVoiceSelects(engine) {
             // Disable if duration is too short for this engine
             if (minDuration > 0 && v.duration != null && v.duration < minDuration) {
                 opt.disabled = true;
-                opt.style.color = '#ff6b6b';
+                opt.style.color = 'var(--st-red)';
                 opt.textContent = `${displayName}${durationLabel} (too short)`;
             }
             
