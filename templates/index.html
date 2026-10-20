@@ -179,28 +179,34 @@
             <aside class="generate-aside" aria-label="Cast and output settings">
                 <div class="generate-aside-scroll">
                     <!-- Cast block: owned by the cast screen (styled in static/css/studio-cast.css). -->
-                    <section id="cast-section" class="cast-section">
+                    <section id="cast-section" class="cast-section" aria-labelledby="cast-section-title">
                         <div class="cast-header">
-                            <h3 class="panel-title">Cast</h3>
+                            <h3 class="panel-title" id="cast-section-title">Cast</h3>
+                            <span class="cast-count" aria-label="Speakers"></span>
+                            <button type="button" class="help-icon" data-help-id="assign-voices" aria-label="Help: Assign Voices">?</button>
+                            <span class="cast-header-spacer"></span>
+                            <div class="seg seg-sm cast-view-toggle" role="group" aria-label="Cast view">
+                                <button type="button" class="seg-item is-active" data-cast-view="list" aria-pressed="true">List</button>
+                                <button type="button" class="seg-item" data-cast-view="details" aria-pressed="false">Details</button>
+                            </div>
                         </div>
                         <div id="stats-section" class="cast-body" style="display: none;">
                             <div class="speakers-header-row">
-                                <div id="speakers-list"></div>
+                                <div id="speakers-list" class="cast-list" data-cast-view="list"></div>
+                                <div id="speakers-duplicates" class="speakers-duplicates" style="display: none;"></div>
                                 <div class="speakers-actions">
-                                    <button type="button" id="build-speaker-profiles-btn" class="btn btn-secondary btn-sm" disabled>Build Profiles</button>
-                                    <button type="button" id="generate-voices-btn" class="btn btn-secondary btn-sm" disabled title="Checking voice-design engine availability…">Generate Voices</button>
-                                    <span id="generate-voices-unavailable" class="help-text hidden">Install Qwen3-TTS or Breeze TTS 2 under Settings → Engine Settings to generate voices.</span>
-                                    <button type="button" id="auto-assign-voices-btn" class="btn btn-secondary btn-sm">Auto Assign</button>
+                                    <button type="button" id="auto-assign-voices-btn" class="btn btn-secondary btn-sm" title="Match each speaker to the closest voice sample by name"><span class="ms" aria-hidden="true">magic_button</span>Auto assign</button>
+                                    <button type="button" id="build-speaker-profiles-btn" class="btn btn-ghost btn-sm" disabled title="Describe every character and suggest a voice type">Build profiles</button>
+                                    <button type="button" id="generate-voices-btn" class="btn btn-secondary btn-sm" disabled title="Checking voice-design engine availability…" aria-label="Generate voices">Generate voices</button>
                                 </div>
+                                <p id="generate-voices-unavailable" class="cast-footnote hidden">Generate voices needs Qwen3-TTS, Breeze TTS 2 or Gemini TTS. Set one up in Settings → Engines.</p>
                             </div>
-                            <div id="speakers-duplicates" class="speakers-duplicates" style="display: none;"></div>
-                            <div id="inline-voice-assignments" style="display: none; margin-top: 20px;">
-                                <h3>
-                                    Assign Voices
-                                    <button type="button" class="help-icon" data-help-id="assign-voices" aria-label="Help: Assign Voices">?</button>
-                                </h3>
+                            <div id="inline-voice-assignments" style="display: none;">
                                 <div id="inline-voice-assignment-list" class="speaker-assignment-host"></div>
                             </div>
+                        </div>
+                        <div class="cast-empty">
+                            <p>Tag dialogue like <code>[narrator]…[/narrator]</code> in the manuscript and the cast appears here, one row per speaker.</p>
                         </div>
                     </section>
 
@@ -2502,13 +2508,13 @@
     </div>
 
     <div class="modal-overlay hidden" id="speaker-batch-modal-overlay">
-        <div class="modal hidden" id="speaker-batch-modal" style="max-width: 520px; width: 95%;">
+        <div class="modal cast-modal hidden" id="speaker-batch-modal" style="max-width: 520px; width: 95%;">
             <div class="modal-header">
-                <h3>Generate Voices</h3>
-                <button class="modal-close" id="speaker-batch-modal-close">&times;</button>
+                <h3>Generate voices</h3>
+                <button type="button" class="modal-close" id="speaker-batch-modal-close" aria-label="Close" title="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
             <div class="modal-body">
-                <p class="help-text">Choose Qwen3-TTS, Breeze TTS 2, or Gemini cloud voice design. Local models stay loaded during the batch when possible. Gemini requires the dedicated TTS API key and creates billable hosted voices; no local samples are uploaded.</p>
+                <p class="help-text cast-modal-intro">Designs a voice for every speaker in the cast from its character profile. Choose Qwen3-TTS, Breeze TTS 2, or Gemini cloud voice design. Local models stay loaded during the batch when possible. Gemini requires the dedicated TTS API key and creates billable hosted voices; no local samples are uploaded.</p>
                 <div class="form-group">
                     <label for="speaker-batch-design-engine">Voice design engine</label>
                     <select id="speaker-batch-design-engine">
@@ -2542,13 +2548,16 @@
                 </div>
                 <div id="speaker-batch-status" class="help-text" style="margin-top: 10px;"></div>
                 <div id="speaker-batch-complete" class="batch-complete hidden">
-                    <h4>All Done!</h4>
-                    <p class="help-text" id="speaker-batch-complete-summary">Your voice samples are ready.</p>
+                    <span class="ms ms-fill" aria-hidden="true">check_circle</span>
+                    <div>
+                        <h4>All done</h4>
+                        <p class="help-text" id="speaker-batch-complete-summary">Your voice samples are ready.</p>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="speaker-batch-cancel-btn">Cancel</button>
-                <button class="btn btn-secondary hidden" id="speaker-batch-start-over-btn">Start Over</button>
+                <button class="btn btn-secondary hidden" id="speaker-batch-start-over-btn">Start over</button>
                 <button class="btn btn-primary" id="speaker-batch-confirm-btn">Generate</button>
                 <button class="btn btn-primary hidden" id="speaker-batch-ok-btn">OK</button>
             </div>
@@ -2556,29 +2565,31 @@
     </div>
 
     <div class="modal-overlay hidden" id="auto-assign-modal-overlay">
-        <div class="modal hidden" id="auto-assign-modal" style="max-width: 640px; width: 95%;">
+        <div class="modal cast-modal hidden" id="auto-assign-modal" style="max-width: 640px; width: 95%;">
             <div class="modal-header">
-                <h3>Auto Assign Voice Samples</h3>
-                <button class="modal-close" id="auto-assign-modal-close">&times;</button>
+                <h3>Auto-assign voice samples</h3>
+                <button type="button" class="modal-close" id="auto-assign-modal-close" aria-label="Close" title="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
             <div class="modal-body">
-                <p class="help-text">Each detected speaker is matched to the closest voice sample by name. Adjust the threshold — only matches at or above it are auto-selected.</p>
+                <p class="help-text cast-modal-intro">Each detected speaker is matched to the closest voice sample by name. Adjust the threshold — only matches at or above it are auto-selected. Applies to engines that clone from voice samples.</p>
                 <div class="auto-assign-threshold-row">
-                    <label for="auto-assign-threshold-slider">Match threshold:</label>
+                    <label for="auto-assign-threshold-slider">Match threshold</label>
                     <input type="range" id="auto-assign-threshold-slider" min="10" max="100" step="1" value="80">
                     <span id="auto-assign-threshold-label">80%</span>
                 </div>
-                <div id="auto-assign-no-voices" class="help-text hidden" style="color: var(--warning-color, #f0a500);">
-                    No voice samples are available. Upload or generate voice samples first.
+                <div id="auto-assign-no-voices" class="callout-warning cast-modal-callout hidden">
+                    <span class="ms" aria-hidden="true">info</span>
+                    <span>No voice samples are available. Upload or generate voice samples first.</span>
                 </div>
-                <div id="auto-assign-no-speakers" class="help-text hidden" style="color: var(--warning-color, #f0a500);">
-                    No detected speakers found. Run Analyze Text first.
+                <div id="auto-assign-no-speakers" class="callout-warning cast-modal-callout hidden">
+                    <span class="ms" aria-hidden="true">info</span>
+                    <span>No speakers detected yet. Tag dialogue like [narrator]…[/narrator] in the manuscript first.</span>
                 </div>
-                <table id="auto-assign-table" class="auto-assign-table hidden">
+                <table id="auto-assign-table" class="auto-assign-table st-table hidden">
                     <thead>
                         <tr>
                             <th>Speaker</th>
-                            <th>Matched Voice Sample</th>
+                            <th>Matched voice sample</th>
                             <th>Score</th>
                         </tr>
                     </thead>
@@ -2587,7 +2598,7 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="auto-assign-cancel-btn">Cancel</button>
-                <button class="btn btn-primary" id="auto-assign-confirm-btn">Apply Assignments</button>
+                <button class="btn btn-primary" id="auto-assign-confirm-btn">Apply assignments</button>
             </div>
         </div>
     </div>
@@ -2624,26 +2635,31 @@
         </div>
     </div>
 
-    <div class="modal-overlay hidden" id="speaker-edit-modal-overlay">
-        <div class="modal hidden" id="speaker-edit-modal" style="max-width: 720px; width: 95%;">
-            <div class="modal-header">
-                <div class="section-title-inline">
-                    <h3 id="speaker-edit-modal-title">Edit Speaker</h3>
-                    <button type="button" class="help-icon" data-help-id="speaker-edit" aria-label="Help: Edit Speaker">?</button>
+    <div class="modal-overlay drawer-overlay speaker-drawer-overlay hidden" id="speaker-edit-modal-overlay">
+        <div class="modal drawer speaker-drawer hidden" id="speaker-edit-modal" role="dialog" aria-modal="true" aria-labelledby="speaker-edit-modal-title">
+            <div class="modal-header speaker-drawer-header">
+                <div class="speaker-drawer-heading">
+                    <span class="kicker speaker-drawer-kicker">Speaker</span>
+                    <div class="speaker-drawer-title-row">
+                        <span class="speaker-drawer-dot" aria-hidden="true"></span>
+                        <h3 id="speaker-edit-modal-title">Edit speaker</h3>
+                    </div>
                 </div>
-                <button class="modal-close" id="speaker-edit-modal-close">&times;</button>
+                <button type="button" class="help-icon" data-help-id="speaker-edit" aria-label="Help: Edit Speaker">?</button>
+                <button type="button" class="modal-close" id="speaker-edit-modal-close" aria-label="Close" title="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
-            <div class="modal-body">
-                <p class="help-text" id="speaker-edit-modal-subtitle">Adjust voice settings and rename the speaker.</p>
+            <div class="modal-body speaker-drawer-body">
+                <p class="help-text" id="speaker-edit-modal-subtitle" hidden>Adjust voice settings and rename the speaker.</p>
                 <div id="speaker-profile-summary" class="speaker-profile-summary hidden"></div>
                 <div id="speaker-edit-modal-body" class="speaker-assignment-host"></div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer speaker-drawer-footer">
                 <label class="speaker-ready-toggle">
-                    <input type="checkbox" id="speaker-ready-checkbox">
-                    Mark as ready
+                    <input type="checkbox" id="speaker-ready-checkbox" class="switch">
+                    <span>Mark as ready</span>
                 </label>
-                <button class="btn btn-secondary" id="speaker-edit-modal-close-btn">Close</button>
+                <span class="speaker-drawer-footer-spacer"></span>
+                <button type="button" class="btn btn-primary" id="speaker-edit-modal-close-btn">Done</button>
             </div>
         </div>
     </div>
