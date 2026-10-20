@@ -3079,6 +3079,7 @@ async function saveSettings() {
     const saveBtn = document.getElementById('save-settings-btn');
     saveBtn.disabled = true;
     saveBtn.textContent = 'Saving…';
+    const localAIWasReady = readyEngineIds().has('localai_tts');
     
     try {
         const response = await fetch('/api/settings', {
@@ -3105,10 +3106,13 @@ async function saveSettings() {
             await loadEngineSetupStatus();
             // LocalAI voice availability depends on the selected model and the
             // explicit voice-cloning rights confirmation. Refresh the shared
-            // catalog so already-open Speaker Properties selectors update now
-            // (only when LocalAI is configured, as on startup, so saving other
-            // settings does not raise a LocalAI connection warning).
-            if (typeof loadLocalAITtsCatalog === 'function' && readyEngineIds().has('localai_tts')) {
+            // catalog so already-open Speaker Properties selectors update now.
+            // Skip it only when LocalAI was not configured before or after this
+            // save (as on startup), so saving other settings does not raise a
+            // LocalAI connection warning; un-configuring it still refreshes the
+            // catalog so stale LocalAI voices do not linger until a reload.
+            if (typeof loadLocalAITtsCatalog === 'function'
+                && (localAIWasReady || readyEngineIds().has('localai_tts'))) {
                 await loadLocalAITtsCatalog(true);
             }
         } else {

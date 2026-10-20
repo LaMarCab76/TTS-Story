@@ -707,8 +707,7 @@
 #settings-tab .engine-status-pill[data-engine-state="partial"],
 #settings-tab .engine-status-pill[data-engine-state="restart"],
 #settings-tab .engine-status-pill[data-engine-state="busy"] { --pill-color: var(--st-accent); }
-#settings-tab .engine-status-pill[data-engine-state="none"] { --pill-color: #9a9286; }
-#settings-tab .engine-status-pill[data-engine-state="none"]::before { background: var(--st-text-faint); }
+#settings-tab .engine-status-pill[data-engine-state="none"] { --pill-color: var(--st-text-faint); }
 #settings-tab .engine-status-pill[data-engine-state="busy"]::before {
     animation: st-settings-pulse 1.2s ease-in-out infinite;
 }
@@ -827,10 +826,32 @@
     line-height: 1.4;
 }
 
-/* Rows with three buttons never fit the note on the same line: give it its own. */
+/* The note sits inline after the buttons, as in the design, whenever the row is
+   wide enough for it (button widths are fixed by their labels: 1 button + note
+   needs ~470px, 2 buttons + note ~690px; 3 buttons never fit). When it cannot
+   fit it gets its own line, flush left, instead of wrapping with the inline
+   6px offset. Container queries track the row's real width at any viewport. */
+#settings-tab .engine-actions {
+    container: engine-actions / inline-size;
+}
+
 #settings-tab .engine-actions:has(> .btn:nth-of-type(3)) .engine-actions-note {
     flex-basis: 100%;
     margin-left: 0;
+}
+
+@container engine-actions (max-width: 689px) {
+    #settings-tab .engine-actions:has(> .btn:nth-of-type(2)) .engine-actions-note {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
+}
+
+@container engine-actions (max-width: 469px) {
+    #settings-tab .engine-actions-note {
+        flex-basis: 100%;
+        margin-left: 0;
+    }
 }
 
 #settings-tab .engine-action-status {
@@ -1081,17 +1102,11 @@
 }
 
 /* --------------------------------------------------------------------------
-   Narrower desktops (1180–1320px): tighten the three columns
+   Narrower desktops (1180–1320px): the section nav (220px) and the 32px engine
+   name stay as designed; the space comes from the engine list (240 → 200px)
+   and tighter padding only.
    -------------------------------------------------------------------------- */
 @media (max-width: 1320px) {
-    #settings-tab .settings-layout {
-        grid-template-columns: 200px minmax(0, 1fr);
-    }
-
-    #settings-tab .settings-nav {
-        padding: 18px 10px;
-    }
-
     #settings-tab .engine-settings-layout {
         grid-template-columns: 200px minmax(0, 1fr);
     }
@@ -1106,15 +1121,6 @@
 
     #settings-tab .settings-section {
         padding: 24px 28px 40px;
-    }
-
-    #settings-tab .settings-panel-title h4 {
-        font-size: 28px;
-    }
-
-    #settings-tab .engine-actions:has(> .btn:nth-of-type(2)) .engine-actions-note {
-        flex-basis: 100%;
-        margin-left: 0;
     }
 }
 
