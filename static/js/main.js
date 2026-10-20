@@ -53,7 +53,18 @@ function getVoiceDesignEngineConfig(engine) {
     return VOICE_DESIGN_ENGINES[normalizeVoiceDesignEngine(engine)];
 }
 
+// The Edit-speaker drawer stays above every tab and would cover the engine
+// panel (and its Install button), so close it before jumping to Settings.
+// Returns false while it refuses to close (Gemini voice creation running).
+function closeSpeakerDrawerBeforeLeaving() {
+    const overlay = document.getElementById('speaker-edit-modal-overlay');
+    if (!overlay || overlay.classList.contains('hidden')) return true;
+    closeSpeakerEditModal();
+    return overlay.classList.contains('hidden');
+}
+
 function openQwen3EngineSettings() {
+    if (!closeSpeakerDrawerBeforeLeaving()) return;
     document.querySelector('.tab-button[data-tab="settings"]')?.click();
     document.getElementById('engine-settings-group')?.classList.remove('collapsed');
     document.querySelector('.engine-tab-btn[data-engine-tab="qwen3"]')?.click();
@@ -62,6 +73,7 @@ function openQwen3EngineSettings() {
 window.openQwen3EngineSettings = openQwen3EngineSettings;
 
 function openBreezeEngineSettings() {
+    if (!closeSpeakerDrawerBeforeLeaving()) return;
     document.querySelector('.tab-button[data-tab="settings"]')?.click();
     document.getElementById('engine-settings-group')?.classList.remove('collapsed');
     document.querySelector('.engine-tab-btn[data-engine-tab="breeze-tts-2"]')?.click();
@@ -3921,6 +3933,40 @@ function invalidateSectionReviewCache() {
     sectionReviewLastFetchedHeadingKey = null;
 }
 
+// The visible .modal-overlay painted on top. Overlays share z-index 1000 unless
+// raised inline (e.g. #awr-entry-overlay), and later ones paint above earlier ones.
+function findTopmostModalOverlay() {
+    const zIndexOf = element => Number.parseInt(getComputedStyle(element).zIndex, 10) || 0;
+    return Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)'))
+        .filter(overlay => overlay.getClientRects().length > 0)
+        .reduce((top, overlay) => (!top || zIndexOf(overlay) >= zIndexOf(top) ? overlay : top), null);
+}
+
+// Esc closes the topmost Generate modal through its own close button, so that
+// modal's cleanup still runs (preview audio stop, batch pause guard, resets).
+// Other screens' modals and the Edit-speaker drawer handle Esc themselves.
+function closeTopmostGenerateModalOnEscape(event) {
+    if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return;
+    if (document.querySelector('dialog[open]')) return;
+    const closeButtonIds = {
+        'engine-first-run-overlay': 'engine-first-run-close',
+        'speaker-batch-modal-overlay': 'speaker-batch-modal-close',
+        'auto-assign-modal-overlay': 'auto-assign-modal-close',
+        'project-modal-overlay': 'project-modal-close',
+        'section-review-modal-overlay': 'section-review-modal-close',
+        'section-edit-modal-overlay': 'section-edit-modal-close',
+        'alt-word-registry-overlay': 'alt-word-registry-close',
+        'awr-entry-overlay': 'awr-entry-close'
+    };
+    const topmost = findTopmostModalOverlay();
+    const closeButton = topmost && closeButtonIds[topmost.id]
+        ? document.getElementById(closeButtonIds[topmost.id])
+        : null;
+    if (!closeButton) return;
+    event.preventDefault();
+    closeButton.click();
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
@@ -3953,6 +3999,7 @@ document.addEventListener('DOMContentLoaded', () => {
             openQwen3EngineSettings();
         }
     });
+    document.addEventListener('keydown', closeTopmostGenerateModalOnEscape);
 });
 
 function initVoiceDropdownFilters() {

@@ -505,12 +505,31 @@ function castAutosize(textarea) {
     textarea.style.height = `${Math.min(textarea.scrollHeight + 2, 320)}px`;
 }
 
+/** The drawer is aria-modal: the app behind it (sidebar + screens) is inert while
+    it is open. Modals stacked over it live at body level, outside .app-shell. */
+function castSetBackgroundInert(inert) {
+    const shell = document.querySelector('.app-shell');
+    if (shell) shell.inert = inert;
+}
+
+/** Tabbable controls of the drawer, in order (for the Tab wrap). */
+function castDrawerFocusable(modal) {
+    const selector = 'a[href], button, input, select, textarea, summary, audio[controls], video[controls], [tabindex]';
+    return Array.from(modal.querySelectorAll(selector)).filter(element => {
+        if (element.disabled || element.tabIndex < 0 || element.type === 'hidden') return false;
+        return typeof element.checkVisibility === 'function'
+            ? element.checkVisibility({ visibilityProperty: true })
+            : element.getClientRects().length > 0;
+    });
+}
+
 /** main.js openSpeakerEditModal → after the row moved into the drawer. */
 function castDrawerOpened() {
     const { modal } = castDrawerElements();
     if (!castDrawerReturnFocus || !modal?.contains(castDrawerReturnFocus)) {
         castDrawerReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     }
+    castSetBackgroundInert(true);
     castSyncDrawer();
     modal?.querySelector('.speaker-drawer-body')?.scrollTo?.(0, 0);
     castAutosize(modal?.querySelector('[data-role="speaker-profile-description"]'));
@@ -522,6 +541,7 @@ function castDrawerOpened() {
 
 /** main.js closeSpeakerEditModal → after the row went back to the hidden list. */
 function castDrawerClosed(speaker) {
+    castSetBackgroundInert(false);
     castRenderNow();
     const returnFocus = castDrawerReturnFocus;
     castDrawerReturnFocus = null;
@@ -564,13 +584,37 @@ function castViewInit() {
     document.addEventListener('keydown', event => {
         if (event.key !== 'Escape' || event.defaultPrevented || !castDrawerOpen()) return;
         const { overlay } = castDrawerElements();
-        const others = Array.from(document.querySelectorAll('.modal-overlay:not(.hidden)')).filter(item => item !== overlay);
-        if (others.length || document.querySelector('dialog[open]')) return;
+        const topmost = typeof findTopmostModalOverlay === 'function' ? findTopmostModalOverlay() : overlay;
+        if (topmost !== overlay || document.querySelector('dialog[open]')) return;
         event.preventDefault();
         if (typeof closeSpeakerEditModal === 'function') closeSpeakerEditModal();
     });
 
+    // Safety net: the app behind follows the overlay's visibility even if some
+    // path hides it without closeSpeakerEditModal (castDrawerClosed).
+    const drawerOverlay = castDrawerElements().overlay;
+    if (drawerOverlay && typeof MutationObserver === 'function') {
+        new MutationObserver(() => castSetBackgroundInert(castDrawerOpen()))
+            .observe(drawerOverlay, { attributes: true, attributeFilter: ['class'] });
+    }
+
     const drawer = document.getElementById('speaker-edit-modal');
+    // Tab / Shift+Tab wrap between the drawer's first and last controls.
+    drawer?.addEventListener('keydown', event => {
+        if (event.key !== 'Tab' || event.defaultPrevented || !castDrawerOpen()) return;
+        const focusable = castDrawerFocusable(drawer);
+        const active = document.activeElement;
+        if (!focusable.length) {
+            event.preventDefault();
+            drawer.focus({ preventScroll: true });
+        } else if (event.shiftKey && (active === drawer || active === focusable[0])) {
+            event.preventDefault();
+            focusable[focusable.length - 1].focus();
+        } else if (!event.shiftKey && active === focusable[focusable.length - 1]) {
+            event.preventDefault();
+            focusable[0].focus();
+        }
+    });
     // The drawer's help icon opens the Help Center tab (help.js, document
     // listener); close the drawer first so it does not cover the article.
     drawer?.addEventListener('click', event => {
