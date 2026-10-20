@@ -4,14 +4,14 @@
 
 Q8 is an experimental, smaller alternative to the original PyTorch runtime. It supports the same saved voice samples, transcripts, voice design, and passage directions. The model license is unchanged.
 
-1. Open **Settings → Breeze TTS 2** and accept the model license.
+1. Open **Settings → Engines → Breeze TTS 2** and accept the model license.
 2. Windows: install Visual Studio 2022 Build Tools with **Desktop development with C++**, CMake tools, and the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home). Linux: install a C++17 compiler, CMake, Vulkan development headers, and `glslc`. This installer does not support macOS yet.
 3. Click **Install / repair Q8**. The log shows the native build and approximately 3.3 GB model download. Installation stays inside Breeze's engine directory; Windows builds briefly use a free drive letter to avoid long-path compiler errors.
-4. Restart the backend, choose **Q8 GGUF · Vulkan** in the Breeze Runtime dropdown, and **save Settings**. Start a new job for the new runtime; saved/resumable jobs retain their configuration snapshots.
+4. Restart the backend, choose **Q8 GGUF · Vulkan (experimental)** in **Breeze runtime (narration and voice design)**, and click **Save settings**. Start a new job for the new runtime; saved/resumable jobs retain their configuration snapshots.
 
 The selection applies to both narration and Breeze voice-design candidates. Models remain loaded between requests inside the isolated worker, and normal job cancellation/cleanup releases them. Q8 refuses silent CPU fallback if a Vulkan GPU is unavailable. PyTorch model ID, full fast mode, and sequence-length controls do not tune Q8; its Q8_0 model revision is pinned by the installer. Seed, guidance, reference effects, and text chunking still apply.
 
-Switch back to **Original PyTorch** and save Settings to use the existing runtime. If that runtime has not been installed, save the selection and use **Install Engine**. **Uninstall Engine** removes both Breeze runtimes and their model files while preserving projects, generated audio, and voice samples. Quantization can change the sound even with the same seed: audition voices before a long production run.
+Switch back to **Original PyTorch** and click **Save settings** to use the existing runtime. If that runtime has not been installed, save the selection and use **Install engine**. **Remove engine** removes both Breeze runtimes and their model files while preserving projects, generated audio, and voice samples. Quantization can change the sound even with the same seed: audition voices before a long production run.
 
 Breeze TTS 2 is an optional local English/Chinese engine that can design a voice from text, clone an approved reference voice, or keep that voice while directing the tone, pace, emotion, and delivery of individual passages.
 
@@ -24,9 +24,9 @@ Breeze TTS 2 is an optional local English/Chinese engine that can design a voice
 - Approximately 14.4 GiB VRAM for the experimental fast path; 24 GB is recommended
 - Linux is the upstream-supported platform. Native Windows use in TTS-Story is experimental. macOS is not supported by the official CUDA runtime.
 
-Open **Settings → Engine Settings → Breeze TTS 2**, read and accept the model license, and select **Install Engine**. The source, Python packages, and model cache remain inside Breeze's isolated engine folder. The model files download on first generation.
+Open **Settings → Engines → Breeze TTS 2**, read and accept the model license, and click **Install engine**. The source, Python packages, and model cache remain inside Breeze's isolated engine folder. The model files download on first generation.
 
-![Engine Settings navigation with local engine tabs and configuration panels](../../../static/help/screenshots/engine-settings-navigation.png)
+![Settings → Engines list with the local engines and a selected engine's panel with Install engine](../../../static/help/screenshots/engine-settings-navigation.png)
 
 *Breeze TTS 2 appears with the other optional local engines and remains unavailable until its license is accepted and installation completes.*
 
@@ -34,17 +34,17 @@ Open **Settings → Engine Settings → Breeze TTS 2**, read and accept the mode
 
 TTS-Story selects the mode from each speaker assignment:
 
-- **Voice Design:** leave the reference voice empty. The speaker's saved **Voice Design Prompt** becomes the instruction.
+- **Voice Design:** leave the reference voice empty. The speaker's saved **Voice design prompt** becomes the instruction.
 - **Voice Clone:** assign a transcript-ready reference voice and do not add a passage direction.
 - **Voice Direction:** assign a transcript-ready reference voice and place a delivery direction before the passage.
 
-Reference audio must have an exact transcript in **Available Voices**. Samples without transcripts are disabled for Breeze assignments.
+Reference audio must have an exact transcript in **Voices → Voice prompts**. Samples without transcripts are disabled for Breeze assignments.
 
 ## Use Breeze for speaker casting
 
-Breeze can also replace Qwen3 as the reference-free casting engine. In the detected-speaker **Generate Voices** dialog, choose **Breeze TTS 2** before starting the batch. For one speaker, open Speaker Properties and choose Breeze under **Voice Design Engine**. In [Voices](app:voices/qwen), open the **Voice creation** sub-tab and select Breeze to design and save a standalone reference sample.
+Breeze can also replace Qwen3 as the reference-free casting engine. In the **Generate voices** dialog (the **…** button below the Cast list), choose **Breeze TTS 2** under **Voice design engine** before starting the batch. For one speaker, open it from the Cast list and choose **Breeze TTS 2 · Design** under **Design a new voice**. In [Voices](app:voices), open the **Voice creation** sub-tab and select **Breeze TTS 2** in **Design engine** to design and save a standalone reference sample.
 
-Each candidate uses the speaker's Voice Design Prompt and the standardized preview passage. The Breeze model stays loaded in a persistent isolated worker while the batch runs, avoiding a full model reload between candidates. The candidate count, approval workflow, saved project state, and prompt-library behavior are the same as Qwen3 casting.
+Each candidate uses the speaker's voice design prompt and the standardized preview passage. The Breeze model stays loaded in a persistent isolated worker while the batch runs, avoiding a full model reload between candidates. The candidate count, approval workflow, saved project state, and prompt-library behavior are the same as Qwen3 casting.
 
 Before a local narration job starts, TTS-Story waits for any active voice-design operation to finish and releases the Qwen3 and Breeze voice-design workers to free GPU memory. Breeze narration then keeps its model and cached reference samples loaded across chapters. Returning to voice creation automatically releases the cached narration engine and reloads the selected design model. This transition can take a little longer on the first request.
 
@@ -66,9 +66,9 @@ For LLM preparation, explicitly ask the model to add one short `[direction]...[/
 - **Clone CFG:** strength for an undirected reference clone. The upstream default is 1.
 - **Design CFG:** instruction strength for reference-free voice design. The upstream example uses 4.
 - **Direction CFG:** instruction strength while retaining a reference voice. The upstream example uses 4.
-- **Base Seed:** keeps a speaker's results more repeatable across a job.
-- **Preferred Chunk Size:** sentence-aware target for audiobook passages.
-- **Fast runtime:** performs an additional CUDA warmup and consumes considerably more VRAM. Leave it disabled on 12 GB cards.
+- **Base seed:** keeps a speaker's results more repeatable across a job.
+- **Preferred chunk size (chars):** sentence-aware target for audiobook passages.
+- **Experimental PyTorch fast runtime:** performs an additional CUDA warmup and consumes considerably more VRAM. Leave it disabled on 12 GB cards.
 - The standard runtime uses lightweight backbone-decode CUDA graphs automatically. These are separate from the full fast-runtime option and were benchmarked on a 12 GB RTX 3080 Ti. The first request captures the graph; later requests reuse it.
 
 Start with eager mode and a short representative passage. Voice design and direction remain stochastic, so audition the result before committing to a full book.
@@ -79,8 +79,8 @@ The model supports inline English events such as `(laugh)`, `(sigh)`, `(cough)`,
 
 ## Troubleshooting
 
-- **Engine remains red:** accept the license and complete installation, then restart TTS-Story when prompted.
-- **Reference sample is disabled:** generate or enter its exact transcript in Available Voices.
+- **Engine is not ready (grey or amber dot):** accept the license and complete installation, then restart TTS-Story when prompted.
+- **Reference sample is disabled:** generate or enter its exact transcript in **Voices → Voice prompts**.
 - **CUDA out of memory:** disable fast mode, close other GPU applications, and shorten the Breeze chunk target.
 - **FlashAttention is not installed:** TTS-Story automatically uses eager attention for both the main model and Breeze text encoder. FlashAttention is optional and should not block generation.
 - **Wrong or inconsistent identity:** use a clean single-speaker reference and verify its transcript exactly.

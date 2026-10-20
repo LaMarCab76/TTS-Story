@@ -39,21 +39,20 @@ Avoid nesting one speaker inside another or leaving narration outside an otherwi
 
 ## The unmatched-tag warning
 
-TTS-Story checks recognized speaker-tag pairs shortly after you type or paste. When it finds an orphaned or mismatched recognized tag, a warning appears above the input with:
+TTS-Story checks recognized speaker-tag pairs shortly after you type or paste. When it finds an orphaned or mismatched recognized tag, the toolbar shows **N tag issues** and an amber strip appears above the manuscript (*N speaker/direction tag issues found*) with:
 
-- **Prev** and **Next** to move through the issues
-- A highlighted affected tag or block
-- **Auto-Fix** to insert a likely missing opening or closing tag
+- up and down arrow buttons (*Previous issue* / *Next issue*) that switch the editor to **Raw tags** and highlight each affected tag
+- **Auto-fix** to insert a likely missing opening or closing tag
 
-![Speaker-tag warning with navigation and Auto-Fix controls beneath the Input Text editor](../../../static/help/screenshots/speaker-tag-warning.png)
+![Tag-issue strip with previous/next arrows and Auto-fix above the Manuscript editor in Raw tags view](../../../static/help/screenshots/speaker-tag-warning.png)
 
-*The warning identifies unbalanced recognized speaker tags; review each location before using Auto-Fix.*
+*The warning identifies unbalanced recognized speaker tags; review each location before using Auto-fix.*
 
 Generation is blocked while those unmatched speaker tags remain.
 
 The validator distinguishes speaker tags from one-part expression cues such as `[laugh]` by treating a name as a speaker only when a closing form for that name appears somewhere in the manuscript. Consequently, a one-off opening tag such as `[alice]Hello there.` with no `[/alice]` anywhere is treated as an expression cue and may not trigger the warning. Before generating, search for every intended speaker's opening and closing forms manually, especially when that speaker appears only once.
 
-> **Review every Auto-Fix.** It uses nearby tags and text boundaries to choose an insertion point. It can make the structure balanced without necessarily expressing the conversation you intended.
+> **Review every Auto-fix.** It uses nearby tags and text boundaries to choose an insertion point. It can make the structure balanced without necessarily expressing the conversation you intended.
 
 Typical corrections are:
 
@@ -78,13 +77,13 @@ Typical corrections are:
 
 ## Rename a detected speaker
 
-After analysis, each assignment card contains the speaker name and an **Apply** button. Enter a new name and select **Apply**. TTS-Story normalizes it to a tag-safe name, rewrites exact matching opening and closing tags in the input, and analyzes again.
+After analysis, click the speaker in the **Cast** list to open its **Edit speaker** drawer, enter a new name in **Name**, and click **Rename**. TTS-Story normalizes it to a tag-safe name, rewrites exact matching opening and closing tags in the manuscript, and analyzes again.
 
 Spaces become hyphens, uppercase becomes lowercase, and unsupported punctuation is removed. Review the rewritten manuscript, especially if similar speaker names exist.
 
 ## Expression and paralinguistic tags
 
-The **Insert paralinguistic tag** bar shows buttons appropriate to the selected engine. Selecting a button inserts its bracketed cue at the current cursor position or replaces the selected text.
+The **Insert tag** menu in the manuscript toolbar lists the paralinguistic tags of the selected engine (it is hidden for engines without them). Choosing a tag inserts it at the cursor in **Raw tags**, or replaces the selected text; from the **Script** view it goes into the paragraph at the top of the screen and the editor switches to Raw tags.
 
 Examples can include:
 
@@ -114,11 +113,11 @@ TTS-Story also accepts the older `[emotion]...[/emotion]` form. A direction is a
 
 ## Speaker tags created by an LLM
 
-**Prep Text** can add or normalize speaker tags, but an LLM can also change names, omit a close, wrap too much narration, or rewrite the prose. When preparation finishes:
+**Prep text** can add or normalize speaker tags, but an LLM can also change names, omit a close, wrap too much narration, or rewrite the prose. When preparation finishes:
 
 1. Compare the output with the source.
 2. Resolve the unmatched-tag warning.
-3. Review **Speakers** and possible duplicate names under **Text Statistics**.
+3. Review the speakers and any possible-duplicates notice in the **Cast** list.
 4. Confirm that each passage belongs to the intended speaker.
 5. Assign voices only after the tags are stable.
 

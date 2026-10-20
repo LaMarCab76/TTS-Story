@@ -6,15 +6,15 @@ No local Breeze model installation is required.
 
 ## Configure the provider
 
-![Engine settings navigation](../../../static/help/screenshots/engine-settings-navigation.png)
+![Settings → Engines list with the Cloud · remote group where Breeze API is listed](../../../static/help/screenshots/engine-settings-navigation.png)
 
-*General Engine Settings navigation; choose the new Breeze API chip under Cloud / Remote Providers.*
+*Settings → Engines; select Breeze API under Cloud · remote.*
 
-1. Open **Settings → Engine Settings → Cloud / Remote Providers → Breeze API**.
-2. Enter your API key and click **Load Models / Voices**.
-3. Choose a model ID and optionally a default saved voice ID. Save Settings.
+1. Open **Settings → Engines → Breeze API** (Cloud · remote).
+2. Enter your API key and click **Load models & voices**.
+3. Choose a model ID and optionally a default saved voice ID. Click **Save provider**.
 4. Select **Breeze API · Hosted** on the Generate page.
-5. Open Speaker Properties and select local samples, just as with OmniVoice.
+5. Open each speaker from the Cast list (Edit speaker drawer) and select local samples, just as with OmniVoice.
    Alternatively clear the local sample and select a saved hosted voice.
 6. Save the project to preserve the speaker profiles and sample assignments.
 
@@ -57,7 +57,7 @@ that request is allowed to return and its result is checkpointed before pausing.
 If a network interruption makes an upload/save result uncertain, automatic retries
 are blocked to prevent duplicates. Check Breeze for the production's `TTS-<job-id>`
 voice names and any pending preview/verification. Once the job has stopped, open
-**Manage Production Voices** in Breeze API Settings and click **Recover** for the
+**Manage production voices** in the Breeze API panel and click **Recover** for the
 affected speaker. Recovery checks the personal voice catalog and reuses an exact
 production-name match without uploading again. If no saved voice exists, it asks
 you to verify the previous operation has stopped and check previews/account history
@@ -87,8 +87,8 @@ the current integration still uses synchronous synthesis.
 
 ## Release hosted voices after delivery
 
-Use **Breeze Voices** on the Library item, or **Manage Production Voices** in
-Breeze API Settings (also available for cancelled jobs or deleted library audio).
+Use **… → Breeze voices** on the Library row, or **Manage production voices** in
+the Breeze API panel (also available for cancelled jobs or deleted library audio).
 The dialog refreshes upload states and shows which speakers belong to each job.
 
 After delivery, approval and payment—or when deliberately abandoning the job—click
@@ -105,19 +105,19 @@ because synthesis finishes, and TTS-Story does not verify customer payment itsel
 
 ## Optional manual upload for shared voices
 
-Save API settings first. Expand **Optional manual upload** in the Breeze API panel,
-then click **Load TTS-Story Samples**,
+Save API settings first. Expand **Optional manual upload (shared across productions)** in the Breeze API panel,
+then click **Load TTS-Story samples**,
 choose a WAV or MP3 sample, give it a name and specify its two-letter language code.
 The sample must contain one clear speaker, be at least three seconds long and no
 larger than 5 MB. Breeze creates its own transcript from the upload.
 
-Confirm that you have the required rights and consent, then click **Upload / Create
-Clone Preview**. This sends the recording to Breeze and may use credits. Listen
-to the preview, then click **Approve / Save Private Voice**. Verification requests
+Confirm that you have the required rights and consent, then click **Upload / create
+clone preview**. This sends the recording to Breeze and may use credits. Listen
+to the preview, then click **Approve / save private voice**. Verification requests
 must be completed on Breeze's platform. Saving uses a private voice slot.
 
-The saved voice appears in the catalog after approval. Select it in Speaker
-Properties; it does not automatically replace other speakers' assignments.
+The saved voice appears in the catalog after approval. Select it in the speaker's
+Edit speaker drawer; it does not automatically replace other speakers' assignments.
 Keep this panel open during upload/approval. You only need to upload a sample
 once: reuse the saved voice for later projects rather than creating duplicates.
 

@@ -1,7 +1,7 @@
 {
   "title": "TTS-Story User Guide",
   "subtitle": "From first launch to a finished, reviewed audiobook",
-  "version": "2026.08.31.1",
+  "version": "2026.10.20.1",
   "categories": [
     {
       "id": "start-here",
@@ -202,7 +202,7 @@
       "file": "create-audio/speaker-tags.md",
       "title": "Speaker and Expression Tags",
       "summary": "Structure multi-voice text correctly and use paralinguistic tags only with engines that support them.",
-      "keywords": ["speaker tags", "narrator", "alice", "paralinguistic", "laugh", "sigh", "insert tag", "raw tags", "tag issues", "auto-fix"],
+      "keywords": ["speaker tags", "narrator", "alice", "paralinguistic", "laugh", "sigh", "insert tag", "tag issues", "auto-fix", "raw tags"],
       "related": ["text-statistics", "assign-voices", "engine-chatterbox"]
     },
     {
@@ -226,7 +226,7 @@
       "file": "create-audio/text-statistics.md",
       "title": "Analyze Text and Review Statistics",
       "summary": "Use automatic analysis to confirm speaker count, chunks, word count, and duration before generating.",
-      "keywords": ["analyze", "statistics", "speakers", "chunks", "duration", "manuscript footer", "words"],
+      "keywords": ["analyze", "statistics", "speakers", "chunks", "duration", "word count", "cast", "footer", "manuscript footer", "words"],
       "related": ["speaker-tags", "assign-voices", "generation-times"]
     },
     {
@@ -234,7 +234,7 @@
       "file": "create-audio/assign-voices.md",
       "title": "Assign and Test Voices",
       "summary": "Build individual speaker profiles and assign each detected speaker a compatible, tested voice.",
-      "keywords": ["voice assignment", "speaker", "speaker properties", "Build Profile", "quick test", "pitch", "speed", "FX", "cast", "edit speaker", "speaker drawer", "mark as ready", "rename", "review"],
+      "keywords": ["voice assignment", "speaker", "cast", "edit speaker", "drawer", "speaker properties", "Build Profile", "quick test", "mark as ready", "pitch", "speed", "FX", "speaker drawer", "rename", "review"],
       "related": ["available-voices", "voice-prompts", "auto-assign-voices"]
     },
     {
@@ -242,7 +242,7 @@
       "file": "create-audio/generation-options.md",
       "title": "Generation and Output Options",
       "summary": "Choose the job engine, format, bitrate, ACX processing, and chapter behavior.",
-      "keywords": ["MP3", "WAV", "OGG", "bitrate", "ACX", "generate", "output", "format", "generate audio"],
+      "keywords": ["MP3", "WAV", "OGG", "bitrate", "ACX", "generate", "output", "generate audio", "separate file per chapter", "format"],
       "related": ["chapters-and-sections", "audiobook-exports", "settings-audio"]
     },
     {
@@ -258,7 +258,7 @@
       "file": "create-audio/projects.md",
       "title": "Save and Restore Projects",
       "summary": "Preserve in-progress text, assignments, and generation choices before experimenting.",
-      "keywords": ["project", "save", "load", "restore", "draft", "project switcher", "projects"],
+      "keywords": ["project", "save", "load", "restore", "draft", "project switcher", "manage projects", "projects"],
       "related": ["data-storage", "input-text", "quick-start"]
     },
 
@@ -336,8 +336,8 @@
     {
       "id": "engine-index-tts",
       "file": "engines/index-tts.md",
-      "title": "IndexTTS",
-      "summary": "Run IndexTTS-2 zero-shot cloning in its isolated environment and tune sampling conservatively.",
+      "title": "IndexTTS 2.5",
+      "summary": "Run IndexTTS 2.5 (or 2) zero-shot cloning in its isolated environment and tune sampling and emotion guidance conservatively.",
       "keywords": ["IndexTTS", "IndexTTS-2", "clone", "FP16", "diffusion", "beam"],
       "related": ["voice-prompts", "gpu-cpu-errors", "performance-tuning"],
       "engine_ids": ["index_tts"]
@@ -487,7 +487,7 @@
       "file": "library/audio-library.md",
       "title": "Use the Audio Library",
       "summary": "Play full stories or chapters, rename collections, inspect metrics, and download completed work.",
-      "keywords": ["library", "play", "chapter", "download", "metrics", "time codes", "alt words", "more actions", "edit metadata", "rename title"],
+      "keywords": ["library", "play", "chapter", "download", "metrics", "time codes", "alt words", "review chunks", "rebuild", "edit metadata", "more actions", "rename title"],
       "related": ["job-review", "library-editing-repair", "audiobook-exports"]
     },
     {
@@ -560,7 +560,7 @@
       "id": "settings",
       "file": "settings/settings.md",
       "title": "Settings Reference",
-      "summary": "Understand global defaults, the Settings sections, save behavior, and when per-job choices override settings.",
+      "summary": "Understand the Settings sections, the Engines list, save behavior, and when per-job choices override settings.",
       "keywords": ["settings", "default engine", "save", "reset", "configuration", "general", "engines", "text prep", "remote admin", "save settings", "reset to defaults"],
       "related": ["settings-audio", "engine-overview", "data-storage"]
     },
@@ -569,7 +569,7 @@
       "file": "settings/engine-management.md",
       "title": "Install, Remove, and Reinstall TTS Engines",
       "summary": "Manage optional local engines, isolated environments, first-run downloads, live progress, restarts, and safe removal.",
-      "keywords": ["install engine", "uninstall engine", "reinstall", "isolated environment", "venv", "model download", "restart", "status dot", "needs setup", "not installed", "remove engine", "repair"],
+      "keywords": ["install engine", "remove engine", "uninstall engine", "repair", "reinstall", "isolated environment", "venv", "model download", "restart", "status dot", "remote admin", "needs setup", "not installed"],
       "related": ["engine-overview", "first-run", "gpu-cpu-errors", "engine-localai-tts"]
     },
     {

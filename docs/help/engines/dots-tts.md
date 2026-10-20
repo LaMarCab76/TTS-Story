@@ -18,7 +18,7 @@ CUDA is strongly recommended. Setup can install a CPU runtime when no NVIDIA GPU
 
 ## Prepare the reference
 
-![Voice Prompts library for adding and managing reference recordings](../../../static/help/screenshots/voice-prompts.png)
+![Voice prompts sub-tab for adding and managing reference recordings](../../../static/help/screenshots/voice-prompts.png)
 
 *Add the Dot.TTS reference recording here and verify its transcript before a long cloning job.*
 
@@ -28,18 +28,18 @@ Leave **Allow reference-audio-only fallback** off for the best-conditioned path.
 
 ## Controls TTS-Story exposes
 
-Open [Settings → Engine Settings](app:settings/dots-tts) and select **Dot.TTS**.
+Open [Settings → Engines](app:settings/dots-tts) and select **Dot.TTS**.
 
 - **Model:** SOAR for best cloning, MeanFlow (`mf`) for speed, or base
-- **Chunk Size:** 250 characters by default; reduce it if long chunks stall
+- **Chunk size (chars):** 250 characters by default; reduce it if long chunks stall
 - **Precision:** auto uses bfloat16 on CUDA and float32 on CPU; explicit types are available for troubleshooting
-- **Default Prompt** and **Default Prompt Transcript**
+- **Default voice prompt** and **Default prompt transcript**
 - **Sampling Steps:** SOAR/base commonly use 10–32; MeanFlow is designed for 4
 - **Guidance Scale:** 1.2 initially; approximately 0.8–1.0 can sound calmer
 - **Speaker Scale:** 1.5 initially; lower it if reference style is exaggerated
 - **Seed:** 42 by default for easier comparison; blank permits unfixed variation
 - **Language:** `none`, `auto_detect`, or a supported language token
-- **Normalize Text**, **Optimize with torch.compile**, and **Allow reference-audio-only fallback**
+- **Normalize text before inference**, **Optimize runtime with torch.compile**, and **Allow reference-audio-only fallback**
 
 ## Effective-use tips
 

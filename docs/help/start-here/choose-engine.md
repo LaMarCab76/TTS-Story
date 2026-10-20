@@ -16,7 +16,7 @@ CPU-only does not mean instant. Test a representative paragraph and measure it b
 
 ### Strict local privacy
 
-Choose a local engine and a local LLM—or skip **Prep Text** entirely. Local synthesis keeps story text away from speech providers, but downloading models and dependencies may still require an internet connection during setup or first use.
+Choose a local engine and a local LLM—or skip **Prep text** entirely. Local synthesis keeps story text away from speech providers, but downloading models and dependencies may still require an internet connection during setup or first use.
 
 Voice cloning with a local engine also keeps the reference recording local. Review [Reference Voice Prompts](help:voice-prompts) for recording quality and storage guidance.
 
@@ -39,7 +39,7 @@ Read [Configure Online Services Safely](help:online-services) before sending a m
 
 Chatterbox, VoxCPM, Pocket TTS Clone, Qwen3 Clone, OmniVoice Clone, IndexTTS, and Dot.TTS use reference audio in different ways. Their quality depends heavily on a clean, representative recording. Some also benefit from or require an accurate reference transcript.
 
-Do not assume a prompt that works well in one cloning engine will sound identical in another. Use **Quick Test** after changing engines.
+Do not assume a prompt that works well in one cloning engine will sound identical in another. Use **Quick test** after changing engines.
 
 ### Expressive dialogue or special controls
 
@@ -65,10 +65,10 @@ Only use expression tags shown for the selected engine. Unsupported bracketed te
 ## A practical evaluation method
 
 1. Create a 30–60 second test containing narration, dialogue, a difficult name, punctuation, and the target language.
-2. Select the engine under **Generation Options**.
+2. Select the engine in the **Output** section of the Generate page.
 3. Assign a compatible voice to every speaker.
 4. Leave advanced controls at defaults.
-5. Use **Quick Test**, then generate the entire short sample.
+5. Click **Test** under **Quick test** in each speaker's Edit speaker drawer, then generate the entire short sample.
 6. Record perceived quality, first-run time, normal generation time, and any cost.
 7. Change one control or one engine and repeat the same passage.
 
@@ -76,16 +76,16 @@ The preview validates a voice and short request. A generated sample also tests c
 
 ## Default engine and job engine
 
-Engine Settings uses red tabs for engines that still need installation or configuration and green tabs for ready engines. Local engines have an **Install Engine** action; hosted engines become ready after their required connection settings are saved. Only ready engines appear in **Settings → Quick Settings → Default Engine** and **Generate → Generation Options → Engine**.
+In **Settings → Engines**, every engine shows a status dot: grey for *Not installed*, amber for *Needs setup*, green for *Ready*. Local engines have an **Install engine** action; hosted engines become ready after their required connection settings are saved. Only ready engines appear in **Settings → General → Default engine** and in the **Engine** list of the Generate page's **Output** section.
 
-Installed local engines also provide **Uninstall Engine**. TTS-Story shows a confirmation before removing that engine's runtime and downloaded model files. Shared dependencies, projects, generated audio, and saved voice samples are preserved. If you reinstall the engine later, its runtime and models must be downloaded again. Restart TTS-Story after removal when prompted.
+Installed local engines also provide **Remove engine**, plus **Repair**, which re-runs the installer without removing the engine. TTS-Story shows a confirmation before removing that engine's runtime and downloaded model files. Shared dependencies, projects, generated audio, and saved voice samples are preserved. If you reinstall the engine later, its runtime and models must be downloaded again. Restart TTS-Story after removal when prompted.
 
 Install/removal progress remains available if you leave Settings or refresh the page. For isolated-environment details, safe removal boundaries, and first-run downloads, read [Install, Remove, and Reinstall TTS Engines](help:engine-management).
 
 The default engine chooses the initial engine for new work. The Generate-page engine selects the engine for the current job. Compatible voice-sample assignments are retained when switching among cloning engines.
 
-![Engine Settings navigation showing the available TTS engine tabs](../../../static/help/screenshots/engine-settings-navigation.png)
+![Settings → Engines list with local and cloud engines and their status dots](../../../static/help/screenshots/engine-settings-navigation.png)
 
-*Open Engine Settings and select the tab matching the engine you want to configure.*
+*Open Settings → Engines and select the engine you want to configure in the list.*
 
 When you have selected an engine, continue with [Assign and Test Voices](help:assign-voices) and [Generation and Output Options](help:generation-options).

@@ -1,14 +1,14 @@
 # How the Pages Work Together
 
-TTS-Story uses one continuous workflow rather than separate project files for every stage. The Generate page prepares a job; Job Queue processes it; Library preserves completed work and its review data; Available Voices and Settings supply reusable resources.
+TTS-Story uses one continuous workflow rather than separate project files for every stage. The Generate page prepares a job; Job Queue processes it; Library preserves completed work and its review data; Voices and Settings supply reusable resources.
 
 ## Workflow at a glance
 
 ```text
-Settings + Available Voices
-             |
+Settings + Voices
+        |
              v
-Input / import -> automatic analysis -> voice assignments -> Generate Audio
+Input / import -> automatic analysis -> voice assignments -> Generate audio
                                                             |
                                                             v
                                                         Job Queue
@@ -19,7 +19,7 @@ Input / import -> automatic analysis -> voice assignments -> Generate Audio
                                       review / regenerate / rebuild / export
 ```
 
-![Generate page showing the controls that create a job snapshot](../../../static/help/screenshots/generate-overview.png)
+![Generate page with the manuscript, the Cast list, and the Output and Chapters controls that create a job snapshot](../../../static/help/screenshots/generate-overview.png)
 
 *Generate combines the manuscript, speaker assignments, engine, and output choices into a submitted job.*
 
@@ -29,31 +29,32 @@ Input / import -> automatic analysis -> voice assignments -> Generate Audio
 
 The **Engine**, output format, bitrate, ACX choice, section behavior, voice assignments, and some engine options selected on Generate travel with the submitted job. Changing Settings later does not rewrite an already queued job's choices.
 
-## Available Voices supplies reusable voice resources
+## Voices supplies reusable voice resources
 
-[Available Voices](app:voices) contains several different kinds of resources:
+[Voices](app:voices) groups them in five sub-tabs:
 
-- Built-in Kokoro voices and previews
-- Custom Kokoro blends
-- Qwen3 and OmniVoice voice-creation tools
-- Uploaded, designed, or downloaded **Voice Prompts** for cloning engines
+- **Voice prompts**: uploaded, designed, or downloaded reference clips for cloning engines
+- **Kokoro**: built-in Kokoro voices and previews
+- **Kokoro blends**: custom Kokoro blends
+- **Voice creation**: Qwen3-TTS, Breeze TTS 2, and OmniVoice voice design
+- **Gemini cloud voices**: designed voices hosted in your Google project
 
-Creating or downloading a voice does not automatically assign it to a speaker. Return to Generate, select a compatible engine, and choose it in **Assign Voices**. See [Voice Management Overview](help:available-voices).
+Creating or downloading a voice does not automatically assign it to a speaker. Return to Generate, select a compatible engine, open the speaker from the **Cast** list, and choose the voice in its **Edit speaker** drawer. See [Voice Management Overview](help:available-voices).
 
 ## Generate creates a job snapshot
 
 [Generate](app:generate) combines:
 
-- Current input text
+- Current manuscript text
 - Detected speakers and sections
 - Per-speaker voices and FX
 - Alternate word substitutions
 - Selected engine and engine overrides
 - Output and chapter options
 
-Analysis runs automatically after input changes. Selecting **Generate Audio** performs a final analysis and validation before the job is added to the queue.
+Analysis runs automatically after input changes. Selecting **Generate audio** performs a final analysis and validation before the job is added to the queue.
 
-**Manage Projects** saves a reusable snapshot of much of this page in the backend's shared project library. Browsers and URLs connected to the same TTS-Story installation see the same list. It does not save generated audio, API keys, or the actual reference-audio files. Read [Save and Restore Projects](help:projects) before relying on it.
+The **Projects** window (open it with the **Project** switcher at the top of the left sidebar) saves a reusable snapshot of much of this page in the backend's shared project library. Browsers and URLs connected to the same TTS-Story installation see the same list. It does not save generated audio, API keys, or the actual reference-audio files. Read [Save and Restore Projects](help:projects) before relying on it.
 
 ## Job Queue owns active processing
 
@@ -75,7 +76,7 @@ An estimated completion time is not a promise. First-run downloads, GPU loading,
 
 Delete and clear actions can remove generated files. Back up final exports before cleaning the Library. See [Use the Audio Library](help:audio-library).
 
-![Expanded Audio Library item with playback, chapter, review, rebuild, and export actions](../../../static/help/screenshots/audio-library.png)
+![Library productions with one expanded into chapter rows with Review chunks, play, and download, and a More actions menu open](../../../static/help/screenshots/audio-library.png)
 
 *Completed work moves to Library, where you can listen, repair chunks, rebuild outputs, and export files.*
 

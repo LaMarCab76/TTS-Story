@@ -1,8 +1,8 @@
 # Generation and Output Options
 
-The **Generation Options** panel on [Generate](app:generate) defines how the current job is synthesized, encoded, and divided into files. These job-level choices can override saved defaults without rewriting Settings.
+The **Output** and **Chapters** sections in the right-hand column of [Generate](app:generate) define how the current job is synthesized, encoded, and divided into files. These job-level choices can override saved defaults without rewriting Settings.
 
-![Generation Options with engine, format, bitrate, ACX, chapter, and Generate Audio controls](../../../static/help/screenshots/generation-options.png)
+![Output and Chapters sections with engine, format, bitrate, ACX, chapter switches and the Generate audio button](../../../static/help/screenshots/generation-options.png)
 
 *Choose the job engine and output structure here after the manuscript and voices are ready.*
 
@@ -18,11 +18,11 @@ Changing the saved default in Settings affects the initial choice for future wor
 - **WAV**: uncompressed review or editing file; much larger.
 - **OGG**: compressed open format; support varies among players and publishing platforms.
 
-The **MP3 Bitrate** control applies when MP3 is selected. Higher bitrates increase file size. Spoken-word material often needs less bandwidth than music, but always test the final delivery platform.
+The bitrate select next to **Format** applies when MP3 is selected. Higher bitrates increase file size. Spoken-word material often needs less bandwidth than music, but always test the final delivery platform.
 
-## ACX Compliant Output
+## ACX
 
-When selected, TTS-Story applies ACX-oriented MP3 encoding and loudness/peak processing: 192 kbps constant bitrate, 44.1 kHz, a target around -19 dB integrated, and a true-peak ceiling below -3 dBTP.
+When the **ACX** switch is on, TTS-Story applies ACX-oriented MP3 encoding and loudness/peak processing: 192 kbps constant bitrate, 44.1 kHz, a target around -19 dB integrated, and a true-peak ceiling below -3 dBTP.
 
 > This processing helps meet technical audio targets; it does not guarantee that an audiobook will pass every ACX content, mastering, room-tone, chapter, metadata, or rights requirement.
 
@@ -32,15 +32,15 @@ See [Audiobook Exports, Metadata, and Time Codes](help:audiobook-exports).
 
 ## Chapter and full-story choices
 
-**Intelligently create separate audio files for each book, chapter, or section** uses enabled heading terms to divide the manuscript. When it is enabled and headings are found, you can also select **Also create a single full-length audiobook after section exports**.
+**Separate file per chapter** uses enabled heading terms to divide the manuscript. When it is on, you can also turn on **Also build full story**.
 
-Review boundaries with **Review detected sections** before submitting. A mistaken heading can create an unwanted file boundary, and a missing heading can combine sections unexpectedly. Read [Chapters, Books, and Sections](help:chapters-and-sections).
+Review boundaries with **Review N sections** in the Chapters section header before submitting. A mistaken heading can create an unwanted file boundary, and a missing heading can combine sections unexpectedly. Read [Chapters, Books, and Sections](help:chapters-and-sections).
 
 ## What is submitted
 
-Selecting **Generate Audio** builds a job from the current:
+Clicking **Generate audio** builds a job from the current:
 
-- Input text
+- Manuscript text
 - Section-heading configuration
 - Engine and engine-specific overrides
 - Voice assignments and per-speaker controls
@@ -54,13 +54,13 @@ The job is then processed in the background. You may continue preparing another 
 
 TTS-Story checks the job in this order:
 
-1. Input Text must not be empty.
+1. The manuscript must not be empty.
 2. Stale text is analyzed again.
 3. Unmatched paired speaker tags block submission.
-4. At least one valid voice assignment must be present. A tagged speaker without its own assignment inherits the first/default assignment, so review every card before submitting.
+4. At least one valid voice assignment must be present. A tagged speaker without its own assignment inherits the first/default assignment, so review every speaker in the Cast list before submitting.
 5. Engine and output choices are added to the request.
 
-On success, the notification reports that the job is queued and shows its position. Open [Job Queue](app:queue) for progress.
+On success, a notification reports the queue position and TTS-Story opens [Job Queue](app:queue) with the new job's details expanded.
 
 ## Start with a representative test
 
@@ -73,7 +73,7 @@ Before a full manuscript:
 5. Generate in the intended final format.
 6. Review both individual chunks and the merged output in [Library](app:library).
 
-For built-in and provider-catalog voices, a Quick Test proves only that a short request can synthesize. For reference/prompt engines, Quick Test only replays the source recording with its FX and does not synthesize at all. A representative job proves assignment collection, actual engine synthesis, chunk order, merging, encoding, chapter output, and provider limits.
+For built-in and provider-catalog voices, a Quick test proves only that a short request can synthesize. For reference/prompt engines, Quick test only replays the source recording with its FX and does not synthesize at all. A representative job proves assignment collection, actual engine synthesis, chunk order, merging, encoding, chapter output, and provider limits.
 
 ## Output-size and time expectations
 

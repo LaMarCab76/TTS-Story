@@ -10,7 +10,7 @@ Open [Voices](app:voices) to maintain reusable voices before assigning them on G
 
 TTS-Story remembers the last sub-tab you opened during the session.
 
-![Voices screen with the Kokoro voice catalog and preview controls](../../../static/help/screenshots/kokoro-voice-browser.png)
+![Voices screen with its five sub-tabs and the Kokoro sub-tab showing the voice catalog and preview controls](../../../static/help/screenshots/kokoro-voice-browser.png)
 
 *Voices groups built-in catalogs, custom blends, designed voices, and reusable reference prompts in one workspace.*
 
@@ -44,6 +44,6 @@ Use filters for name, source, gender, and language. Gender and language are orga
 
 ## Assign voices to a manuscript
 
-Return to [Generate](app:generate), analyze the text, and click a speaker chip. Select a compatible built-in voice or prompt, then use **Quick Test**. Assignment is per detected speaker and per selected job engine.
+Return to [Generate](app:generate), let the text be analyzed, and click the speaker in the **Cast** list to open its **Edit speaker** drawer. Select a compatible built-in voice or prompt, then click **Test** under **Quick test**. Assignment is per detected speaker and per selected job engine.
 
 For the complete workflow, see [Assign and Test Voices](help:assign-voices) and [Generate and Auto-Assign Voices](help:auto-assign-voices).

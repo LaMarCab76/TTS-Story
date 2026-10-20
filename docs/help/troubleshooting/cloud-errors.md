@@ -20,15 +20,15 @@ Provider messages take precedence over this table.
 ## Verify configuration in order
 
 1. Open [Settings](app:settings).
-2. Select the provider or engine tab.
+2. Open **Engines** (speech) or **Text prep (LLM)** and select the provider.
 3. Re-enter the credential without leading/trailing spaces.
 4. Restore the documented Base URL unless the provider explicitly gave another.
-5. Use **Fetch Models**, **Test & Load Voices**, or the provider's catalog button.
+5. Use **Fetch models**, **Test connection & load voices**, **Test connection & load catalog**, **Discover models**, or the provider's catalog button.
 6. Select an item returned for the current account.
-7. Click **Save Settings**.
+7. Click **Save provider** or **Save settings**.
 8. Test one sentence before retrying the manuscript.
 
-![Cloud LLM settings with provider, credential, model catalog, and connection controls](../../../static/help/screenshots/llm-cloud-settings.png)
+![Text prep (LLM) settings with the primary provider, credential, model catalog, and Fetch OpenRouter models](../../../static/help/screenshots/llm-cloud-settings.png)
 
 *Verify the provider URL and credential, refresh the live catalog, select an available model, and save before a minimal test.*
 
@@ -50,11 +50,11 @@ Model/voice discovery proves only that the catalog request works. Generation may
 
 Increase a timeout only when the provider is accepting requests but legitimately needs longer. A longer timeout does not fix 401, 403, 404, or 429 responses.
 
-Prep Text treats temporary capacity and hard quota errors differently. High demand, overload, timeout, connection, and temporary service failures retry the same profile up to five times before advancing. Explicit quota exhaustion and a profile's local daily request cap advance immediately. After a backup succeeds, later sections continue with it; Pause and Resume retain that active profile. Authentication, invalid model, validation, and other non-retryable failures stop immediately. Correct Settings, then resume or restart as appropriate.
+Prep text treats temporary capacity and hard quota errors differently. High demand, overload, timeout, connection, and temporary service failures retry the same profile up to five times before advancing. Explicit quota exhaustion and a profile's local daily request cap advance immediately. After a backup succeeds, later sections continue with it; Pause and Resume retain that active profile. Authentication, invalid model, validation, and other non-retryable failures stop immediately. Correct Settings, then resume or restart as appropriate.
 
 Daily profile counters reset at midnight Pacific Time and count attempts made by this TTS-Story installation, including failed attempts. They do not include use of the same key by another application or another TTS-Story installation. Set a profile limit to `0` only when unlimited local use is intentional.
 
-Build Profiles and the individual Build Profile action are independent requests. Each begins with the primary LLM again. If a specific backup fails, verify its provider-level settings and any model or API-key overrides; a blank override inherits the chosen provider's normal value.
+Build profiles and the individual Build profile action are independent requests. Each begins with the primary LLM again. If a specific backup fails, verify its provider-level settings and any model or API-key overrides; a blank override inherits the chosen provider's normal value.
 
 ## Credential safety
 

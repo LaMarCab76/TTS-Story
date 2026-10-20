@@ -2,13 +2,13 @@
 
 Local engines depend on the main Python environment, engine-specific isolated environments, downloaded models, and audio command-line tools. A working web page does not guarantee that every optional engine is installed and ready.
 
-![Engine settings navigation showing the tabs used to inspect local engine configuration](../../../static/help/screenshots/engine-settings-navigation.png)
+![Settings → Engines list used to inspect local engine configuration](../../../static/help/screenshots/engine-settings-navigation.png)
 
-*Open the affected engine's own Settings tab before changing device, model, chunk-size, or isolated-runtime options.*
+*Open the affected engine's panel in Settings → Engines before changing device, model, chunk-size, or isolated-runtime options.*
 
 ## Confirm installation and health
 
-After moving the project to another computer or updating dependencies, run the platform setup script and allow it to finish. Core setup installs TTS-Story and shared tools; it does not force every optional engine onto the computer. Open **Settings → Engine Settings** to install or repair the affected local engine.
+After moving the project to another computer or updating dependencies, run the platform setup script and allow it to finish. Core setup installs TTS-Story and shared tools; it does not force every optional engine onto the computer. Open **Settings → Engines** to install or repair (**Repair**) the affected local engine.
 
 Restart TTS-Story after setup. Then inspect `http://localhost:5000/api/health` and run:
 
@@ -40,7 +40,7 @@ Use the live engine-management log and health unavailable reason before modifyin
 2. Restart TTS-Story to unload cached models.
 3. Reduce the selected engine's character chunk size.
 4. Disable optional high-memory acceleration or quality settings.
-5. Use a supported lower-precision mode if the engine tab offers it.
+5. Use a supported lower-precision mode if the engine panel offers it.
 6. Try a smaller engine or CPU-focused engine.
 
 **Unload GPU model after job** releases cached engine state after completion but makes the next job reload the model.
