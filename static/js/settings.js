@@ -172,7 +172,7 @@ function renderEngineSetupStatus() {
     const q8Status = document.getElementById('breeze-q8-status');
     if (q8Status) q8Status.textContent = breezeStatus?.q8_ready
         ? 'Q8 installed. Choose Q8 GGUF above and save settings to use it.'
-        : 'Q8 is not installed. Use Install / Repair Q8 to add it.';
+        : 'Q8 is not installed. Use Install / repair Q8 to add it.';
     document.querySelectorAll('.engine-tab-btn[data-engine-tab]').forEach(button => {
         const entries = engineStatusForTab(button.dataset.engineTab);
         button.classList.remove('engine-status-ready', 'engine-status-missing');

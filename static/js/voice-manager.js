@@ -2009,10 +2009,15 @@ function summarizeFileSize(bytes) {
     return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
+// This script loads after main/queue/library, so this copy is the runtime global.
+// It must stay quote-safe: callers interpolate it into attribute values.
 function escapeHtml(value = '') {
-    const div = document.createElement('div');
-    div.textContent = value;
-    return div.innerHTML;
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 async function renameChatterboxVoice(voiceId) {

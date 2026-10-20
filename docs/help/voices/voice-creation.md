@@ -2,7 +2,7 @@
 
 Voice creation synthesizes a short voice sample from a written description. An accepted preview can be saved to voice prompts and reused as reference audio by compatible cloning engines.
 
-Open [Voices](app:voices), select the **Voice creation** sub-tab, and choose **Qwen3-TTS**, **Breeze TTS 2**, or **OmniVoice** in the engine switch. **Gemini voice design** in the same row opens the separate Gemini designer for hosted Google voices.
+Open [Voices](app:voices/qwen), select the **Voice creation** sub-tab, and choose **Qwen3-TTS**, **Breeze TTS 2**, or **OmniVoice** in the engine switch. **Gemini voice design** in the same row opens the separate Gemini designer for hosted Google voices.
 
 ![Voice Creation panel with engine selection, sample text, instructions, and preview controls](../../../static/help/screenshots/voice-creation.png)
 

@@ -6,7 +6,7 @@ Q8 is an experimental, smaller alternative to the original PyTorch runtime. It s
 
 1. Open **Settings → Breeze TTS 2** and accept the model license.
 2. Windows: install Visual Studio 2022 Build Tools with **Desktop development with C++**, CMake tools, and the [Vulkan SDK](https://vulkan.lunarg.com/sdk/home). Linux: install a C++17 compiler, CMake, Vulkan development headers, and `glslc`. This installer does not support macOS yet.
-3. Click **Install / Repair Q8**. The log shows the native build and approximately 3.3 GB model download. Installation stays inside Breeze's engine directory; Windows builds briefly use a free drive letter to avoid long-path compiler errors.
+3. Click **Install / repair Q8**. The log shows the native build and approximately 3.3 GB model download. Installation stays inside Breeze's engine directory; Windows builds briefly use a free drive letter to avoid long-path compiler errors.
 4. Restart the backend, choose **Q8 GGUF · Vulkan** in the Breeze Runtime dropdown, and **save Settings**. Start a new job for the new runtime; saved/resumable jobs retain their configuration snapshots.
 
 The selection applies to both narration and Breeze voice-design candidates. Models remain loaded between requests inside the isolated worker, and normal job cancellation/cleanup releases them. Q8 refuses silent CPU fallback if a Vulkan GPU is unavailable. PyTorch model ID, full fast mode, and sequence-length controls do not tune Q8; its Q8_0 model revision is pinned by the installer. Seed, guidance, reference effects, and text chunking still apply.
@@ -42,7 +42,7 @@ Reference audio must have an exact transcript in **Available Voices**. Samples w
 
 ## Use Breeze for speaker casting
 
-Breeze can also replace Qwen3 as the reference-free casting engine. In the detected-speaker **Generate Voices** dialog, choose **Breeze TTS 2** before starting the batch. For one speaker, open Speaker Properties and choose Breeze under **Voice Design Engine**. In [Available Voices](app:voices), expand **Voice Creation** and select Breeze to design and save a standalone reference sample.
+Breeze can also replace Qwen3 as the reference-free casting engine. In the detected-speaker **Generate Voices** dialog, choose **Breeze TTS 2** before starting the batch. For one speaker, open Speaker Properties and choose Breeze under **Voice Design Engine**. In [Voices](app:voices/qwen), open the **Voice creation** sub-tab and select Breeze to design and save a standalone reference sample.
 
 Each candidate uses the speaker's Voice Design Prompt and the standardized preview passage. The Breeze model stays loaded in a persistent isolated worker while the batch runs, avoiding a full model reload between candidates. The candidate count, approval workflow, saved project state, and prompt-library behavior are the same as Qwen3 casting.
 

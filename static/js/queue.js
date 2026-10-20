@@ -605,9 +605,13 @@ function resolveChatterboxVoiceName(promptPath) {
 }
 
 function escapeHtml(value = '') {
-    const div = document.createElement('div');
-    div.textContent = value;
-    return div.innerHTML;
+    // Quote-safe: used inside attribute values (e.g. <option value>).
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 function getKokoroVoiceSelection(jobId, chunk) {
@@ -1683,52 +1687,6 @@ function renderQueueInlineDetails(item, job) {
     if (panel._queueHtml !== html) {
         panel.innerHTML = html;
         panel._queueHtml = html;
-    }
-}
-
-function getStatusClass(status) {
-    switch (status) {
-        case 'queued':
-            return 'status-queued';
-        case 'processing':
-            return 'status-processing';
-        case 'pausing':
-            return 'status-pausing';
-        case 'paused':
-            return 'status-paused';
-        case 'completed':
-            return 'status-completed';
-        case 'interrupted':
-            return 'status-interrupted';
-        case 'failed':
-            return 'status-failed';
-        case 'cancelled':
-            return 'status-cancelled';
-        default:
-            return '';
-    }
-}
-
-function getStatusIcon(status) {
-    switch (status) {
-        case 'queued':
-            return '';
-        case 'processing':
-            return '';
-        case 'pausing':
-            return '';
-        case 'paused':
-            return '';
-        case 'completed':
-            return '';
-        case 'interrupted':
-            return '';
-        case 'failed':
-            return '';
-        case 'cancelled':
-            return '';
-        default:
-            return '';
     }
 }
 

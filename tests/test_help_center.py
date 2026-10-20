@@ -19,6 +19,7 @@ HELP_LINK_RE = re.compile(r"help:([^\s)\"'<>]+)")
 APP_LINK_RE = re.compile(r"app:([^\s)\"'<>]+)")
 DATA_HELP_ID_RE = re.compile(r"data-help-id\s*=\s*([\"'])(.*?)\1")
 ENGINE_TAB_RE = re.compile(r"data-engine-tab\s*=\s*([\"'])(.*?)\1")
+VOICES_SUBTAB_RE = re.compile(r"data-voices-target\s*=\s*([\"'])(.*?)\1")
 MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]\r\n]*)\]\(([^)\r\n]+)\)")
 HELP_SCREENSHOT_TARGET_RE = re.compile(
     r"^\.\./\.\./\.\./static/help/screenshots/"
@@ -346,8 +347,15 @@ class BundledHelpContentTests(unittest.TestCase):
         }
         self.assertTrue(engine_tabs, "Expected Settings engine tabs in index.html")
 
+        voices_sections = {
+            match.group(2).strip()
+            for match in VOICES_SUBTAB_RE.finditer(template_source)
+        }
+        self.assertTrue(voices_sections, "Expected Voices sub-tabs in index.html")
+
         supported_locations = {"generate", "queue", "library", "voices", "settings"}
         supported_locations.update(f"settings/{tab}" for tab in engine_tabs)
+        supported_locations.update(f"voices/{section}" for section in voices_sections)
         links_seen = 0
 
         for relative in _declared_source_paths(self.manifest):

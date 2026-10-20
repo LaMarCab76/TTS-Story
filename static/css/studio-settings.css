@@ -1047,61 +1047,6 @@
 }
 
 /* --------------------------------------------------------------------------
-   Breeze production voices dialog (breeze-api.js, launched from Settings)
-   -------------------------------------------------------------------------- */
-#breeze-productions-dialog h2 {
-    margin: 0 0 8px;
-    color: var(--st-text);
-    font-family: var(--st-font-serif);
-    font-size: 24px;
-    font-weight: 400;
-    line-height: 1.2;
-}
-
-#breeze-productions-dialog h3 {
-    margin: 0 0 4px;
-    color: var(--st-text);
-    font-size: 14px;
-    font-weight: 600;
-}
-
-#breeze-productions-dialog p {
-    margin: 0 0 10px;
-    color: var(--st-text-3);
-    line-height: 1.5;
-}
-
-#breeze-productions-dialog [data-status]:empty {
-    display: none;
-}
-
-#breeze-productions-dialog button {
-    display: inline-flex;
-    align-items: center;
-    height: 28px;
-    margin: 0 6px 10px 0;
-    padding: 0 10px;
-    border: 1px solid var(--st-border-control);
-    border-radius: 6px;
-    background: transparent;
-    color: var(--st-text-btn);
-    font: inherit;
-    font-size: 12.5px;
-    cursor: pointer;
-}
-
-#breeze-productions-dialog button:hover {
-    border-color: var(--st-border-strong);
-    background: rgba(236, 230, 220, 0.04);
-    color: var(--st-text-strong);
-}
-
-#breeze-productions-dialog button:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
-
-/* --------------------------------------------------------------------------
    Narrower desktops (1180–1320px): the section nav (220px) and the 32px engine
    name stay as designed; the space comes from the engine list (240 → 200px)
    and tighter padding only.

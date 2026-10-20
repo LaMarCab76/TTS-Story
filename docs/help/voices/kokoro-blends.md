@@ -8,7 +8,7 @@ A custom Kokoro voice combines one or more built-in voice packs. One component c
 
 ## Create a blend
 
-1. Open [Voices](app:voices).
+1. Open [Voices](app:voices/custom).
 2. Select the **Kokoro blends** sub-tab.
 3. Click **New blend**.
 4. Enter a short, descriptive Name.

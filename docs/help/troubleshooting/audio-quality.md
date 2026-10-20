@@ -30,7 +30,7 @@ For a cloning engine, inspect the reference prompt:
 - a natural 5–10 second performance; and
 - an exact transcript when the engine requests one.
 
-Use the same prompt in Quick Test and one normal chunk. If the raw prompt is poor, replace it in [Available Voices](app:voices) rather than compensating with pitch and speed.
+Use the same prompt in Quick Test and one normal chunk. If the raw prompt is poor, replace it in [Voices → Voice prompts](app:voices/prompts) rather than compensating with pitch and speed.
 
 Very short text can also sound less stable than a complete sentence. Keep engine character chunks near the recommended range and avoid splitting inside abbreviations or names.
 
