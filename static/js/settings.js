@@ -117,14 +117,62 @@ function engineStatusForTab(tabName) {
     return engineSetupCatalog.filter(engine => engine.settings_tab === tabName);
 }
 
+const ENGINE_STATE_LABELS = {
+    ready: 'Ready',
+    partial: 'Partly ready',
+    setup: 'Needs setup',
+    none: 'Not installed',
+    busy: 'Working…',
+    restart: 'Restart required',
+    unknown: 'Status unavailable',
+};
+
+// ready: every catalog entry of the tab is ready · partial: only some are ·
+// none: not ready and installable (local runtime missing) · setup: not ready and
+// nothing to install (cloud credentials or connection fields missing).
+function engineSetupStateForTab(tabName) {
+    const entries = engineStatusForTab(tabName);
+    if (!entries.length) return 'unknown';
+    if (entries.every(engine => engine.ready)) return 'ready';
+    if (entries.some(engine => engine.ready)) return 'partial';
+    return entries.some(engine => engine.install_target) ? 'none' : 'setup';
+}
+
+function setEngineTabState(tabName, state, label = '') {
+    const text = label || ENGINE_STATE_LABELS[state] || '';
+    document.querySelectorAll(`.engine-tab-btn[data-engine-tab="${CSS.escape(tabName)}"]`).forEach(button => {
+        button.dataset.engineState = state;
+        button.setAttribute('aria-label', `${button.textContent.trim()} (${text})`);
+    });
+    const panel = document.getElementById(`engine-panel-${tabName}`);
+    if (!panel) return;
+    panel.dataset.engineState = state;
+    const pill = panel.querySelector('[data-engine-status-pill]');
+    if (pill) {
+        pill.dataset.engineState = state;
+        pill.textContent = text;
+    }
+}
+
+function refreshEngineStateIndicators() {
+    let readyTabs = 0;
+    document.querySelectorAll('.engine-tab-btn[data-engine-tab]').forEach(button => {
+        const state = engineSetupStateForTab(button.dataset.engineTab);
+        if (state === 'ready') readyTabs += 1;
+        setEngineTabState(button.dataset.engineTab, state);
+    });
+    const readyCount = document.getElementById('engine-ready-count');
+    if (readyCount) readyCount.textContent = String(readyTabs);
+}
+
 function renderEngineSetupStatus() {
     const breezeStatus = engineSetupCatalog.find(engine => engine.id === 'breeze_tts_2');
     const breezeLicense = document.getElementById('breeze-tts-2-license-accept');
     if (breezeLicense && breezeStatus?.license_accepted) breezeLicense.checked = true;
     const q8Status = document.getElementById('breeze-q8-status');
     if (q8Status) q8Status.textContent = breezeStatus?.q8_ready
-        ? 'Q8 installed. Choose Q8 GGUF above and save Settings to use it.'
-        : 'Q8 is not installed. Use Install / Repair Q8 below.';
+        ? 'Q8 installed. Choose Q8 GGUF above and save settings to use it.'
+        : 'Q8 is not installed. Use Install / Repair Q8 to add it.';
     document.querySelectorAll('.engine-tab-btn[data-engine-tab]').forEach(button => {
         const entries = engineStatusForTab(button.dataset.engineTab);
         button.classList.remove('engine-status-ready', 'engine-status-missing');
@@ -133,6 +181,7 @@ function renderEngineSetupStatus() {
             ? 'engine-status-ready'
             : 'engine-status-missing');
     });
+    refreshEngineStateIndicators();
 
     document.querySelectorAll('.engine-panel[id^="engine-panel-"]').forEach(panel => {
         const tabName = panel.id.replace('engine-panel-', '');
@@ -142,31 +191,49 @@ function renderEngineSetupStatus() {
         const ready = entries.every(engine => engine.ready);
         const installTarget = entries.find(engine => !engine.ready && engine.install_target)?.install_target;
         const uninstallEntry = entries.find(engine => engine.ready && engine.uninstall_target);
+        // Cloud providers have nothing to install: the status pill and their
+        // connection fields explain what is missing.
+        if (!installTarget && !(ready && uninstallEntry)) return;
         const status = document.createElement('div');
         status.className = `engine-setup-status ${ready ? 'ready' : 'missing'}`;
         status.dataset.engineSetupTab = tabName;
         const text = document.createElement('div');
         text.className = 'engine-setup-status-text';
-        text.innerHTML = ready
-            ? '<strong>Ready</strong> — this engine is available on the Generate page.'
-            : (installTarget
-                ? '<strong>Not installed.</strong> Install this local engine to make it available.'
-                : '<strong>Configuration required.</strong> Complete the required connection fields and save Settings.');
+        text.textContent = installTarget
+            ? 'Installs into its own isolated environment and model folder, so it cannot change another engine or the TTS-Story core.'
+            : 'Removing deletes this engine\'s runtime and model downloads. Projects, generated audio, settings and saved voices are kept.';
         status.appendChild(text);
         if (installTarget) {
             const installButton = document.createElement('button');
             installButton.type = 'button';
-            installButton.className = 'btn btn-primary btn-sm';
-            installButton.textContent = 'Install Engine';
+            installButton.className = 'btn btn-primary engine-install-btn';
+            installButton.dataset.icon = 'download';
+            installButton.dataset.idleLabel = 'Install engine';
+            installButton.textContent = 'Install engine';
             installButton.dataset.installEngine = installTarget;
             installButton.addEventListener('click', () => startEngineInstall(installTarget, status, installButton));
             status.appendChild(installButton);
         }
         if (ready && uninstallEntry) {
+            // Repair re-runs the installer for a ready engine; install_engine.py
+            // recreates an unhealthy isolated environment.
+            const repairTarget = uninstallEntry.install_target || uninstallEntry.uninstall_target;
+            const repairButton = document.createElement('button');
+            repairButton.type = 'button';
+            repairButton.className = 'btn btn-ghost';
+            repairButton.dataset.idleLabel = 'Repair';
+            repairButton.textContent = 'Repair';
+            repairButton.dataset.installEngine = repairTarget;
+            repairButton.addEventListener('click', () => {
+                if (!confirm('Repair re-runs this engine\'s installer and may download its runtime again. Continue?')) return;
+                startEngineInstall(repairTarget, status, repairButton);
+            });
+            status.appendChild(repairButton);
             const uninstallButton = document.createElement('button');
             uninstallButton.type = 'button';
-            uninstallButton.className = 'btn btn-danger btn-sm';
-            uninstallButton.textContent = 'Uninstall Engine';
+            uninstallButton.className = 'btn btn-danger';
+            uninstallButton.dataset.idleLabel = 'Remove engine';
+            uninstallButton.textContent = 'Remove engine';
             uninstallButton.dataset.uninstallEngine = uninstallEntry.uninstall_target;
             uninstallButton.addEventListener('click', () => startEngineUninstall(
                 uninstallEntry,
@@ -175,9 +242,13 @@ function renderEngineSetupStatus() {
             ));
             status.appendChild(uninstallButton);
         }
-        const title = panel.querySelector('.settings-panel-title');
-        if (title) title.insertAdjacentElement('afterend', status);
-        else panel.prepend(status);
+        // Install cards sit right under the engine header; remove/repair cards
+        // close the panel. A panel can pin the card with [data-engine-setup-anchor].
+        const anchor = panel.querySelector('[data-engine-setup-anchor]');
+        const head = panel.querySelector('.engine-panel-head') || panel.querySelector('.settings-panel-title');
+        if (anchor) anchor.insertAdjacentElement('afterend', status);
+        else if (!ready && head) head.insertAdjacentElement('afterend', status);
+        else panel.appendChild(status);
     });
     filterEngineSelectors();
 }
@@ -192,6 +263,7 @@ async function loadEngineSetupStatus() {
         await restoreActiveEngineManagementJob();
     } catch (error) {
         console.error('Unable to load TTS engine setup status', error);
+        if (!engineSetupCatalog.length) refreshEngineStateIndicators();
     }
 }
 
@@ -230,6 +302,7 @@ function setEngineManagementBusy(job, busy = true) {
     document.querySelectorAll('.engine-setup-status.busy').forEach(status => {
         status.classList.remove('busy');
     });
+    refreshEngineStateIndicators();
     if (!busy || !job) return;
     const ui = engineManagementUi(job);
     if (!ui) return;
@@ -240,8 +313,9 @@ function setEngineManagementBusy(job, busy = true) {
     tabButton?.classList.add('engine-status-busy');
     const text = ui.statusElement.querySelector('.engine-setup-status-text');
     const verb = job.action === 'uninstall' ? 'Removing' : 'Installing';
+    setEngineTabState(ui.tabName, 'busy', `${verb}…`);
     if (text) {
-        text.innerHTML = `<strong>${verb} ${ui.entry?.name || job.engine}…</strong> This operation continues if you leave Settings or refresh the page.`;
+        text.innerHTML = `<strong>${verb} ${escapeHtml(ui.entry?.name || job.engine || 'engine')}…</strong> This operation continues if you leave Settings or refresh the page.`;
     }
     if (ui.button) {
         ui.button.disabled = true;
@@ -293,6 +367,7 @@ function showBackendRestartRequired(job) {
     if (!ui) return;
     ui.statusElement.classList.remove('missing', 'busy');
     ui.statusElement.classList.add('ready');
+    setEngineTabState(ui.tabName, 'restart');
     const text = ui.statusElement.querySelector('.engine-setup-status-text');
     if (text) {
         text.innerHTML = '<strong>Installed.</strong> Restart the TTS-Story backend to load this engine.';
@@ -302,9 +377,13 @@ function showBackendRestartRequired(job) {
         ui.output.scrollTop = ui.output.scrollHeight;
     }
     const oldButton = ui.statusElement.querySelector('[data-install-engine], [data-uninstall-engine]');
+    ui.statusElement.querySelectorAll('[data-install-engine], [data-uninstall-engine]').forEach(button => {
+        if (button !== oldButton) button.remove();
+    });
     const restartButton = document.createElement('button');
     restartButton.type = 'button';
-    restartButton.className = 'btn btn-primary btn-sm';
+    restartButton.className = 'btn btn-primary engine-install-btn';
+    restartButton.dataset.icon = 'restart_alt';
     restartButton.textContent = 'Restart TTS-Story';
     restartButton.dataset.restartBackend = 'true';
     restartButton.addEventListener('click', () => restartTtsStoryBackend(restartButton));
@@ -350,7 +429,7 @@ async function restartTtsStoryBackend(button) {
         throw new Error('The backend did not return within 90 seconds. Check the TTS-Story terminal.');
     } catch (error) {
         button.disabled = false;
-        button.textContent = 'Retry Restart';
+        button.textContent = 'Retry restart';
         if (statusText) {
             statusText.innerHTML = `<strong>Restart failed.</strong> ${error.message || 'Check the TTS-Story terminal.'}`;
         }
@@ -365,11 +444,12 @@ async function startEngineInstall(engine, statusElement, button, runtime = null)
         ? Boolean(document.getElementById('breeze-tts-2-license-accept')?.checked)
         : undefined;
     if (engine === 'breeze_tts_2' && !licenseAccepted) {
-        alert('Review and accept the BreezeBlue Research and Non-Commercial License before installing Breeze TTS 2.');
+        settingsNotify('Review and accept the BreezeBlue Research and Non-Commercial License before installing Breeze TTS 2.', 'warning');
+        document.getElementById('breeze-tts-2-license-accept')?.focus();
         return;
     }
     button.disabled = true;
-    button.textContent = 'Starting...';
+    button.textContent = 'Starting…';
     let output = statusElement.querySelector('.engine-install-output');
     if (!output) {
         output = document.createElement('pre');
@@ -393,7 +473,7 @@ async function startEngineInstall(engine, statusElement, button, runtime = null)
         pollEngineInstall(data.job_id, statusElement, button, output, 'install', engine);
     } catch (error) {
         button.disabled = false;
-        button.textContent = 'Install Engine';
+        button.textContent = button.dataset.idleLabel || 'Install engine';
         output.textContent = error.message || 'Installation could not be started.';
     }
 }
@@ -405,7 +485,7 @@ async function startEngineUninstall(engineEntry, statusElement, button) {
         || 'This removes the local engine runtime and downloaded models. Reinstalling later requires downloading them again.';
     if (!confirm(`${warning}\n\nDo you want to uninstall this engine?`)) return;
     button.disabled = true;
-    button.textContent = 'Starting removal...';
+    button.textContent = 'Starting removal…';
     let output = statusElement.querySelector('.engine-install-output');
     if (!output) {
         output = document.createElement('pre');
@@ -429,7 +509,7 @@ async function startEngineUninstall(engineEntry, statusElement, button) {
         pollEngineInstall(data.job_id, statusElement, button, output, 'uninstall', engine);
     } catch (error) {
         button.disabled = false;
-        button.textContent = 'Uninstall Engine';
+        button.textContent = button.dataset.idleLabel || 'Remove engine';
         output.textContent = error.message || 'Engine removal could not be started.';
     }
 }
@@ -453,7 +533,7 @@ function pollEngineInstall(jobId, statusElement, button, output, action = 'insta
             output.textContent = job.output || 'Installer is running...';
             output.scrollTop = output.scrollHeight;
             if (job.status === 'running') {
-                button.textContent = action === 'uninstall' ? 'Removing...' : 'Installing...';
+                button.textContent = action === 'uninstall' ? 'Removing…' : 'Installing…';
                 activeEngineInstallPoll = setTimeout(poll, 1000);
                 return;
             }
@@ -490,7 +570,7 @@ function pollEngineInstall(jobId, statusElement, button, output, action = 'insta
                 // to wait for a page refresh.
                 showBackendRestartRequired({ ...job, settings_tab: settingsTab });
             } else {
-                button.textContent = action === 'uninstall' ? 'Retry Removal' : 'Retry Install';
+                button.textContent = action === 'uninstall' ? 'Retry removal' : 'Retry install';
                 button.disabled = false;
             }
         } catch (error) {
@@ -512,7 +592,7 @@ async function dismissFirstRunWelcome(openSettings = false) {
     document.getElementById('first-run-welcome-modal')?.classList.add('hidden');
     if (!openSettings) return;
     document.querySelector('.tab-button[data-tab="settings"]')?.click();
-    document.getElementById('engine-settings-group')?.classList.remove('collapsed');
+    showSettingsSection('engine-settings-group');
     const firstMissing = document.querySelector('.engine-tab-btn.engine-status-missing[data-engine-tab]');
     firstMissing?.click();
     document.getElementById('engine-settings-group')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -633,7 +713,7 @@ function renderLLMBackupProfiles() {
             <div class="llm-backup-profile-heading">${index + 1}. ${escapeHtml(profile.name || `Backup ${index + 1}`)}</div>
             <div class="settings-form-grid">
                 <div class="form-group">
-                    <label>Profile Name</label>
+                    <label>Profile name</label>
                     <input type="text" data-profile-field="name" value="${escapeHtml(profile.name || '')}" placeholder="Backup ${index + 1}">
                 </div>
                 <div class="form-group">
@@ -646,15 +726,15 @@ function renderLLMBackupProfiles() {
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Model Override</label>
+                    <label>Model override</label>
                     <input type="text" data-profile-field="model" list="llm-backup-model-suggestions" value="${escapeHtml(profile.model || '')}" placeholder="Blank uses provider default">
                 </div>
                 <div class="form-group">
-                    <label>API Key Override</label>
+                    <label>API key override</label>
                     <input type="password" data-profile-field="api_key" value="${escapeHtml(profile.api_key || '')}" placeholder="Blank uses provider API key above" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label>Daily Request Limit</label>
+                    <label>Daily request limit</label>
                     <input type="number" data-profile-field="daily_request_limit" min="0" max="1000000" step="1" value="${profile.daily_request_limit ?? 18}">
                     <small>Resets at midnight Pacific Time. Use 0 for unlimited requests.</small>
                 </div>
@@ -777,7 +857,7 @@ async function fetchAtlasCloudModels(buttonEl) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Fetch Atlas Models';
+            buttonEl.textContent = originalLabel || 'Fetch Atlas models';
         }
         renderLLMModelSuggestions();
     }
@@ -836,7 +916,7 @@ async function fetchOpenRouterModels(buttonEl) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Fetch OpenRouter Models';
+            buttonEl.textContent = originalLabel || 'Fetch OpenRouter models';
         }
         renderLLMModelSuggestions();
     }
@@ -916,7 +996,7 @@ async function fetchLocalLlmModels(buttonEl) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Fetch Local Models';
+            buttonEl.textContent = originalLabel || 'Fetch local models';
         }
         renderLLMModelSuggestions();
     }
@@ -1254,7 +1334,7 @@ function setupSettingsListeners() {
     const speedSlider = document.getElementById('speed');
     const speedValue = document.getElementById('speed-value');
     speedSlider.addEventListener('input', (e) => {
-        speedValue.textContent = e.target.value + 'x';
+        speedValue.textContent = formatSpeechSpeed(e.target.value);
     });
     
     // Save settings
@@ -1377,6 +1457,53 @@ function setupSettingsListeners() {
     setupSharedReplicateSettings();
     setupLlmProviderHandlers();
     setupOmniVoicePerformancePreset();
+    setupSaveProviderButtons();
+}
+
+// "Save provider" in each cloud engine panel saves the whole settings form
+// (the backend merges), with its own busy label.
+function setupSaveProviderButtons() {
+    document.querySelectorAll('#settings-tab [data-save-provider]').forEach(button => {
+        button.addEventListener('click', async () => {
+            if (button.disabled) return;
+            const idleLabel = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Saving…';
+            try {
+                await saveSettings();
+            } finally {
+                button.disabled = false;
+                button.textContent = idleLabel;
+            }
+        });
+    });
+}
+
+function settingsNotify(message, type = 'info') {
+    if (typeof showNotification === 'function') showNotification(message, type);
+    else alert(message);
+}
+
+// Settings sections: exactly one .settings-group is shown (the one without
+// .collapsed); the left section nav and the hidden accordion headers both route here.
+let activeSettingsSectionId = 'engine-settings-group';
+
+function showSettingsSection(groupId) {
+    const groups = Array.from(document.querySelectorAll('#settings-tab .settings-group[id]'));
+    const target = groups.find(group => group.id === groupId);
+    if (!target) return false;
+    const changed = activeSettingsSectionId !== target.id || target.classList.contains('collapsed');
+    activeSettingsSectionId = target.id;
+    groups.forEach(group => group.classList.toggle('collapsed', group !== target));
+    document.querySelectorAll('#settings-tab [data-settings-section]').forEach(item => {
+        const active = item.dataset.settingsSection === target.id;
+        item.classList.toggle('is-active', active);
+        if (active) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+    });
+    const pane = document.getElementById('settings-pane');
+    if (changed && pane) pane.scrollTop = 0;
+    return true;
 }
 
 // Settings accordion toggle
@@ -1386,10 +1513,28 @@ function setupSettingsAccordion() {
         header.addEventListener('click', () => {
             const group = header.closest('.settings-group');
             if (group) {
-                group.classList.toggle('collapsed');
+                showSettingsSection(group.id);
             }
         });
     });
+    document.querySelectorAll('#settings-tab [data-settings-section]').forEach(item => {
+        item.addEventListener('click', () => showSettingsSection(item.dataset.settingsSection));
+    });
+    // Older deep links (e.g. main.js openQwen3EngineSettings) only remove
+    // .collapsed from a group; follow them so a single section stays visible.
+    if (typeof MutationObserver === 'function') {
+        const observer = new MutationObserver(records => {
+            const opened = records
+                .map(record => record.target)
+                .find(group => !group.classList.contains('collapsed') && group.id !== activeSettingsSectionId);
+            if (opened) showSettingsSection(opened.id);
+        });
+        document.querySelectorAll('#settings-tab .settings-group[id]').forEach(group => {
+            observer.observe(group, { attributes: true, attributeFilter: ['class'] });
+        });
+    }
+    const initial = document.querySelector('#settings-tab .settings-group[id]:not(.collapsed)');
+    showSettingsSection(initial?.id || activeSettingsSectionId);
 }
 
 // Engine tab switching within Engine Settings group
@@ -1398,23 +1543,39 @@ function setupEngineTabSwitching() {
     tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             const targetTab = btn.dataset.engineTab;
-            
+            const alreadyActive = btn.classList.contains('active');
+
             // Update button states
-            tabButtons.forEach(b => b.classList.remove('active'));
+            tabButtons.forEach(b => {
+                b.classList.remove('active');
+                b.removeAttribute('aria-current');
+            });
             btn.classList.add('active');
-            
+            btn.setAttribute('aria-current', 'true');
+
             // Update panel visibility
             const panels = document.querySelectorAll('.engine-panel');
             panels.forEach(panel => {
                 panel.classList.remove('active');
             });
-            
+
             const targetPanel = document.getElementById(`engine-panel-${targetTab}`);
             if (targetPanel) {
                 targetPanel.classList.add('active');
             }
+            // The detail pane shares the section scroll container: start a newly
+            // opened engine at its header.
+            const pane = document.getElementById('settings-pane');
+            if (!alreadyActive && pane && activeSettingsSectionId === 'engine-settings-group') {
+                pane.scrollTop = 0;
+            }
         });
     });
+}
+
+function formatSpeechSpeed(value) {
+    const speed = Number.parseFloat(value);
+    return `${Number.isFinite(speed) ? speed.toFixed(1) : '1.0'}×`;
 }
 
 function updateSettingsBitrateState() {
@@ -1493,7 +1654,7 @@ async function fetchGeminiModels(buttonEl) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Fetch Available Models';
+            buttonEl.textContent = originalLabel || 'Fetch models';
         }
         renderLLMModelSuggestions();
     }
@@ -1543,8 +1704,8 @@ async function verifyPocketTtsHuggingFaceAccess() {
         return;
     }
     button.disabled = true;
-    button.textContent = 'Checking...';
-    status.textContent = 'Contacting Hugging Face...';
+    button.textContent = 'Checking…';
+    status.textContent = 'Contacting Hugging Face…';
     status.style.color = '';
     try {
         const response = await fetch('/api/pocket-tts/huggingface-access', {
@@ -1561,7 +1722,7 @@ async function verifyPocketTtsHuggingFaceAccess() {
         status.style.color = 'var(--danger-color, #ef4444)';
     } finally {
         button.disabled = false;
-        button.textContent = 'Verify Voice-Cloning Access';
+        button.textContent = 'Verify voice-cloning access';
     }
 }
 
@@ -1652,7 +1813,7 @@ async function fetchAzureSpeechVoices(buttonEl) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Test Connection & Load Voices';
+            buttonEl.textContent = originalLabel || 'Test connection & load voices';
         }
     }
 }
@@ -1742,7 +1903,7 @@ async function fetchEdgeTtsVoices(buttonEl, { force = true } = {}) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Test Connection & Load Voices';
+            buttonEl.textContent = originalLabel || 'Test connection & load voices';
         }
     }
 }
@@ -1802,7 +1963,7 @@ async function fetchElevenLabsCatalog(buttonEl, { force = true } = {}) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Test Connection & Load Catalog';
+            buttonEl.textContent = originalLabel || 'Test connection & load catalog';
         }
     }
 }
@@ -1884,7 +2045,7 @@ async function fetchLocalAITtsCatalog(buttonEl) {
     } finally {
         if (buttonEl) {
             buttonEl.disabled = false;
-            buttonEl.textContent = originalLabel || 'Test Connection & Load Catalog';
+            buttonEl.textContent = originalLabel || 'Discover models';
         }
     }
 }
@@ -1985,7 +2146,7 @@ function applySettings(settings) {
     // Speed
     const speed = settings.speed || 1.0;
     setElementValue('speed', speed, 1.0);
-    setElementText('speed-value', speed + 'x', '1.0x');
+    setElementText('speed-value', formatSpeechSpeed(speed), '1.0×');
     
     // Default output format / bitrate
     const defaultFormat = (settings.output_format || 'mp3').toLowerCase();
@@ -2624,16 +2785,16 @@ async function saveSettings() {
     const defaultFormat = defaultFormatSelect ? defaultFormatSelect.value : 'mp3';
     const defaultBitrate = defaultBitrateSelect ? parseInt(defaultBitrateSelect.value, 10) || 128 : 128;
 
+    // Intro/segment silence fields are labelled and stored in milliseconds
+    // (applySettings shows intro_silence_ms as-is). Earlier builds treated
+    // values <= 20 as seconds, which turned "20 ms" into 20 seconds.
     const parseSilenceInput = (inputId) => {
         const rawValue = document.getElementById(inputId)?.value?.trim() || '';
         const parsed = parseFloat(rawValue);
         if (!Number.isFinite(parsed)) {
             return 0;
         }
-        if (parsed <= 20) {
-            return Math.round(parsed * 1000);
-        }
-        return Math.round(parsed);
+        return Math.max(0, Math.round(parsed));
     };
     const parseClampedFloat = (inputId, fallback, minimum = 0, maximum = 1) => {
         const parsed = parseFloat(document.getElementById(inputId)?.value);
@@ -2917,7 +3078,7 @@ async function saveSettings() {
     
     const saveBtn = document.getElementById('save-settings-btn');
     saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
+    saveBtn.textContent = 'Saving…';
     
     try {
         const response = await fetch('/api/settings', {
@@ -2933,13 +3094,7 @@ async function saveSettings() {
             if (remoteToken) {
                 try { sessionStorage.setItem('ttsStoryRemoteAdminToken', remoteToken); } catch (_) {}
             }
-            alert('Settings saved successfully!');
-            // LocalAI voice availability depends on the selected model and the
-            // explicit voice-cloning rights confirmation. Refresh the shared
-            // catalog so already-open Speaker Properties selectors update now.
-            if (typeof loadLocalAITtsCatalog === 'function') {
-                await loadLocalAITtsCatalog(true);
-            }
+            settingsNotify('Settings saved', 'success');
             // Refresh status bar - loadHealthStatus is defined in main.js
             if (typeof loadHealthStatus === 'function') {
                 loadHealthStatus();
@@ -2948,15 +3103,23 @@ async function saveSettings() {
                 location.reload();
             }
             await loadEngineSetupStatus();
+            // LocalAI voice availability depends on the selected model and the
+            // explicit voice-cloning rights confirmation. Refresh the shared
+            // catalog so already-open Speaker Properties selectors update now
+            // (only when LocalAI is configured, as on startup, so saving other
+            // settings does not raise a LocalAI connection warning).
+            if (typeof loadLocalAITtsCatalog === 'function' && readyEngineIds().has('localai_tts')) {
+                await loadLocalAITtsCatalog(true);
+            }
         } else {
-            alert('Error saving settings: ' + data.error);
+            settingsNotify('Error saving settings: ' + data.error, 'error');
         }
     } catch (error) {
         console.error('Error saving settings:', error);
-        alert('Failed to save settings');
+        settingsNotify('Failed to save settings', 'error');
     } finally {
         saveBtn.disabled = false;
-        saveBtn.textContent = 'Save Settings';
+        saveBtn.textContent = 'Save settings';
     }
 }
 
@@ -3154,11 +3317,11 @@ async function resetSettings() {
         
         if (data.success) {
             applySettings(defaults);
-            alert('Settings reset to defaults');
+            settingsNotify('Settings reset to defaults', 'success');
             loadHealthStatus();
         }
     } catch (error) {
         console.error('Error resetting settings:', error);
-        alert('Failed to reset settings');
+        settingsNotify('Failed to reset settings', 'error');
     }
 }
