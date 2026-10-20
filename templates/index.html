@@ -358,33 +358,55 @@
         </div>
 
         <!-- Library Tab -->
-        <div id="library-tab" class="tab-content screen">
+        <div id="library-tab" class="tab-content screen library-screen">
             <div class="screen-header">
                 <div class="screen-title-group">
                     <h1 class="screen-title">Library</h1>
+                    <button type="button" class="help-icon" data-help-id="audio-library" aria-label="Help: Audio Library">?</button>
+                    <span id="library-subtitle" class="screen-subtitle">Loading…</span>
+                </div>
+                <div class="screen-actions">
+                    <label class="search-box library-search">
+                        <span class="ms" aria-hidden="true">search</span>
+                        <input type="search" id="library-search-input" placeholder="Search titles" aria-label="Search productions" autocomplete="off" spellcheck="false">
+                    </label>
+                    <button type="button" id="refresh-library-btn" class="btn btn-ghost"><span class="ms" aria-hidden="true">refresh</span>Refresh</button>
+                    <button type="button" id="clear-library-btn" class="btn btn-danger">Clear all</button>
                 </div>
             </div>
-            <div class="screen-body">
-            <div class="section">
-                <div class="library-section-header">
-                    <div class="library-section-title">
-                        <h2>Audio Library</h2>
-                        <button type="button" class="help-icon" data-help-id="audio-library" aria-label="Help: Audio Library">?</button>
-                        <span class="library-section-desc">Manage your generated audio files. Play, download, or delete previous generations.</span>
-                    </div>
-                    <div class="button-group library-section-actions">
-                        <button id="refresh-library-btn" class="btn btn-secondary">Refresh Library</button>
-                        <button id="clear-library-btn" class="btn btn-secondary">Clear All</button>
-                    </div>
+            <div class="screen-body library-body">
+                <div id="library-list" class="library-list">
+                    <div id="library-items"></div>
+                    <p id="library-empty" class="library-empty" style="display: none;">
+                        <span class="ms library-empty-icon" aria-hidden="true">library_music</span>
+                        <span class="library-empty-title">No productions yet</span>
+                        <span class="library-empty-text">Finished audio from the Generate screen shows up here.</span>
+                    </p>
                 </div>
-            </div>
 
-            <div id="library-list" class="section">
-                <div id="library-items"></div>
-                <p id="library-empty" style="display: none; text-align: center; color: var(--text-muted); padding: 40px;">
-                    No audio files in library yet. Generate some audio to get started!
-                </p>
-            </div>
+                <!-- Chunk review: one persistent inline panel. library.js moves it under the
+                     chapter row being reviewed and parks it back in this hidden dock. -->
+                <div id="chunk-review-modal-overlay" class="library-review-dock hidden" aria-hidden="true">
+                    <section id="chunk-review-modal" class="library-review hidden" aria-labelledby="chunk-review-modal-title">
+                        <div class="library-review-head">
+                            <h3 id="chunk-review-modal-title" class="library-review-title">Chunk review</h3>
+                            <span id="chunk-review-meta" class="library-review-meta"></span>
+                            <span class="library-review-spacer"></span>
+                            <button type="button" class="btn btn-ghost btn-xs" id="chunk-review-rename-btn" style="display: none;">Rename chapter</button>
+                            <button type="button" class="library-review-playall" id="chunk-review-play-all" aria-label="Play all chunks in order"><span id="chunk-review-play-all-label">Play all in order</span></button>
+                            <button type="button" class="library-review-close" id="chunk-review-modal-close" aria-label="Close chunk review" title="Close chunk review"><span class="ms" aria-hidden="true">close</span></button>
+                        </div>
+                        <div class="library-review-body" id="chunk-review-modal-body">
+                            <div class="chunk-review-loading">Loading chunks…</div>
+                        </div>
+                        <div class="library-review-foot">
+                            <span class="library-review-note">Regenerated chunks are added to the chapter after you recompile.</span>
+                            <span class="library-review-spacer"></span>
+                            <button type="button" class="btn btn-ghost btn-md" id="chunk-review-close-btn">Close</button>
+                            <button type="button" class="btn btn-secondary btn-md library-review-recompile" id="chunk-review-recompile-btn" disabled>Recompile audio</button>
+                        </div>
+                    </section>
+                </div>
             </div>
         </div>
 
@@ -2594,24 +2616,28 @@
 
     <!-- Time Codes Modal -->
     <div class="modal-overlay hidden" id="timecodes-modal-overlay">
-        <div class="modal hidden" id="timecodes-modal" style="max-width: 600px; width: 95%;">
+        <div class="modal hidden library-timecodes-modal" id="timecodes-modal" style="max-width: 600px; width: 95%;">
             <div class="modal-header">
-                <h3 id="timecodes-modal-title">YouTube Time Codes</h3>
-                <button class="modal-close" id="timecodes-modal-close" aria-label="Close">✕</button>
+                <h3 id="timecodes-modal-title">YouTube time codes</h3>
+                <button type="button" class="modal-close" id="timecodes-modal-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
             <div class="modal-body">
                 <div class="timecodes-intro-row">
-                    <label for="timecodes-intro-seconds">Intro length (seconds):</label>
-                    <input type="number" id="timecodes-intro-seconds" value="0" min="0" step="1" style="width:90px;" />
-                    <label for="timecodes-drift-adjust" style="margin-left:12px;">Drift adjust (s/chapter):</label>
-                    <input type="number" id="timecodes-drift-adjust" value="0.07" step="0.01" style="width:80px;" title="Add this many seconds per chapter to compensate for any accumulated drift. Use negative values if timecodes run late." />
-                    <button class="btn btn-primary btn-sm" id="timecodes-calculate-btn">Calculate</button>
+                    <label class="field" for="timecodes-intro-seconds">
+                        <span class="field-label">Intro length</span>
+                        <span class="input-unit"><input type="number" id="timecodes-intro-seconds" value="0" min="0" step="1" /><span>sec</span></span>
+                    </label>
+                    <label class="field" for="timecodes-drift-adjust">
+                        <span class="field-label">Drift adjust</span>
+                        <span class="input-unit"><input type="number" id="timecodes-drift-adjust" value="0.07" step="0.01" title="Add this many seconds per chapter to compensate for any accumulated drift. Use negative values if timecodes run late." /><span>s / chapter</span></span>
+                    </label>
+                    <button type="button" class="btn btn-primary" id="timecodes-calculate-btn">Calculate</button>
                 </div>
-                <p class="timecodes-help-text">Enter the length of your video intro, then click Calculate to generate chapter start times you can paste into your YouTube description. Use Drift adjust to fine-tune if timestamps drift over a long audiobook.</p>
+                <p class="timecodes-help-text">Enter the length of your video intro, then calculate chapter start times you can paste into your YouTube description. Use drift adjust to fine-tune timestamps that drift over a long audiobook.</p>
                 <div id="timecodes-result" class="timecodes-result hidden">
                     <div class="timecodes-result-header">
-                        <span>Chapter Time Codes</span>
-                        <button class="btn btn-secondary btn-sm" id="timecodes-copy-btn">Copy</button>
+                        <span>Chapter time codes</span>
+                        <button type="button" class="btn btn-secondary btn-sm" id="timecodes-copy-btn">Copy</button>
                     </div>
                     <pre id="timecodes-output" class="timecodes-output"></pre>
                 </div>
@@ -2619,7 +2645,7 @@
                 <div id="timecodes-error" class="timecodes-error hidden"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="timecodes-close-btn">Close</button>
+                <button type="button" class="btn btn-secondary" id="timecodes-close-btn">Close</button>
             </div>
         </div>
     </div>
@@ -2704,38 +2730,6 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="section-edit-cancel-btn">Cancel</button>
                 <button class="btn btn-primary" id="section-edit-save-btn">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-overlay hidden" id="chunk-review-modal-overlay">
-        <div class="modal hidden" id="chunk-review-modal" style="max-width: 900px; width: 95%;">
-            <div class="modal-header">
-                <h3 id="chunk-review-modal-title">Review Chunks</h3>
-                <button class="btn btn-secondary btn-xs" id="chunk-review-rename-btn" style="margin-left: 10px;">Rename</button>
-                <button class="modal-close" id="chunk-review-modal-close">&times;</button>
-            </div>
-            <div class="modal-body" id="chunk-review-modal-body">
-                <div class="chunk-review-loading">Loading chunks...</div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="chunk-review-close-btn">Close</button>
-                <button class="btn btn-primary" id="chunk-review-recompile-btn" disabled>Recompile Audio</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-overlay hidden" id="chapter-review-modal-overlay">
-        <div class="modal hidden" id="chapter-review-modal" style="max-width: 900px; width: 95%;">
-            <div class="modal-header">
-                <h3 id="chapter-review-modal-title">Chapter Review</h3>
-                <button class="modal-close" id="chapter-review-modal-close">&times;</button>
-            </div>
-            <div class="modal-body" id="chapter-review-modal-body">
-                <div class="chunk-review-loading">Loading chapter...</div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="chapter-review-close-btn">Close</button>
             </div>
         </div>
     </div>
