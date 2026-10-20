@@ -1,12 +1,12 @@
 # Create Voices with Qwen3, Breeze, or OmniVoice
 
-Voice Creation synthesizes a short voice sample from a written description. An accepted preview can be saved to Voice Prompts and reused as reference audio by compatible cloning engines.
+Voice creation synthesizes a short voice sample from a written description. An accepted preview can be saved to voice prompts and reused as reference audio by compatible cloning engines.
 
-Open [Available Voices](app:voices), expand **Voice Creation**, and choose **Qwen3-TTS**, **Breeze TTS 2**, or **OmniVoice**.
+Open [Voices](app:voices), select the **Voice creation** sub-tab, and choose **Qwen3-TTS**, **Breeze TTS 2**, or **OmniVoice** in the engine switch. **Gemini voice design** in the same row opens the separate Gemini designer for hosted Google voices.
 
 ![Voice Creation panel with engine selection, sample text, instructions, and preview controls](../../../static/help/screenshots/voice-creation.png)
 
-*Describe the intended voice, generate a short preview, and save only an approved result to Voice Prompts.*
+*Describe the intended voice, generate a short preview, and save only an approved result to voice prompts.*
 
 ## Qwen3-TTS and Breeze voice design
 
@@ -21,17 +21,17 @@ Provide:
 
 Use a concrete instruction such as “calm middle-aged narrator, low pitch, measured pace, warm but restrained” rather than subjective terms alone. The Sample Text should resemble the target manuscript and be long enough to reveal rhythm and pronunciation.
 
-Click **Generate Preview**, listen to the entire result, and click **Save to Voice Prompts** only when satisfied. Saving is disabled until a preview exists.
+Click **Generate preview**, listen to the entire result in the Preview player, and click **Save to voice prompts** only when satisfied. Saving is disabled until a preview exists.
 
-Select the design engine before generating. Qwen3 and Breeze use the same voice name, sample text, language, and style-instruction fields, but each model synthesizes its own interpretation. If the selected engine is unavailable, **Generate Preview** and the corresponding speaker generation action are disabled; use **Open Engine Settings** to install it.
+Select the design engine before generating. Qwen3 and Breeze use the same voice name, sample text, language, and style-instruction fields, but each model synthesizes its own interpretation. If the selected engine is unavailable, a notice appears, **Generate preview** and the corresponding speaker generation action are disabled; use **Open engine settings** in the notice to install it.
 
 Breeze currently supports English and Chinese voice design. Its model weights, derivative models, and self-hosted output are subject to the BreezeBlue Research and Non-Commercial License; commercial use requires separate authorization. Review the license shown in Breeze settings before installation.
 
 ## OmniVoice design
 
-Provide a name, optional gender metadata, a short description, and sample text. Build the Voice Instruction with the selectable tags for gender, age, pitch, whisper, and accent. Select at least one instruction tag before generating.
+Provide a name, optional gender metadata, a short description, and sample text. Build the Voice instruction by clicking the tag pills for gender, age, pitch, whisper, and accent (one per group). Select at least one instruction tag before generating.
 
-Click **Generate Preview**, review it, then **Save to Voice Prompts**.
+Click **Generate preview**, review it, then **Save to voice prompts**.
 
 All three engines run in isolated local environments and may download large model files on first setup/use. First preview generation can therefore take much longer than later previews.
 

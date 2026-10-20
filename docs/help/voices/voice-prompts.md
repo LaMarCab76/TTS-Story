@@ -1,6 +1,6 @@
 # Reference Voice Prompts
 
-A voice prompt is a clean audio clip used by a cloning engine to guide voice identity and delivery. TTS-Story manages uploaded files and generated voice-design samples under **Voice Prompts** on [Available Voices](app:voices).
+A voice prompt is a clean audio clip used by a cloning engine to guide voice identity and delivery. TTS-Story manages uploaded files and generated voice-design samples on the **Voice prompts** sub-tab of [Voices](app:voices).
 
 ![Voice Prompts manager with upload, filtering, preview, and library actions](../../../static/help/screenshots/voice-prompts.png)
 
@@ -25,25 +25,25 @@ Dot.TTS works best with the exact spoken transcript. A transcript is required be
 
 ## Upload one clip
 
-1. Expand **Voice Prompts**.
-2. Enter a friendly Voice Name.
-3. choose an audio file.
-4. Enter exactly what is spoken in **Exact Transcript** when the sample may be used with LocalAI or another transcript-aware engine.
-5. Click **Save Voice**.
+1. On the **Voice prompts** sub-tab, click **Add voice**.
+2. Enter a friendly Voice name.
+3. Choose an audio file.
+4. Enter exactly what is spoken in **Exact transcript** when the sample may be used with LocalAI or another transcript-aware engine.
+5. Click **Save voice**.
 
-For bulk import, drag several supported clips into the drop zone or use **Browse Files**. Filenames become friendly names, so rename source files before import if that saves cleanup.
+For bulk import, drag several supported clips onto the drop zone above the table or use **Browse files**. Filenames become friendly names, so rename source files before import if that saves cleanup.
 
 Files are copied into `data/voice_prompts`; the originals are not linked in place.
 
 ## Organize the library
 
-Use search and Source, Gender, and Language filters. Edit metadata to improve filtering or add a missing exact transcript. A **Transcript ready** badge shows which samples can be synchronized to LocalAI; generated voice-design samples are backfilled from their saved preview text when possible. Metadata labels do not alter how the recording sounds.
+Use search and the source, gender, and language filters. Click a column header to sort the table. Edit metadata with the pencil icon to improve filtering or add a missing exact transcript. The **Transcript** column shows **Added** for samples that can be synchronized to LocalAI and **Missing** for samples without one; generated voice-design samples are backfilled from their saved preview text when possible. Metadata labels do not alter how the recording sounds.
 
-For a sample without text, select **Generate Transcript** in its row. You can also select several missing samples and use **Generate Transcripts** in the batch toolbar. TTS-Story runs SenseVoice locally, stores the detected text with the sample, and then marks it transcript-ready. The first request may take longer while the ASR model downloads and loads. Review the generated transcript with **Edit**, especially for names, invented words, acronyms, and noisy recordings.
+For a sample without text, open the row's **More actions** menu and select **Generate transcript**. You can also select several missing samples and use **Generate transcripts** in the selection bar that appears above the table. TTS-Story runs SenseVoice locally, stores the detected text with the sample, and then marks it transcript-ready. The first request may take longer while the ASR model downloads and loads. Review the generated transcript with the edit (pencil) icon, especially for names, invented words, acronyms, and noisy recordings.
 
-Available row and batch actions include preview, edit metadata, export, archive, and delete. Archived voices remain stored and can be restored with **Unarchive**. Deleting removes the managed prompt and can break assignments that still reference its path.
+Each row has a play button, an edit icon, and a **More actions** menu with export, archive, and delete. Selecting rows shows a selection bar with the same actions for several voices at once. Archived voices remain stored in the collapsible **Archived voices** card and can be restored with **Unarchive**. Deleting removes the managed prompt and can break assignments that still reference its path.
 
-**Load External Voices** retrieves the current external GitHub catalog. Previewing requires internet access. Download an external voice to make a local prompt available to compatible engines.
+**Load external voices** retrieves the current external GitHub catalog. Previewing requires internet access. Use an external voice's download icon, or **Download** in its **More actions** menu, to make a local prompt available to compatible engines; previewing alone does not add it to your prompts.
 
 ## Assign a prompt
 

@@ -1261,11 +1261,14 @@ function renderVoiceRows(container, rows, { archived, total = rows.length }) {
         row.dataset.archived = archived ? 'true' : 'false';
 
         const isExternal = entry.source === 'external';
-        const isDownloaded = isExternal ? entry.is_downloaded : true;
+        // `is_downloaded` only means the GitHub sample is cached (previewing caches it too).
+        // Voices actually added to voice prompts are filtered out of the external list, so
+        // every external row still needs its Download action and reads as "External".
+        const hasLocalFile = isExternal ? !!entry.is_downloaded : true;
         const name = entry.name || 'Untitled Voice';
         const genderText = entry.gender ? escapeHtml(entry.gender) : '<span class="voices-dash">—</span>';
         const sourcePill = isExternal
-            ? (isDownloaded ? '<span class="pill pill-green">Downloaded</span>' : '<span class="pill">External</span>')
+            ? `<span class="pill"${hasLocalFile ? ' title="Sample cached locally. Download it to use it as a voice prompt."' : ''}>External</span>`
             : '<span class="pill pill-green">Local</span>';
         let transcriptCell = '<span class="voices-dash">—</span>';
         if (!isExternal) {
@@ -1286,8 +1289,8 @@ function renderVoiceRows(container, rows, { archived, total = rows.length }) {
         // Icon-only buttons keep their text label (JS rewrites it: Play/Stop/Loading…,
         // Download/Downloading...); CSS hides the text and draws the icon.
         const secondaryAction = isExternal
-            ? (isDownloaded ? '<span class="voices-row-slot" aria-hidden="true"></span>' : `
-                <button type="button" class="voices-row-icon voices-row-download" data-action="download" data-voice-id="${voicesAttr(entry.short_name)}" title="Download to voice prompts" aria-label="Download ${nameAttr}">Download</button>`)
+            ? `
+                <button type="button" class="voices-row-icon voices-row-download" data-action="download" data-voice-id="${voicesAttr(entry.short_name)}" title="Download to voice prompts" aria-label="Download ${nameAttr}">Download</button>`
             : `<button type="button" class="voices-row-icon voices-row-edit" data-action="edit-meta" title="Edit details" aria-label="Edit ${nameAttr}">Edit</button>`;
 
         row.innerHTML = `
@@ -1311,15 +1314,15 @@ function renderVoiceRows(container, rows, { archived, total = rows.length }) {
                         data-action="preview"
                         data-label-play="Play"
                         data-label-stop="Stop"
-                        title="${isExternal && !isDownloaded ? 'Preview sample' : 'Play'}"
+                        title="${isExternal ? 'Preview sample' : 'Play'}"
                         ${canPreview ? '' : 'disabled data-disabled="true"'}>Play</button>
                     ${secondaryAction}
                     <button type="button" class="voices-row-icon voices-row-more" aria-haspopup="menu" aria-expanded="false" title="More actions" aria-label="More actions for ${nameAttr}">More</button>
                     <div class="st-menu voices-row-menu" role="menu" hidden>
-                        <button type="button" class="st-menu-item" role="menuitem" data-icon="ios_share" data-action="export" ${!isDownloaded ? 'disabled title="Download the voice first"' : ''}>Export</button>
+                        <button type="button" class="st-menu-item" role="menuitem" data-icon="ios_share" data-action="export" ${!hasLocalFile ? 'disabled title="Download the voice first"' : ''}>Export</button>
                         <button type="button" class="st-menu-item" role="menuitem" data-icon="${archived ? 'unarchive' : 'archive'}" data-action="${archiveAction}">${archiveLabel}</button>
                         ${canTranscribe ? '<button type="button" class="st-menu-item" role="menuitem" data-icon="subtitles" data-action="transcribe">Generate transcript</button>' : ''}
-                        ${isExternal && !isDownloaded ? `<button type="button" class="st-menu-item" role="menuitem" data-icon="download" data-action="download" data-voice-id="${voicesAttr(entry.short_name)}">Download</button>` : ''}
+                        ${isExternal ? `<button type="button" class="st-menu-item" role="menuitem" data-icon="download" data-action="download" data-voice-id="${voicesAttr(entry.short_name)}">Download</button>` : ''}
                         <div class="st-menu-sep" role="separator"></div>
                         <button type="button" class="st-menu-item is-danger" role="menuitem" data-icon="delete" data-action="delete">Delete</button>
                     </div>

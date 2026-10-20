@@ -604,12 +604,6 @@
     gap: 4px;
 }
 
-#voices-tab .voices-row-slot {
-    flex: none;
-    width: 28px;
-    height: 28px;
-}
-
 #voices-tab .voices-row-play,
 #voices-tab .voices-row-icon,
 #voices-tab .gemini-play {
@@ -1386,9 +1380,16 @@
     display: none;
 }
 
-/* Native audio players: override the global `audio{margin:20px 0;background:#000}`. */
+#voices-tab .creation-preview audio {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* Native audio players: override the global `audio{margin:20px 0;background:#000}`.
+   Never let a player flex-shrink to 0px inside a column panel; only the
+   creation preview row lets it grow horizontally. */
 #voices-tab audio {
-    flex: 1;
+    flex: none;
     width: 100%;
     max-width: 520px;
     height: 36px;
@@ -1474,8 +1475,11 @@
 }
 
 #voices-tab #gemini-voices-manager-player {
+    flex: none;
     width: 100%;
     max-width: 420px;
+    height: 36px;
+    min-height: 36px;
     margin: 0;
 }
 
