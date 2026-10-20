@@ -331,29 +331,23 @@
         </div>
 
         <!-- Job Queue Tab -->
-        <div id="queue-tab" class="tab-content screen">
-            <div class="screen-header">
+        <div id="queue-tab" class="tab-content screen queue-screen">
+            <div class="screen-header queue-header">
                 <div class="screen-title-group">
                     <h1 class="screen-title">Job Queue</h1>
+                    <button type="button" class="help-icon" data-help-id="job-queue" aria-label="Help: Job Queue">?</button>
+                    <span id="queue-summary" class="screen-subtitle" aria-live="polite">Loading…</span>
+                </div>
+                <div class="screen-actions">
+                    <button type="button" id="refresh-queue-btn" class="btn btn-ghost"><span class="ms" aria-hidden="true">refresh</span>Refresh</button>
+                    <button type="button" id="clear-queue-btn" class="btn btn-danger">Clear queue</button>
                 </div>
             </div>
-            <div class="screen-body">
-            <div class="queue-header">
-                <div>
-                    <div class="section-title-inline">
-                        <h2>Job Queue</h2>
-                        <button type="button" class="help-icon" data-help-id="job-queue" aria-label="Help: Job Queue">?</button>
-                    </div>
-                    <p>Monitor active and pending audio generation jobs.</p>
+            <div class="screen-body queue-body">
+                <div id="queue-list" class="queue-list" aria-busy="true">
+                    <div class="queue-loading">Loading queue…</div>
                 </div>
-                <div style="display:flex;gap:8px;">
-                    <button id="refresh-queue-btn" class="btn btn-secondary">Refresh</button>
-                    <button id="clear-queue-btn" class="btn btn-danger">Clear Queue</button>
-                </div>
-            </div>
-            <div id="queue-list">
-                <p><em>Loading queue...</em></p>
-            </div>
+                <p id="queue-footnote" class="queue-footnote">Jobs keep running if you switch pages. Paused jobs resume from their last checkpoint.</p>
             </div>
         </div>
 
@@ -2450,13 +2444,16 @@
 
     <!-- Job Detail Modal -->
     <div id="job-detail-modal-overlay" class="modal-overlay hidden"></div>
-    <div id="job-detail-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="job-detail-modal-title">
+    <div id="job-detail-modal" class="modal hidden job-detail-modal" role="dialog" aria-modal="true" aria-labelledby="job-detail-modal-title">
         <div class="modal-header">
-            <h3 id="job-detail-modal-title">Job Details</h3>
-            <button type="button" class="modal-close" id="job-detail-modal-close">×</button>
+            <div class="job-detail-modal-heading">
+                <h3 id="job-detail-modal-title">Job details</h3>
+                <span id="job-detail-modal-subtitle" class="job-detail-modal-subtitle"></span>
+            </div>
+            <button type="button" class="modal-close" id="job-detail-modal-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
         </div>
         <div class="modal-body" id="job-detail-modal-body">
-            <div class="chunk-review-loading">Loading job details...</div>
+            <div class="job-detail-loading">Loading job details…</div>
         </div>
         <div class="modal-footer">
             <button type="button" class="btn btn-secondary" id="job-detail-modal-close-btn">Close</button>
