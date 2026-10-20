@@ -104,22 +104,21 @@ function ensureChunkReviewCloseHandlers() {
         recompileBtn.addEventListener('click', recompileLibraryAudio);
         recompileBtn.dataset.recompileBound = 'true';
     }
-    if (!document.body.dataset.chunkReviewEscBound) {
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                const overlay = document.getElementById('chunk-review-modal-overlay');
-                if (overlay && !overlay.classList.contains('hidden')) {
-                    closeChunkReviewModal();
-                }
-            }
-        });
-        document.body.dataset.chunkReviewEscBound = 'true';
+    // The review is an inline panel now: "Play all in order" lives in its static header.
+    const playAllBtn = document.getElementById('chunk-review-play-all');
+    if (playAllBtn && !playAllBtn.dataset.playAllBound) {
+        playAllBtn.addEventListener('click', handleLibraryReviewPlayAll);
+        playAllBtn.dataset.playAllBound = 'true';
     }
 }
 
 async function openChapterReviewModal(jobId, relativePath, fallbackTitle) {
     if (!jobId) return;
     ensureChunkReviewCloseHandlers();
+    if (chunkReviewModalJobId) {
+        // Switching reviews: stop playback/watchers of the previous one first.
+        closeChunkReviewModal();
+    }
     chapterReviewMode = true;
     chunkReviewModalJobId = jobId;
     chunkReviewModalData = null;
@@ -132,8 +131,11 @@ async function openChapterReviewModal(jobId, relativePath, fallbackTitle) {
     const renameBtn = document.getElementById('chunk-review-rename-btn');
     if (overlay) overlay.classList.remove('hidden');
     if (modal) modal.classList.remove('hidden');
-    if (body) body.innerHTML = '<div class="chunk-review-loading">Loading chapter...</div>';
-    if (titleEl) titleEl.textContent = fallbackTitle || 'Chapter Review';
+    if (body) body.innerHTML = '<div class="chunk-review-loading">Loading chapter…</div>';
+    if (titleEl) titleEl.textContent = 'Chunk review';
+    if (renameBtn) renameBtn.style.display = 'none';
+    showLibraryReviewPanel(jobId, relativePath);
+    const requestToken = ++libraryReviewRequestToken;
 
     // Store chapter index for rename functionality
     let chapterIndex = null;
@@ -142,6 +144,7 @@ async function openChapterReviewModal(jobId, relativePath, fallbackTitle) {
     try {
         const response = await fetch(`/api/library/${jobId}/chunks`);
         const data = await response.json();
+        if (requestToken !== libraryReviewRequestToken) return;
         if (!data.success) {
             throw new Error(data.error || 'Failed to load chapter');
         }
@@ -160,12 +163,13 @@ async function openChapterReviewModal(jobId, relativePath, fallbackTitle) {
         const filtered = filterChapterReviewData(data, target);
         chunkReviewModalData = filtered;
         if (titleEl) {
-            titleEl.textContent = currentTitle;
+            titleEl.textContent = 'Chunk review';
+            titleEl.title = currentTitle;
         }
 
         // Wire up rename button
         if (renameBtn && chapterIndex !== null) {
-            renameBtn.style.display = 'inline-block';
+            renameBtn.style.display = 'inline-flex';
             renameBtn.onclick = () => {
                 openChapterRenameModal(jobId, chapterIndex, currentTitle);
             };
@@ -175,6 +179,7 @@ async function openChapterReviewModal(jobId, relativePath, fallbackTitle) {
 
         renderChunkReviewModal(filtered);
     } catch (error) {
+        if (requestToken !== libraryReviewRequestToken) return;
         console.error('Error loading chapter review:', error);
         if (body) body.innerHTML = '<div class="chunk-review-empty">Failed to load chapter.</div>';
         alert(error.message || 'Failed to load chapter review');
@@ -206,6 +211,339 @@ function clearActiveLibraryPlayer(player) {
     }
 }
 
+// ─── Library screen helpers (Estudio redesign) ───────────────────────────────
+// Everything below only touches the DOM from handlers, never at load time.
+
+const LIBRARY_SPEAKER_PALETTE = [
+    '#c4b8a5', '#dd9581', '#94b89e', '#8fb3c9', '#d6b46a',
+    '#b79ac8', '#e0a3b4', '#9fc2b5', '#c9a27e', '#a8b47c'
+];
+// Speaker order of the production under review (first appearance in its chunks).
+let libraryReviewSpeakerOrder = [];
+// Where the inline chunk review panel lives: { jobId, key } (key = chapter relative path or '__full__').
+let libraryReviewAnchor = null;
+// Popover menu currently open: { menu, trigger }.
+let libraryOpenMenu = null;
+// Bumped whenever a review opens or closes, so late responses of a previous review are ignored.
+let libraryReviewRequestToken = 0;
+// Production cards the user expanded; restored after the list re-renders.
+const libraryExpandedJobIds = new Set();
+// Last /api/library payload rendered; identical refreshes keep the current DOM (players, open review).
+let libraryLastListingSignature = '';
+// "More" menu entry that opens the Library actions help article (help.js handles [data-help-id] clicks).
+const LIBRARY_ACTIONS_HELP_MENU_ITEM = '<button type="button" class="st-menu-item" role="menuitem" data-help-id="audio-library-actions"><span class="ms" aria-hidden="true">help</span><span class="library-menu-label">About these actions</span></button>';
+
+function librarySpeakerColor(name, orderedNames) {
+    const shared = typeof window !== 'undefined' && window ? window.studioSpeakerColor : null;
+    if (typeof shared === 'function') return shared(name, orderedNames);
+    const key = String(name == null ? '' : name).trim().toLowerCase();
+    let index = Array.isArray(orderedNames)
+        ? orderedNames.findIndex(entry => String(entry == null ? '' : entry).trim().toLowerCase() === key)
+        : -1;
+    if (index < 0) {
+        let hash = 0;
+        for (let i = 0; i < key.length; i += 1) {
+            hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+        }
+        index = Math.abs(hash);
+    }
+    return LIBRARY_SPEAKER_PALETTE[index % LIBRARY_SPEAKER_PALETTE.length];
+}
+
+function formatLibraryDuration(totalSeconds) {
+    if (totalSeconds === null || totalSeconds === undefined || totalSeconds === '') return '';
+    const value = Number(totalSeconds);
+    if (!Number.isFinite(value) || value < 0) return '';
+    const seconds = Math.round(value);
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const rest = seconds % 60;
+    return hours
+        ? `${hours}:${String(minutes).padStart(2, '0')}:${String(rest).padStart(2, '0')}`
+        : `${minutes}:${String(rest).padStart(2, '0')}`;
+}
+
+function libraryBulkRegenLabel(count) {
+    return count ? `Regenerate ${count} speaker${count === 1 ? '' : 's'}` : 'Regenerate selected';
+}
+
+function playLibraryAudioElement(player, onFailure) {
+    const attempt = player.play();
+    if (attempt && typeof attempt.catch === 'function') {
+        attempt.catch(error => {
+            if (error && error.name === 'AbortError') return;
+            console.warn('Library playback failed:', error);
+            if (typeof showNotification === 'function') {
+                showNotification('This audio file could not be played.', 'error');
+            }
+            if (typeof onFailure === 'function') onFailure();
+        });
+    }
+}
+
+function downloadLibraryFile(jobId, relativePath, downloadName = '') {
+    if (!relativePath) {
+        downloadLibraryAudio(jobId);
+        return;
+    }
+    const query = [`file=${encodeURIComponent(relativePath)}`];
+    if (downloadName) query.push(`download_name=${encodeURIComponent(downloadName)}`);
+    window.location.href = `/api/download/${jobId}?${query.join('&')}`;
+}
+
+async function renameLibraryCollectionTitle(jobId, titleEl) {
+    const nextTitle = prompt('Production title', titleEl?.textContent || '');
+    if (!nextTitle || !nextTitle.trim()) return;
+    try {
+        const response = await fetch(`/api/library/${jobId}/title`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: nextTitle })
+        });
+        const data = await response.json();
+        if (!data.success) {
+            alert(`Failed to update title: ${data.error}`);
+            return;
+        }
+        if (titleEl) titleEl.textContent = data.title;
+    } catch (error) {
+        console.error('Error updating collection title:', error);
+        alert('Failed to update title');
+    }
+}
+
+// Popover menus (Download ▾, more, chapter row). Rendered fixed on <body> so card edges never clip them.
+function closeLibraryMenu({ restoreFocus = false } = {}) {
+    if (!libraryOpenMenu) return;
+    const { menu, trigger } = libraryOpenMenu;
+    libraryOpenMenu = null;
+    menu.remove();
+    if (trigger) {
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.classList.remove('is-open');
+        if (restoreFocus && typeof trigger.focus === 'function') trigger.focus();
+    }
+}
+
+function openLibraryMenu(trigger, entries, { align = 'end' } = {}) {
+    if (!trigger) return;
+    if (libraryOpenMenu && libraryOpenMenu.trigger === trigger) {
+        closeLibraryMenu();
+        return;
+    }
+    closeLibraryMenu();
+    const menu = document.createElement('div');
+    menu.className = 'st-menu library-menu';
+    menu.setAttribute('role', 'menu');
+    entries.filter(Boolean).forEach(entry => {
+        if (entry === 'separator') {
+            const separator = document.createElement('div');
+            separator.className = 'st-menu-sep';
+            separator.setAttribute('role', 'separator');
+            menu.appendChild(separator);
+            return;
+        }
+        if (entry.markup) {
+            const holder = document.createElement('div');
+            holder.innerHTML = entry.markup;
+            const item = holder.firstElementChild;
+            if (!item) return;
+            item.addEventListener('click', () => closeLibraryMenu());
+            menu.appendChild(item);
+            return;
+        }
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `st-menu-item${entry.danger ? ' is-danger' : ''}`;
+        button.setAttribute('role', 'menuitem');
+        if (entry.icon) {
+            const icon = document.createElement('span');
+            icon.className = 'ms';
+            icon.setAttribute('aria-hidden', 'true');
+            icon.textContent = entry.icon;
+            button.appendChild(icon);
+        }
+        const label = document.createElement('span');
+        label.className = 'library-menu-label';
+        label.textContent = entry.label;
+        button.appendChild(label);
+        if (entry.hint) {
+            const hint = document.createElement('span');
+            hint.className = 'library-menu-hint';
+            hint.textContent = entry.hint;
+            button.appendChild(hint);
+        }
+        button.addEventListener('click', (event) => {
+            closeLibraryMenu();
+            if (typeof entry.onClick === 'function') {
+                event.stopPropagation();
+                entry.onClick();
+            }
+        });
+        menu.appendChild(button);
+    });
+    document.body.appendChild(menu);
+    const rect = trigger.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const height = menu.offsetHeight;
+    let left = align === 'start' ? rect.left : rect.right - width;
+    left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    let top = rect.bottom + 6;
+    if (top + height > window.innerHeight - 8 && rect.top - height - 6 > 8) {
+        top = rect.top - height - 6;
+    }
+    menu.style.left = `${Math.round(left)}px`;
+    menu.style.top = `${Math.round(top)}px`;
+    trigger.setAttribute('aria-expanded', 'true');
+    trigger.classList.add('is-open');
+    libraryOpenMenu = { menu, trigger };
+    menu.querySelector('.st-menu-item')?.focus({ preventScroll: true });
+}
+
+function handleLibraryMenuKeydown(event) {
+    if (!libraryOpenMenu) return;
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        closeLibraryMenu({ restoreFocus: true });
+        return;
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+    const items = Array.from(libraryOpenMenu.menu.querySelectorAll('.st-menu-item:not(:disabled)'));
+    if (!items.length) return;
+    event.preventDefault();
+    const current = items.indexOf(document.activeElement);
+    const step = event.key === 'ArrowDown' ? 1 : -1;
+    items[(current + step + items.length) % items.length].focus();
+}
+
+// Inline chunk review panel: one persistent node (#chunk-review-modal) that is parked in its hidden
+// dock and moved under the chapter row being reviewed. It survives Library re-renders.
+function parkLibraryReviewPanel() {
+    const host = document.getElementById('chunk-review-modal');
+    const dock = document.getElementById('chunk-review-modal-overlay');
+    if (host && dock && host.parentElement !== dock) {
+        dock.appendChild(host);
+    }
+}
+
+function isLibraryReviewOpenFor(jobId, key) {
+    const host = document.getElementById('chunk-review-modal');
+    return Boolean(
+        libraryReviewAnchor
+        && libraryReviewAnchor.jobId === jobId
+        && libraryReviewAnchor.key === key
+        && host
+        && !host.classList.contains('hidden')
+    );
+}
+
+function syncLibraryReviewRowButtons() {
+    const container = document.getElementById('library-items');
+    if (!container) return;
+    container.querySelectorAll('.library-chapter').forEach(wrapper => {
+        const card = wrapper.closest('.library-item');
+        const isReviewing = Boolean(
+            libraryReviewAnchor
+            && card
+            && card.dataset.jobId === libraryReviewAnchor.jobId
+            && wrapper.contains(document.getElementById('chunk-review-modal'))
+        );
+        wrapper.classList.toggle('is-reviewing', isReviewing);
+        const button = wrapper.querySelector('.library-chapter-review');
+        if (button) {
+            button.textContent = isReviewing ? 'Hide chunks' : 'Review chunks';
+            button.setAttribute('aria-expanded', String(isReviewing));
+        }
+    });
+}
+
+function attachLibraryReviewPanel({ scroll = false } = {}) {
+    const host = document.getElementById('chunk-review-modal');
+    const container = document.getElementById('library-items');
+    if (!host || !container || !libraryReviewAnchor) {
+        parkLibraryReviewPanel();
+        syncLibraryReviewRowButtons();
+        return false;
+    }
+    const card = Array.from(container.querySelectorAll('.library-item'))
+        .find(element => element.dataset.jobId === libraryReviewAnchor.jobId);
+    if (!card) {
+        // The production is on another page or filtered out; keep the review state and park the panel.
+        parkLibraryReviewPanel();
+        syncLibraryReviewRowButtons();
+        return false;
+    }
+    if (typeof card._librarySetExpanded === 'function') {
+        card._librarySetExpanded(true);
+    }
+    const wrappers = Array.from(card.querySelectorAll('.library-chapter'));
+    const wrapper = wrappers.find(element => element.dataset.reviewKey === libraryReviewAnchor.key)
+        || (libraryReviewAnchor.key === '__full__' ? null : wrappers.find(element => element.dataset.reviewKey === '__full__'));
+    const target = wrapper || card.querySelector('.library-chapters') || card.querySelector('.library-item-details');
+    if (!target) {
+        parkLibraryReviewPanel();
+        syncLibraryReviewRowButtons();
+        return false;
+    }
+    if (host.parentElement !== target) {
+        target.appendChild(host);
+    }
+    syncLibraryReviewRowButtons();
+    if (scroll && typeof host.scrollIntoView === 'function') {
+        host.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+    return true;
+}
+
+function showLibraryReviewPanel(jobId, key) {
+    libraryReviewAnchor = { jobId, key: key || '__full__' };
+    const host = document.getElementById('chunk-review-modal');
+    if (host) host.classList.remove('hidden');
+    const meta = document.getElementById('chunk-review-meta');
+    if (meta) meta.textContent = '';
+    const playAll = document.getElementById('chunk-review-play-all');
+    if (playAll) playAll.disabled = true;
+    attachLibraryReviewPanel({ scroll: true });
+}
+
+function handleLibraryReviewPlayAll() {
+    const body = document.getElementById('chunk-review-modal-body');
+    const playAllButton = document.getElementById('chunk-review-play-all');
+    const playAllLabel = document.getElementById('chunk-review-play-all-label');
+    if (!body || !playAllButton) return;
+    if (chunkSequenceAudio) {
+        stopChunkSequence(true);
+        return;
+    }
+    const cards = Array.from(body.querySelectorAll('.library-chunk-card'));
+    const items = cards.map(card => {
+        const playButton = card.querySelector('.library-chunk-play');
+        return {
+            card,
+            url: playButton?.getAttribute('data-audio-url') || '',
+            index: Number(card.getAttribute('data-idx'))
+        };
+    }).filter(item => item.url);
+    let startIndex = 0;
+    const preferredIndex = chunkSequenceStartIndex ?? chunkSequenceResumeIndex;
+    if (preferredIndex !== null && preferredIndex !== undefined) {
+        const preferredPos = items.findIndex(item => item.index === preferredIndex);
+        if (preferredPos >= 0) {
+            startIndex = preferredPos;
+        } else {
+            const nextPos = items.findIndex(item => item.index > preferredIndex);
+            if (nextPos >= 0) {
+                startIndex = nextPos;
+            }
+        }
+    }
+    chunkSequenceButton = playAllButton;
+    chunkSequenceLabel = playAllLabel || null;
+    startChunkSequence(items, startIndex);
+}
+
+// ─── End Library screen helpers ──────────────────────────────────────────────
+
 // Audio playback state for chunk review modal
 let libraryActiveAudio = null;
 let libraryActivePlayButton = null;
@@ -227,7 +565,7 @@ let previewButton = null;
 // Voice map for looking up lang_code by voice id
 let libraryVoiceMap = new Map();
 
-function setRegenButtonBusy(button, isBusy, label = 'Regenerating...') {
+function setRegenButtonBusy(button, isBusy, label = 'Regenerating…') {
     if (!button) return;
     if (isBusy) {
         if (!button.dataset.originalText) {
@@ -298,17 +636,11 @@ function wireBookToggleEvents() {
         header.addEventListener('click', () => {
             const bookIdx = header.getAttribute('data-book-index');
             const chaptersContainer = document.querySelector(`.book-chapters[data-book-index="${bookIdx}"]`);
-            const toggle = header.querySelector('.book-toggle');
 
             if (chaptersContainer) {
                 const isCollapsed = chaptersContainer.classList.contains('collapsed');
-                if (isCollapsed) {
-                    chaptersContainer.classList.remove('collapsed');
-                    if (toggle) toggle.textContent = '▼';
-                } else {
-                    chaptersContainer.classList.add('collapsed');
-                    if (toggle) toggle.textContent = '▶';
-                }
+                chaptersContainer.classList.toggle('collapsed', !isCollapsed);
+                header.setAttribute('aria-expanded', String(isCollapsed));
             }
         });
     });
@@ -319,15 +651,15 @@ function setLibraryRecompileButtonState(hasActiveRegen, label = '') {
     const button = document.getElementById('chunk-review-recompile-btn');
     if (!button || button.dataset.recompileBusy === 'true') return;
     button.disabled = Boolean(hasActiveRegen);
-    button.textContent = label || (hasActiveRegen ? 'Waiting for regeneration...' : 'Recompile Audio');
+    button.textContent = label || (hasActiveRegen ? 'Waiting for regeneration…' : 'Recompile audio');
 }
 
 function setLibraryBulkActionState(isActive) {
     const button = document.getElementById('chunk-review-rebuild-selected');
     if (!button) return;
-    const hasSelection = Boolean(document.querySelector('.bulk-speaker-checkbox:checked'));
-    button.disabled = Boolean(isActive) || !hasSelection;
-    button.textContent = isActive ? 'Regeneration in progress...' : 'Regen Selected Speakers';
+    const selectedCount = document.querySelectorAll('.bulk-speaker-checkbox:checked').length;
+    button.disabled = Boolean(isActive) || !selectedCount;
+    button.textContent = isActive ? 'Regeneration in progress…' : libraryBulkRegenLabel(selectedCount);
 }
 
 async function requestLibraryReviewRestore(jobId) {
@@ -409,33 +741,49 @@ document.addEventListener('DOMContentLoaded', () => {
     // Refresh button
     const refreshBtn = document.getElementById('refresh-library-btn');
     if (refreshBtn) {
-        refreshBtn.addEventListener('click', loadLibrary);
+        refreshBtn.addEventListener('click', () => loadLibrary({ force: true }));
     }
-    
+
     // Clear all button
     const clearBtn = document.getElementById('clear-library-btn');
     if (clearBtn) {
         clearBtn.addEventListener('click', clearLibrary);
     }
 
-    // Chunk review modal close handlers
-    const modalOverlay = document.getElementById('chunk-review-modal-overlay');
-    const modalCloseBtn = document.getElementById('chunk-review-modal-close');
-    const modalCloseFooterBtn = document.getElementById('chunk-review-close-btn');
-
-    if (modalOverlay) {
-        modalOverlay.addEventListener('click', (e) => {
-            if (e.target === modalOverlay) {
-                closeChunkReviewModal();
+    // Header search (libraryBrowseQuery stays the single source of truth)
+    const searchInput = document.getElementById('library-search-input');
+    if (searchInput) {
+        let searchTimer = null;
+        searchInput.addEventListener('input', () => {
+            libraryBrowseQuery = searchInput.value;
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => displayLibraryItems(libraryBrowseItems), 200);
+        });
+        searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && searchInput.value) {
+                event.preventDefault();
+                searchInput.value = '';
+                libraryBrowseQuery = '';
+                clearTimeout(searchTimer);
+                displayLibraryItems(libraryBrowseItems);
             }
         });
     }
-    if (modalCloseBtn) {
-        modalCloseBtn.addEventListener('click', closeChunkReviewModal);
-    }
-    if (modalCloseFooterBtn) {
-        modalCloseFooterBtn.addEventListener('click', closeChunkReviewModal);
-    }
+
+    // Popover menus: close on outside click, Escape, scroll and resize.
+    document.addEventListener('click', (event) => {
+        if (!libraryOpenMenu) return;
+        if (libraryOpenMenu.menu.contains(event.target) || libraryOpenMenu.trigger.contains(event.target)) return;
+        closeLibraryMenu();
+    });
+    document.addEventListener('keydown', handleLibraryMenuKeydown);
+    document.addEventListener('scroll', (event) => {
+        if (libraryOpenMenu && !libraryOpenMenu.menu.contains(event.target)) closeLibraryMenu();
+    }, true);
+    window.addEventListener('resize', () => closeLibraryMenu());
+
+    // Chunk review panel buttons (close, recompile, play all)
+    ensureChunkReviewCloseHandlers();
 });
 
 document.addEventListener('library:refresh', () => {
@@ -443,19 +791,39 @@ document.addEventListener('library:refresh', () => {
 });
 
 // Load library items
-async function loadLibrary() {
+async function loadLibrary({ force = false } = {}) {
+    const refreshBtn = document.getElementById('refresh-library-btn');
+    if (refreshBtn) refreshBtn.classList.add('is-loading');
     try {
         const response = await fetch('/api/library');
         const data = await response.json();
-        
+
         if (data.success) {
-            displayLibraryItems(data.items);
+            const items = Array.isArray(data.items) ? data.items : [];
+            if (chunkReviewModalJobId && !items.some(item => item.job_id === chunkReviewModalJobId)) {
+                closeChunkReviewModal();
+            }
+            const signature = JSON.stringify(items);
+            const container = document.getElementById('library-items');
+            if (!force && signature === libraryLastListingSignature && container && container.childElementCount) {
+                // Nothing changed: keep players, expanded cards and the open review as they are.
+                libraryBrowseItems = items;
+                return;
+            }
+            libraryLastListingSignature = signature;
+            displayLibraryItems(items, true);
         } else {
+            const subtitle = document.getElementById('library-subtitle');
+            if (subtitle) subtitle.textContent = 'Library unavailable';
             alert('Error loading library: ' + data.error);
         }
     } catch (error) {
         console.error('Error loading library:', error);
+        const subtitle = document.getElementById('library-subtitle');
+        if (subtitle) subtitle.textContent = 'Library unavailable';
         alert('Failed to load library');
+    } finally {
+        if (refreshBtn) refreshBtn.classList.remove('is-loading');
     }
 }
 
@@ -463,24 +831,37 @@ async function loadLibrary() {
 function formatEngineName(engine) {
     if (!engine) return '';
     const engineMap = {
-        'kokoro': 'Kokoro',
-        'kokoro_replicate': 'Kokoro (Replicate)',
-        'chatterbox_turbo_local': 'Chatterbox',
-        'chatterbox_turbo_replicate': 'Chatterbox (Replicate)',
-        'voxcpm_local': 'VoxCPM 1.5',
-        'pocket_tts': 'Pocket TTS (Clone Voices)',
-        'pocket_tts_preset': 'Pocket TTS (Preset Voices)',
-        'qwen3_custom': 'Qwen3-TTS (Custom Voice)',
-        'qwen3_clone': 'Qwen3-TTS (Voice Clone)',
-        'omnivoice_clone': 'OmniVoice (Voice Clone)',
-        'omnivoice_design': 'OmniVoice (Voice Design)',
-        'dots_tts': 'Dot.TTS (Voice Clone)',
-        'audio8_tts': 'Audio8 TTS (Voice Clone)',
+        'kokoro': 'Kokoro · Local GPU',
+        'kokoro_replicate': 'Kokoro · Replicate',
+        'chatterbox_turbo_local': 'Chatterbox · Local GPU',
+        'chatterbox_turbo_replicate': 'Chatterbox · Replicate',
+        'voxcpm_local': 'VoxCPM 1.5 · Local GPU',
+        'pocket_tts': 'Pocket TTS · Clone Voices',
+        'pocket_tts_preset': 'Pocket TTS · Preset Voices',
+        'qwen3_custom': 'Qwen3-TTS · Custom Voice',
+        'qwen3_clone': 'Qwen3-TTS · Voice Clone',
+        'omnivoice_clone': 'OmniVoice · Voice Clone',
+        'omnivoice_design': 'OmniVoice · Voice Design',
+        'kitten_tts': 'KittenTTS · CPU',
+        'index_tts': 'IndexTTS · Zero-Shot Clone',
+        'dots_tts': 'Dot.TTS · Voice Clone',
+        'audio8_tts': 'Audio8 TTS · Voice Clone',
+        'breeze_tts_2': 'Breeze TTS 2',
+        'breeze_api': 'Breeze API · Hosted',
         'azure_speech': 'Microsoft Azure Speech',
-        'edge_tts': 'Microsoft Edge TTS (Experimental)',
-        'elevenlabs': 'ElevenLabs',
+        'edge_tts': 'Microsoft Edge TTS · Experimental',
+        'elevenlabs': 'ElevenLabs · Cloud',
+        'gemini_tts': 'Gemini 3.8 Flash TTS · Cloud',
+        'gemini_tts_lite': 'Gemini 3.8 Flash-Lite TTS · Cloud',
+        'openai_tts': 'OpenAI-compatible TTS · Cloud',
+        'localai_tts': 'LocalAI TTS · Self-hosted',
     };
-    return engineMap[engine] || engine;
+    const key = String(engine);
+    if (engineMap[key]) return engineMap[key];
+    // LocalAI engines may carry a model suffix (e.g. "localai_tts:kokoro").
+    const base = key.split(/[:@/]/)[0];
+    if (engineMap[base]) return engineMap[base];
+    return key.replace(/[_-]+/g, ' ').replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
 function formatSectionLabel(section, fallbackLabel) {
@@ -496,69 +877,88 @@ function formatSectionLabel(section, fallbackLabel) {
     return fallbackLabel;
 }
 
+// Chapter rows of an expanded production. The "Full story" (or single-file) row carries
+// .chapter-review-all and its data-full-story-* attributes; it reviews the whole production.
 function renderChapterControls(item) {
-    const sections = item.book_mode && item.books?.length ? item.books : item.chapters;
-    if (!sections || sections.length <= 1) {
-        if (!item.has_chunks) return '';
-        // Single-chapter or no chapters but chunk data exists — render just the review button
-        const reviewAllButton = `
-            <button
-                class="btn btn-secondary btn-xs chapter-pill chapter-review-all"
-                type="button"
-                data-review-all="true"
-                data-job-id="${item.job_id}"
-                data-full-story-src="${item.full_story?.output_file || ''}"
-                data-full-story-path="${item.full_story?.relative_path || ''}"
-            >
-                Review Chunks
-            </button>
-        `;
+    const jobIdAttr = libraryEscapeAttr(item.job_id || '');
+    const sections = (item.book_mode && item.books?.length ? item.books : item.chapters) || [];
+    const fallbackLabel = item.book_mode ? 'Book' : 'Chapter';
+    const canReview = Boolean(item.has_chunks);
+    const actions = (label, { more = true } = {}) => `
+        <div class="library-chapter-actions">
+            ${canReview ? `<button type="button" class="btn btn-ghost btn-xs library-chapter-review" aria-expanded="false" title="Review the chunks of ${label}">Review chunks</button>` : ''}
+            <button type="button" class="library-chapter-play" data-label="${label}" aria-label="Play ${label}"></button>
+            <button type="button" class="library-chapter-icon library-chapter-download" aria-label="Download ${label}" title="Download"><span class="ms" aria-hidden="true">download</span></button>
+            ${more
+                ? `<button type="button" class="library-chapter-icon library-chapter-more" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${label}" title="More"><span class="ms" aria-hidden="true">more_horiz</span></button>`
+                : '<span class="library-chapter-icon library-chapter-more-spacer" aria-hidden="true"></span>'}
+        </div>
+    `;
+
+    const loneWholeSection = sections.length === 1
+        && (!item.chapter_mode || /^full story$/i.test(String(sections[0]?.title || '').trim()));
+    if (sections.length === 0 || (sections.length === 1 && (!item.full_story || loneWholeSection))) {
+        // Single output: one row for the whole production.
+        const only = sections[0] || null;
+        const onlyTitle = only ? formatSectionLabel(only, fallbackLabel) : '';
+        const label = libraryEscapeAttr(item.chapter_mode && onlyTitle && onlyTitle !== 'Full Story' ? onlyTitle : 'Single file');
+        const src = item.full_story?.output_file || only?.output_file || item.output_file || '';
+        const path = item.full_story?.relative_path || only?.relative_path || item.relative_path || '';
+        const duration = item.full_story?.duration_seconds ?? only?.duration_seconds ?? item.duration_seconds;
         return `
-            <div class="chapter-controls" data-job-id="${item.job_id}">
-                <div class="chapter-pill-container">
-                    ${reviewAllButton}
+            <div class="library-chapters" data-job-id="${jobIdAttr}">
+                <div class="library-chapter is-full is-single" data-review-key="__full__">
+                    <div class="library-chapter-row chapter-review-all" data-review-all="true" data-job-id="${jobIdAttr}" data-full-story-src="${item.full_story?.output_file || ''}" data-full-story-path="${item.full_story?.relative_path || ''}" data-src="${libraryEscapeAttr(src)}" data-relative-path="${libraryEscapeAttr(path)}">
+                        <span class="library-chapter-num"></span>
+                        <div class="library-chapter-name"><span class="library-chapter-title">${label}</span></div>
+                        <span class="library-chapter-dur">${formatLibraryDuration(duration)}</span>
+                        ${actions(label, { more: false })}
+                    </div>
                 </div>
             </div>
         `;
     }
 
-    const label = item.book_mode ? 'Books' : 'Chapters';
-    const fallbackLabel = item.book_mode ? 'Book' : 'Chapter';
+    const rows = sections.map((section, idx) => {
+        // Labels go into text and attributes (aria-label, title), so escape quotes too.
+        const label = libraryEscapeAttr(formatSectionLabel(section, fallbackLabel));
+        // Only rows that map to metadata["chapters"] can be renamed (the listing sends
+        // position null for book rows and for chapters known only from the review manifest).
+        const position = !item.book_mode && Number.isInteger(section.position) ? section.position : '';
+        return `
+            <div class="library-chapter${section.missing_file ? ' is-missing' : ''}" data-review-key="${libraryEscapeAttr(section.relative_path || `row-${idx}`)}">
+                <div class="library-chapter-row" data-job-id="${jobIdAttr}" data-relative-path="${libraryEscapeAttr(section.relative_path || '')}" data-src="${libraryEscapeAttr(section.output_file || '')}" data-index="${libraryEscapeAttr(section.index ?? (idx + 1))}" data-position="${position}" data-row-index="${idx}">
+                    <span class="library-chapter-num">${String(idx + 1).padStart(2, '0')}</span>
+                    <div class="library-chapter-name">
+                        <span class="library-chapter-title" title="${label}">${label}</span>
+                        ${section.missing_file ? '<span class="pill pill-red">Missing file</span>' : ''}
+                    </div>
+                    <span class="library-chapter-dur">${formatLibraryDuration(section.duration_seconds)}</span>
+                    ${actions(label)}
+                </div>
+            </div>
+        `;
+    }).join('');
 
-    const reviewAllButton = item.has_chunks
-        ? `
-            <button
-                class="btn btn-secondary btn-xs chapter-pill chapter-review-all"
-                type="button"
-                data-review-all="true"
-                data-job-id="${item.job_id}"
-                data-full-story-src="${item.full_story?.output_file || ''}"
-                data-full-story-path="${item.full_story?.relative_path || ''}"
-            >
-                Full Story
-            </button>
-        `
-        : '';
+    const fullStoryRow = item.full_story ? `
+        <div class="library-chapter is-full" data-review-key="__full__">
+            <div class="library-chapter-row chapter-review-all" data-review-all="true" data-job-id="${jobIdAttr}" data-full-story-src="${item.full_story?.output_file || ''}" data-full-story-path="${item.full_story?.relative_path || ''}">
+                <span class="library-chapter-num"></span>
+                <div class="library-chapter-name">
+                    <span class="library-chapter-title">Full story</span>
+                    <span class="library-combined-pill">Combined</span>
+                </div>
+                <span class="library-chapter-dur">${formatLibraryDuration(item.full_story.duration_seconds)}</span>
+                ${actions('Full story', { more: false })}
+            </div>
+        </div>
+    ` : '';
 
     return `
-        <div class="chapter-controls" data-job-id="${item.job_id}">
-            <div class="chapter-controls-header">
-                <strong>${label}</strong>
-            </div>
-            <div class="chapter-pill-container">
-                ${sections.map((section, idx) => `
-                    <button
-                        class="btn btn-secondary btn-xs chapter-pill ${idx === 0 ? 'active' : ''}"
-                        data-job-id="${item.job_id}"
-                        data-relative-path="${section.relative_path}"
-                        data-src="${section.output_file}"
-                        data-index="${(section.index ?? (idx + 1))}"
-                    >
-                        ${formatSectionLabel(section, fallbackLabel)}
-                    </button>
-                `).join('')}
-                ${reviewAllButton}
-            </div>
+        <div class="library-chapters" data-job-id="${jobIdAttr}">
+            ${item.book_mode ? `<div class="library-chapters-head">${sections.length} books</div>` : ''}
+            ${rows}
+            ${fullStoryRow}
         </div>
     `;
 }
@@ -572,6 +972,11 @@ let libraryBrowseItems = [];
 let libraryBrowsePage = 0;
 let libraryBrowseQuery = '';
 
+function formatLibraryBytes(bytes) {
+    const megabytes = (Number(bytes) || 0) / (1024 * 1024);
+    return megabytes >= 1024 ? `${(megabytes / 1024).toFixed(2)} GB` : `${megabytes.toFixed(2)} MB`;
+}
+
 function displayLibraryItems(items, preservePage = false) {
     libraryBrowseItems = items;
     if (!preservePage) libraryBrowsePage = 0;
@@ -583,25 +988,29 @@ function displayLibraryItems(items, preservePage = false) {
     ) : items;
     const pages = Math.max(1, Math.ceil(filtered.length / LIBRARY_PAGE_SIZE));
     libraryBrowsePage = Math.min(libraryBrowsePage, pages - 1);
+    // Header subtitle: "3 productions · 20.62 MB" (or "1 of 3 productions" while searching)
+    const subtitle = document.getElementById('library-subtitle');
+    if (subtitle) {
+        const totalBytes = items.reduce((sum, item) => sum + (Number(item.file_size) || 0), 0);
+        const noun = items.length === 1 ? 'production' : 'productions';
+        const count = query ? `${filtered.length} of ${items.length} ${noun}` : `${items.length} ${noun}`;
+        subtitle.textContent = items.length ? `${count} · ${formatLibraryBytes(totalBytes)}` : count;
+    }
     let navigation = document.getElementById('library-pagination');
     if (!navigation) {
         navigation = document.createElement('div');
         navigation.id = 'library-pagination';
-        navigation.style.cssText = 'display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0';
-        navigation.innerHTML = '<input type="search" aria-label="Search audiobooks" placeholder="Search audiobooks..." style="max-width:360px"><button type="button" class="btn btn-secondary" data-page="previous">Previous</button><span role="status"></span><button type="button" class="btn btn-secondary" data-page="next">Next</button>';
-        document.getElementById('library-items').before(navigation);
-        let searchTimer;
-        navigation.querySelector('input').addEventListener('input', event => {
-            libraryBrowseQuery = event.target.value;
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(() => displayLibraryItems(libraryBrowseItems), 200);
-        });
+        navigation.className = 'library-pagination';
+        navigation.innerHTML = '<button type="button" class="btn btn-ghost btn-sm" data-page="previous"><span class="ms" aria-hidden="true">chevron_left</span>Previous</button><span role="status"></span><button type="button" class="btn btn-ghost btn-sm" data-page="next">Next<span class="ms" aria-hidden="true">chevron_right</span></button>';
+        document.getElementById('library-items').after(navigation);
         navigation.querySelectorAll('button').forEach(button => button.addEventListener('click', () => {
             libraryBrowsePage += button.dataset.page === 'next' ? 1 : -1;
             displayLibraryItems(libraryBrowseItems, true);
+            document.getElementById('library-list')?.scrollIntoView({ block: 'start' });
         }));
     }
-    navigation.querySelector('[role="status"]').textContent = `${filtered.length} audiobooks · Page ${libraryBrowsePage + 1} of ${pages}`;
+    navigation.hidden = pages <= 1;
+    navigation.querySelector('[role="status"]').textContent = `${filtered.length} ${filtered.length === 1 ? 'production' : 'productions'} · Page ${libraryBrowsePage + 1} of ${pages}`;
     navigation.querySelector('[data-page="previous"]').disabled = libraryBrowsePage === 0;
     navigation.querySelector('[data-page="next"]').disabled = libraryBrowsePage >= pages - 1;
     renderLibraryPage(filtered.slice(libraryBrowsePage * LIBRARY_PAGE_SIZE, (libraryBrowsePage + 1) * LIBRARY_PAGE_SIZE));
@@ -610,29 +1019,49 @@ function displayLibraryItems(items, preservePage = false) {
 function renderLibraryPage(items) {
     const container = document.getElementById('library-items');
     const emptyMessage = document.getElementById('library-empty');
+    closeLibraryMenu();
+    // The inline review panel survives re-renders: park it before the cards are replaced.
+    parkLibraryReviewPanel();
     // Explicitly release media resources before replacing the library cards.
     container.querySelectorAll('audio').forEach(player => {
         player.pause();
         player.removeAttribute('src');
         player.load();
     });
-    
+
     if (items.length === 0) {
         container.innerHTML = '';
+        const searching = Boolean(libraryBrowseQuery.trim()) && libraryBrowseItems.length > 0;
+        emptyMessage.classList.toggle('is-search', searching);
+        const emptyTitle = emptyMessage.querySelector('.library-empty-title');
+        const emptyText = emptyMessage.querySelector('.library-empty-text');
+        if (emptyTitle) emptyTitle.textContent = searching ? 'No matching productions' : 'No productions yet';
+        if (emptyText) {
+            emptyText.textContent = searching
+                ? `Nothing in the library matches “${libraryBrowseQuery.trim()}”.`
+                : 'Finished audio from the Generate screen shows up here.';
+        }
         emptyMessage.style.display = 'block';
+        syncLibraryReviewRowButtons();
         return;
     }
-    
+
     emptyMessage.style.display = 'none';
     container.innerHTML = '';
-    
+
     items.forEach(item => {
         const itemCard = document.createElement('div');
         itemCard.className = 'library-item';
-        
+        itemCard.dataset.jobId = item.job_id;
+        const jobIdAttr = libraryEscapeAttr(item.job_id || '');
+
         const createdDate = new Date(item.created_at);
-        const formattedDate = createdDate.toLocaleString();
-        const fileSizeMB = (item.file_size / (1024 * 1024)).toFixed(2);
+        const formattedDate = Number.isNaN(createdDate.getTime())
+            ? ''
+            : createdDate.toLocaleString(undefined, {
+                year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            });
+        const fileSizeMB = formatLibraryBytes(item.file_size);
         const sectionList = item.book_mode && item.books?.length ? item.books : item.chapters;
         const initialChapter = (sectionList && sectionList.length > 0) ? sectionList[0] : null;
         if (initialChapter) {
@@ -650,56 +1079,58 @@ function renderLibraryPage(items) {
 
         const defaultTitle = item.book_mode ? 'Book Collection' : (item.chapter_mode ? 'Chapter Collection' : 'Generated Audio');
         const displayTitle = item.collection_title || defaultTitle;
+        const formatLabel = String(item.format || '').toUpperCase();
+        const metaLine = [engineLabel, formatLabel, fileSizeMB, formattedDate].filter(Boolean).map(escapeHtml).join(' · ');
+        const durationLabel = formatLibraryDuration(item.duration_seconds);
 
-        const hasBooks = item.book_mode && Array.isArray(item.books) && item.books.length > 0;
-        const hasChapters = Array.isArray(item.chapters) && item.chapters.length > 0;
         itemCard.innerHTML = `
-            <div class="library-item-header library-item-summary" data-job-id="${item.job_id}">
-                <button class="library-item-toggle" aria-expanded="false" aria-label="Toggle details">▶</button>
-                <div class="library-item-controls" data-job-id="${item.job_id}" data-full-story-src="${item.full_story ? item.full_story.output_file : ''}" data-full-story-path="${item.full_story ? item.full_story.relative_path : ''}">
-                    <button class="btn btn-secondary btn-xs library-item-control-btn library-item-play" data-job-id="${item.job_id}" aria-label="Play">▶</button>
-                    <button class="btn btn-secondary btn-xs library-item-control-btn library-item-pause" data-job-id="${item.job_id}" aria-label="Pause">⏸</button>
+            <div class="library-item-header library-item-summary" data-job-id="${jobIdAttr}">
+                <div class="library-item-controls" data-job-id="${jobIdAttr}" data-full-story-src="${libraryEscapeAttr(item.full_story ? item.full_story.output_file : '')}" data-full-story-path="${libraryEscapeAttr(item.full_story ? item.full_story.relative_path : '')}">
+                    <button type="button" class="library-item-control-btn library-item-play" data-job-id="${jobIdAttr}" data-state="stopped" aria-label="Play"></button>
                 </div>
                 <div class="library-item-info">
-                    <strong class="library-item-title">${escapeHtml(displayTitle)}</strong>
-                    <button class="btn btn-secondary btn-xs library-title-edit" type="button" title="Edit title">✎</button>
-                    <span class="library-item-date">${formattedDate}</span>
+                    <span class="library-item-title">${escapeHtml(displayTitle)}</span>
+                    <span class="library-item-subline">${metaLine}</span>
                 </div>
-                <div class="library-item-meta">
-                    ${engineLabel ? `<span class="library-item-engine">${engineLabel}</span>` : ''}
-                    <span class="library-item-size">${fileSizeMB} MB</span>
-                    <span class="library-item-format">${item.format.toUpperCase()}</span>
-                    <button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="openLibraryAwr('${item.job_id}')">Alt Words</button>
-                    ${item.timing_metrics ? `<button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="openLibraryMetrics('${item.job_id}', this)">Metrics</button>` : ''}
-                    <button class="btn btn-secondary btn-xs library-item-meta-action timecodes-open-btn" type="button" data-job-id="${item.job_id}" data-title="${escapeHtml(displayTitle)}">Time Codes</button>
-                    <button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="downloadLibraryAudio('${item.job_id}')">Download</button>
-                    ${item.chapter_mode ? `<button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="openM4BDownloadModal('${item.job_id}', '${escapeHtml(displayTitle)}')">Download M4B</button>` : ''}
-                    <button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="openAudiobookMetadataModal('${item.job_id}')">Edit Metadata</button>
-                    <button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="repairLibraryItem('${item.job_id}', this)">Rebuild</button>
-                    ${item.engine === 'breeze_api' ? `<button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="openBreezeProductions('${item.job_id}')">Breeze Voices</button>` : ''}
-                    <button class="btn btn-secondary btn-xs library-item-meta-action" type="button" onclick="deleteLibraryItem('${item.job_id}')">Delete</button>
-                    <button type="button" class="help-icon library-item-meta-action" data-help-id="audio-library-actions" aria-label="Help: Audio Library Actions">?</button>
-                </div>
+                <span class="library-item-duration"${durationLabel ? '' : ' hidden'}>${durationLabel}</span>
+                <button type="button" class="btn btn-secondary btn-md library-item-meta-action library-download-btn" aria-haspopup="menu" aria-expanded="false"><span class="ms" aria-hidden="true">download</span>Download<span class="ms library-download-caret" aria-hidden="true">expand_more</span></button>
+                <button type="button" class="btn btn-ghost btn-md library-item-meta-action library-metadata-btn">Edit metadata</button>
+                <button type="button" class="btn btn-ghost btn-md library-item-meta-action library-rebuild-btn" title="Recompile chapter files and the full story from the chunk files">Rebuild</button>
+                <button type="button" class="btn btn-ghost btn-md btn-icon library-item-meta-action library-more-btn" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" title="Alt words, metrics, time codes, delete"><span class="ms" aria-hidden="true">more_horiz</span></button>
+                <button type="button" class="library-item-toggle" aria-expanded="false" aria-label="Show chapters"></button>
             </div>
-            <div class="library-item-details collapsed" data-job-id="${item.job_id}">
+            <div class="library-item-details collapsed" data-job-id="${jobIdAttr}">
+                <div class="library-item-scrubber">
+                    <span class="library-scrub-time library-scrub-current">0:00</span>
+                    <div class="library-scrub-track" role="slider" tabindex="0" aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div class="library-scrub-fill"></div>
+                    </div>
+                    <span class="library-scrub-time library-scrub-total">${durationLabel || '0:00'}</span>
+                    <button type="button" class="library-scrub-stop" aria-label="Stop" title="Stop" disabled><span class="ms" aria-hidden="true">stop</span></button>
+                </div>
                 <div class="library-item-player">
                     <audio controls preload="none" id="player-${item.job_id}"></audio>
                 </div>
                 ${renderChapterControls(item)}
-                ${renderFullStoryBanner(item)}
             </div>
         `;
-        
+
         if (item.timing_metrics) {
             itemCard.dataset.timingMetrics = JSON.stringify(item.timing_metrics);
         }
 
         container.appendChild(itemCard);
 
+        const jobId = item.job_id;
+        const chapterWrappers = Array.from(itemCard.querySelectorAll('.library-chapter'));
+        const primaryKey = item.full_story || !chapterWrappers.some(wrapper => wrapper.dataset.reviewKey !== '__full__')
+            ? '__full__'
+            : (initialChapter?.relative_path || '');
         const player = itemCard.querySelector(`#player-${item.job_id}`);
         const ensurePlayerSource = () => {
             if (player && !player.getAttribute('src')) {
-                player.src = initialChapter?.output_file || item.output_file;
+                player.src = item.full_story?.output_file || initialChapter?.output_file || item.output_file;
+                player.dataset.selectionKey = primaryKey;
             }
         };
 
@@ -708,49 +1139,86 @@ function renderLibraryPage(items) {
         const toggleBtn = itemCard.querySelector(`.library-item-toggle`);
         const controls = itemCard.querySelector(`.library-item-controls[data-job-id="${item.job_id}"]`);
         const playBtn = itemCard.querySelector(`.library-item-play[data-job-id="${item.job_id}"]`);
-        const pauseBtn = itemCard.querySelector(`.library-item-pause[data-job-id="${item.job_id}"]`);
+        const stopBtn = itemCard.querySelector('.library-scrub-stop');
         const titleEl = itemCard.querySelector('.library-item-title');
-        const editTitleBtn = itemCard.querySelector('.library-title-edit');
+        const scrubCurrent = itemCard.querySelector('.library-scrub-current');
+        const scrubTotal = itemCard.querySelector('.library-scrub-total');
+        const scrubTrack = itemCard.querySelector('.library-scrub-track');
+        const scrubFill = itemCard.querySelector('.library-scrub-fill');
+
+        const setExpanded = (expand) => {
+            if (!details || !toggleBtn) return;
+            const isCollapsed = details.classList.contains('collapsed');
+            if (expand === isCollapsed) {
+                if (expand) ensurePlayerSource();
+                details.classList.toggle('collapsed', !expand);
+            }
+            itemCard.classList.toggle('is-open', expand);
+            toggleBtn.setAttribute('aria-expanded', String(expand));
+            toggleBtn.setAttribute('aria-label', expand ? 'Hide chapters' : 'Show chapters');
+            if (expand) {
+                libraryExpandedJobIds.add(jobId);
+            } else {
+                libraryExpandedJobIds.delete(jobId);
+            }
+        };
+        itemCard._librarySetExpanded = setExpanded;
 
         if (summaryHeader && details && toggleBtn) {
             summaryHeader.addEventListener('click', (event) => {
-                if (event.target.closest('.library-item-controls') || event.target.closest('.library-title-edit') || event.target.closest('.library-item-meta-action')) {
+                if (event.target.closest('.library-item-controls') || event.target.closest('.library-item-meta-action')) {
                     return;
                 }
                 const isCollapsed = details.classList.contains('collapsed');
                 if (isCollapsed) ensurePlayerSource();
-                details.classList.toggle('collapsed');
-                toggleBtn.textContent = isCollapsed ? '▼' : '▶';
-                toggleBtn.setAttribute('aria-expanded', String(isCollapsed));
+                if (!isCollapsed && libraryReviewAnchor && libraryReviewAnchor.jobId === jobId) {
+                    // Collapsing the production also closes its open chunk review.
+                    closeChunkReviewModal();
+                }
+                setExpanded(isCollapsed);
             });
         }
 
-        if (editTitleBtn && titleEl) {
-            editTitleBtn.addEventListener('click', async (event) => {
-                event.stopPropagation();
-                const nextTitle = prompt('Collection title', titleEl.textContent || '');
-                if (!nextTitle) {
-                    return;
-                }
-
-                try {
-                    const response = await fetch(`/api/library/${item.job_id}/title`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title: nextTitle })
-                    });
-                    const data = await response.json();
-                    if (!data.success) {
-                        alert(`Failed to update title: ${data.error}`);
-                        return;
-                    }
-                    titleEl.textContent = data.title;
-                } catch (error) {
-                    console.error('Error updating collection title:', error);
-                    alert('Failed to update title');
+        // Durations we already know, keyed like player.dataset.selectionKey.
+        const knownDurations = { __full__: item.full_story?.duration_seconds ?? item.duration_seconds };
+        (sectionList || []).forEach(section => {
+            if (section?.relative_path) knownDurations[section.relative_path] = section.duration_seconds;
+        });
+        const scrubDuration = () => {
+            if (Number.isFinite(player.duration) && player.duration > 0) return player.duration;
+            const known = Number(knownDurations[player.dataset.selectionKey || primaryKey]);
+            if (Number.isFinite(known) && known > 0) return known;
+            const total = Number(item.duration_seconds);
+            return Number.isFinite(total) && total > 0 ? total : 0;
+        };
+        const updateScrubber = () => {
+            if (!scrubTrack) return;
+            const total = scrubDuration();
+            const current = Math.max(0, Math.min(player.currentTime || 0, total || Infinity));
+            const percent = total > 0 ? Math.min(100, (current / total) * 100) : 0;
+            scrubCurrent.textContent = formatLibraryDuration(Math.floor(current)) || '0:00';
+            scrubTotal.textContent = formatLibraryDuration(total) || '0:00';
+            scrubFill.style.width = `${percent}%`;
+            scrubTrack.setAttribute('aria-valuenow', String(Math.round(percent)));
+            scrubTrack.setAttribute('aria-valuetext', `${scrubCurrent.textContent} of ${scrubTotal.textContent}`);
+        };
+        const chapterRows = Array.from(itemCard.querySelectorAll('.library-chapter-row'));
+        const syncChapterRows = () => {
+            const key = player.dataset.selectionKey || '';
+            const hasSource = Boolean(player.getAttribute('src'));
+            const active = hasSource && !player.paused && !player.ended;
+            chapterRows.forEach(row => {
+                const rowKey = row.closest('.library-chapter')?.dataset.reviewKey || '';
+                const isCurrent = hasSource && rowKey === key && (active || player.currentTime > 0);
+                row.classList.toggle('is-current', isCurrent);
+                const rowPlay = row.querySelector('.library-chapter-play');
+                if (rowPlay) {
+                    const playing = isCurrent && active;
+                    rowPlay.dataset.state = playing ? 'playing' : 'stopped';
+                    rowPlay.setAttribute('aria-label', `${playing ? 'Pause' : 'Play'} ${rowPlay.dataset.label || ''}`.trim());
                 }
             });
-        }
+        };
 
         if (controls && player) {
             const getFullStoryInfo = () => {
@@ -760,21 +1228,17 @@ function renderLibraryPage(items) {
             };
 
             const updateControls = () => {
-                if (!playBtn || !pauseBtn) return;
-
-                const isStopped = (player.currentTime === 0 && player.paused) || player.ended;
-
-                if (isStopped) {
-                    // Fully stopped: show play button, hide pause button
-                    playBtn.textContent = '▶';
-                    playBtn.setAttribute('aria-label', 'Play');
-                    pauseBtn.style.display = 'none';
-                } else {
-                    // Playing or paused (but not stopped): show stop button and pause button
-                    playBtn.textContent = '■';
-                    playBtn.setAttribute('aria-label', 'Stop');
-                    pauseBtn.style.display = 'inline-block';
+                const hasSource = Boolean(player.getAttribute('src'));
+                const isPlaying = hasSource && !player.paused && !player.ended;
+                const isPaused = hasSource && player.paused && !player.ended && player.currentTime > 0;
+                if (playBtn) {
+                    playBtn.dataset.state = isPlaying ? 'playing' : (isPaused ? 'paused' : 'stopped');
+                    playBtn.setAttribute('aria-label', isPlaying ? 'Pause' : (isPaused ? 'Resume' : 'Play'));
                 }
+                if (stopBtn) stopBtn.disabled = !(isPlaying || isPaused);
+                itemCard.classList.toggle('is-playing', isPlaying);
+                syncChapterRows();
+                updateScrubber();
             };
 
             // Initialize button states
@@ -783,13 +1247,15 @@ function renderLibraryPage(items) {
             if (playBtn) {
                 playBtn.addEventListener('click', (event) => {
                     event.stopPropagation();
-                    
-                    // If playing or paused, stop it
-                    if (player.currentTime > 0) {
+
+                    // Pause or resume whatever is loaded
+                    if (player.getAttribute('src') && !player.paused && !player.ended) {
                         player.pause();
-                        player.currentTime = 0;
-                        clearActiveLibraryPlayer(player);
-                        updateControls();
+                        return;
+                    }
+                    if (player.getAttribute('src') && player.currentTime > 0 && !player.ended) {
+                        setActiveLibraryPlayer(player, updateControls);
+                        playLibraryAudioElement(player, updateControls);
                         return;
                     }
 
@@ -800,6 +1266,7 @@ function renderLibraryPage(items) {
                         const separator = fullStorySrc.includes('?') ? '&' : '?';
                         player.src = `${fullStorySrc}${separator}v=${Date.now()}`;
                         player.load();
+                        player.dataset.selectionKey = '__full__';
                         currentChapterSelection[item.job_id] = {
                             output_file: fullStorySrc,
                             relative_path: fullStoryPath,
@@ -807,161 +1274,238 @@ function renderLibraryPage(items) {
                         };
                     }
                     setActiveLibraryPlayer(player, updateControls);
-                    player.play();
+                    playLibraryAudioElement(player, updateControls);
                     updateControls();
                 });
             }
 
-            if (pauseBtn) {
-                pauseBtn.addEventListener('click', (event) => {
+            if (stopBtn) {
+                stopBtn.addEventListener('click', (event) => {
                     event.stopPropagation();
-                    
-                    // Toggle pause/unpause
-                    if (!player.paused) {
-                        player.pause();
-                    } else if (player.currentTime > 0) {
-                        player.play();
-                    }
-                    // Don't call updateControls here - let the play/pause events handle it
+                    player.pause();
+                    player.currentTime = 0;
+                    clearActiveLibraryPlayer(player);
+                    updateControls();
                 });
             }
 
-            player.addEventListener('play', () => {
-                updateControls();
+            ['play', 'pause', 'loadedmetadata', 'durationchange', 'emptied'].forEach(eventName => {
+                player.addEventListener(eventName, updateControls);
             });
-
-            player.addEventListener('pause', () => {
-                updateControls();
-            });
-
+            player.addEventListener('timeupdate', updateScrubber);
             player.addEventListener('ended', () => {
                 clearActiveLibraryPlayer(player);
                 updateControls();
             });
+
+            if (scrubTrack) {
+                const seekTo = (seconds) => {
+                    ensurePlayerSource();
+                    const total = scrubDuration();
+                    if (!total) return;
+                    try {
+                        player.currentTime = Math.max(0, Math.min(total, seconds));
+                    } catch (error) {
+                        console.warn('Unable to seek Library audio:', error);
+                    }
+                    updateControls();
+                };
+                scrubTrack.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const rect = scrubTrack.getBoundingClientRect();
+                    if (!rect.width) return;
+                    const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+                    seekTo(ratio * scrubDuration());
+                });
+                scrubTrack.addEventListener('keydown', (event) => {
+                    const step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[event.key];
+                    if (step !== undefined) {
+                        event.preventDefault();
+                        seekTo((player.currentTime || 0) + step);
+                    } else if (event.key === 'Home') {
+                        event.preventDefault();
+                        seekTo(0);
+                    } else if (event.key === 'End') {
+                        event.preventDefault();
+                        seekTo(scrubDuration() - 1);
+                    }
+                });
+            }
+
+            // Chapter rows: play / review / download / row menu
+            const reviewAllButton = itemCard.querySelector('.chapter-review-all');
+            chapterRows.forEach(row => {
+                const wrapper = row.closest('.library-chapter');
+                const key = wrapper?.dataset.reviewKey || '';
+                const isWholeRow = row === reviewAllButton;
+                const relativePath = row.getAttribute('data-relative-path') || '';
+                const rowTitle = row.querySelector('.library-chapter-title')?.textContent.trim() || '';
+                const section = isWholeRow ? null : (sectionList || []).find(ch => ch.relative_path === relativePath) || null;
+                const rowSelection = () => {
+                    if (isWholeRow) {
+                        const fullStoryPath = reviewAllButton.getAttribute('data-full-story-path');
+                        return fullStoryPath
+                            ? { output_file: reviewAllButton.getAttribute('data-full-story-src'), relative_path: fullStoryPath, title: 'Full Story' }
+                            : { output_file: row.getAttribute('data-src'), relative_path: relativePath, title: rowTitle };
+                    }
+                    const rowIndex = Number(row.getAttribute('data-row-index'));
+                    return {
+                        ...(section || { output_file: row.getAttribute('data-src'), relative_path: relativePath, title: rowTitle }),
+                        chapter_number: Number.isFinite(rowIndex) ? rowIndex + 1 : null,
+                    };
+                };
+
+                row.querySelector('.library-chapter-play')?.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const isCurrent = player.dataset.selectionKey === key && Boolean(player.getAttribute('src'));
+                    if (isCurrent && !player.paused && !player.ended) {
+                        player.pause();
+                        return;
+                    }
+                    if (isCurrent && player.currentTime > 0 && !player.ended) {
+                        setActiveLibraryPlayer(player, updateControls);
+                        playLibraryAudioElement(player, updateControls);
+                        return;
+                    }
+                    const fullStorySrc = isWholeRow ? reviewAllButton.getAttribute('data-full-story-src') : '';
+                    if (fullStorySrc) {
+                        const separator = fullStorySrc.includes('?') ? '&' : '?';
+                        player.src = `${fullStorySrc}${separator}v=${Date.now()}`;
+                    } else {
+                        const src = row.getAttribute('data-src');
+                        if (!src) return;
+                        player.src = src;
+                    }
+                    player.dataset.selectionKey = key;
+                    currentChapterSelection[jobId] = rowSelection();
+                    setActiveLibraryPlayer(player, updateControls);
+                    playLibraryAudioElement(player, updateControls);
+                    updateControls();
+                });
+
+                row.querySelector('.library-chapter-download')?.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    if (isWholeRow) {
+                        if (item.full_story) {
+                            downloadLibraryAudio(jobId);
+                        } else {
+                            downloadLibraryFile(jobId, relativePath);
+                        }
+                        return;
+                    }
+                    currentChapterSelection[jobId] = rowSelection();
+                    downloadLibraryItem(jobId);
+                });
+
+                row.querySelector('.library-chapter-review')?.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    if (isLibraryReviewOpenFor(jobId, key)) {
+                        closeChunkReviewModal();
+                        return;
+                    }
+                    if (isWholeRow) {
+                        restoreToReview(jobId);
+                    } else {
+                        openChapterReviewModal(jobId, relativePath, rowTitle);
+                    }
+                });
+
+                const rowMore = row.querySelector('.library-chapter-more');
+                rowMore?.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    // data-position is the chapter's index in metadata["chapters"] (what the rename
+                    // route addresses). It is empty for book rows and manifest-only chapters, which
+                    // that route cannot rename, so those rows offer no Rename entry.
+                    const positionAttr = row.getAttribute('data-position');
+                    const position = positionAttr === null || positionAttr === '' ? NaN : Number(positionAttr);
+                    openLibraryMenu(rowMore, [
+                        Number.isInteger(position) ? {
+                            icon: 'edit',
+                            label: 'Rename chapter',
+                            onClick: () => openChapterRenameModal(jobId, position, rowTitle)
+                        } : null,
+                        {
+                            icon: 'download',
+                            label: item.book_mode ? 'Download book' : 'Download chapter',
+                            hint: String(section?.format || item.format || '').toUpperCase(),
+                            onClick: () => {
+                                currentChapterSelection[jobId] = rowSelection();
+                                downloadLibraryItem(jobId);
+                            }
+                        },
+                    ]);
+                });
+            });
         }
 
-        // Wire chapter buttons
-        const chapterControls = itemCard.querySelector('.chapter-controls');
-        const chapterButtons = itemCard.querySelectorAll(`.chapter-pill[data-job-id="${item.job_id}"]`);
-        const reviewAllButton = itemCard.querySelector('.chapter-review-all');
-        const menu = ensureChapterActionMenu(chapterControls);
-
-        chapterButtons.forEach(button => {
-            if (button === reviewAllButton) return;
-            button.addEventListener('click', (event) => {
-                event.stopPropagation();
-                const relativePath = button.getAttribute('data-relative-path');
-                const src = button.getAttribute('data-src');
-                const jobId = button.getAttribute('data-job-id');
-                const playerEl = document.getElementById(`player-${jobId}`);
-
-                chapterButtons.forEach(btn => btn.classList.remove('active'));
-                button.classList.add('active');
-
-                if (playerEl && src) {
-                    playerEl.src = src;
-                    playerEl.load();
-                }
-
-                const chapterNumber = Number(button.getAttribute('data-index')) || null;
-                const selectedChapter = (sectionList || []).find(ch => ch.relative_path === relativePath) || {
-                    output_file: src,
-                    relative_path: relativePath,
-                    title: button.textContent.trim(),
-                    index: chapterNumber ? chapterNumber - 1 : null,
-                };
-                currentChapterSelection[jobId] = {
-                    ...selectedChapter,
-                    chapter_number: chapterNumber || (Number.isFinite(selectedChapter.index) ? selectedChapter.index + 1 : null),
-                };
-                const anchorId = relativePath || button.textContent.trim();
-                if (menu && !menu.classList.contains('hidden') && menu.dataset.anchorId === anchorId) {
-                    closeChapterActionMenus(chapterControls);
-                    return;
-                }
-                if (menu) {
-                    menu.dataset.anchorId = anchorId;
-                }
-                showChapterActionMenu({
-                    menu,
-                    button,
-                    container: chapterControls,
-                    items: [
-                        {
-                            label: 'Review Chunks',
-                            onClick: () => openChapterReviewModal(jobId, relativePath, button.textContent.trim())
-                        },
-                        {
-                            label: 'Rename Chapter',
-                            onClick: () => openChapterRenameModal(jobId, (Number(button.getAttribute('data-index')) || 1) - 1, button.textContent.trim())
-                        },
-                        {
-                            label: 'Download Chapter',
-                            onClick: () => downloadLibraryItem(jobId)
-                        }
-                    ]
-                });
-            });
+        // Header actions
+        const downloadBtn = itemCard.querySelector('.library-download-btn');
+        downloadBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const formatHint = String(item.full_story?.format || item.format || '').toUpperCase();
+            const entries = [];
+            if (item.full_story) {
+                entries.push({ icon: 'download', label: 'Full story', hint: formatHint, onClick: () => downloadLibraryAudio(jobId) });
+            } else if (!sectionList || sectionList.length <= 1) {
+                const onlyPath = sectionList?.[0]?.relative_path || item.relative_path || '';
+                entries.push({ icon: 'download', label: 'Audio file', hint: formatHint, onClick: () => downloadLibraryFile(jobId, onlyPath) });
+            }
+            if (sectionList && sectionList.length > 1) {
+                entries.push({ icon: 'folder_zip', label: item.book_mode ? 'All books' : 'All chapters', hint: 'ZIP', onClick: () => downloadChapterZip(jobId) });
+            }
+            if (item.chapter_mode) {
+                entries.push({ icon: 'menu_book', label: 'Audiobook', hint: 'M4B', onClick: () => openM4BDownloadModal(jobId, displayTitle) });
+            }
+            openLibraryMenu(downloadBtn, entries);
         });
 
-        if (reviewAllButton) {
-            reviewAllButton.addEventListener('click', (event) => {
-                event.stopPropagation();
-                const jobId = reviewAllButton.getAttribute('data-job-id');
-                const fullStorySrc = reviewAllButton.getAttribute('data-full-story-src');
-                const fullStoryPath = reviewAllButton.getAttribute('data-full-story-path');
-                const playerEl = document.getElementById(`player-${jobId}`);
-                if (playerEl && fullStorySrc) {
-                    chapterButtons.forEach(btn => btn.classList.remove('active'));
-                    reviewAllButton.classList.add('active');
-                    const separator = fullStorySrc.includes('?') ? '&' : '?';
-                    playerEl.src = `${fullStorySrc}${separator}v=${Date.now()}`;
-                    playerEl.load();
-                    currentChapterSelection[jobId] = {
-                        output_file: fullStorySrc,
-                        relative_path: fullStoryPath,
-                        title: 'Full Story'
-                    };
-                }
-                const anchorId = 'review-all';
-                if (menu && !menu.classList.contains('hidden') && menu.dataset.anchorId === anchorId) {
-                    closeChapterActionMenus(chapterControls);
-                    return;
-                }
-                if (menu) {
-                    menu.dataset.anchorId = anchorId;
-                }
-                const menuItems = [
-                    {
-                        label: 'Review Chunks',
-                        onClick: () => restoreToReview(jobId)
+        itemCard.querySelector('.library-metadata-btn')?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            openAudiobookMetadataModal(jobId);
+        });
+
+        const rebuildBtn = itemCard.querySelector('.library-rebuild-btn');
+        rebuildBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            repairLibraryItem(jobId, rebuildBtn);
+        });
+
+        const moreBtn = itemCard.querySelector('.library-more-btn');
+        moreBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const entries = [
+                { icon: 'edit', label: 'Rename title', onClick: () => renameLibraryCollectionTitle(jobId, titleEl) },
+                item.has_chunks ? {
+                    icon: 'fact_check',
+                    label: 'Review all chunks',
+                    onClick: () => {
+                        if (!isLibraryReviewOpenFor(jobId, '__full__')) restoreToReview(jobId);
                     }
-                ];
-                if (fullStoryPath) {
-                    menuItems.push({
-                        label: 'Download Full Story',
-                        onClick: () => downloadFullStory(jobId, fullStoryPath)
-                    });
-                }
-                showChapterActionMenu({
-                    menu,
-                    button: reviewAllButton,
-                    container: chapterControls,
-                    items: menuItems
-                });
-            });
+                } : null,
+                'separator',
+                { icon: 'spellcheck', label: 'Alt words', onClick: () => openLibraryAwr(jobId) },
+                item.timing_metrics ? { icon: 'monitoring', label: 'Metrics', onClick: () => openLibraryMetrics(jobId, moreBtn) } : null,
+                { icon: 'schedule', label: 'Time codes', onClick: () => openTimeCodesModal(jobId, displayTitle) },
+                item.engine === 'breeze_api' && typeof window.openBreezeProductions === 'function'
+                    ? { icon: 'graphic_eq', label: 'Breeze voices', onClick: () => window.openBreezeProductions(jobId) }
+                    : null,
+                'separator',
+                { markup: LIBRARY_ACTIONS_HELP_MENU_ITEM },
+                { icon: 'delete', label: 'Delete', danger: true, onClick: () => deleteLibraryItem(jobId) },
+            ];
+            openLibraryMenu(moreBtn, entries);
+        });
+
+        if (libraryExpandedJobIds.has(jobId)) {
+            setExpanded(true);
         }
     });
 
-    if (!document.body.dataset.chapterMenuBound) {
-        document.addEventListener('click', (event) => {
-            if (!event.target.closest('.chapter-pill') && !event.target.closest('.chapter-action-menu')) {
-                closeChapterActionMenus();
-            }
-        });
-        document.body.dataset.chapterMenuBound = 'true';
+    if (libraryReviewAnchor) {
+        attachLibraryReviewPanel();
+    } else {
+        syncLibraryReviewRowButtons();
     }
-
 }
 
 // Library Metrics Modal
@@ -986,17 +1530,18 @@ function openLibraryMetrics(jobId, btn) {
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'library-metrics-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9000;display:flex;align-items:center;justify-content:center;';
+        overlay.className = 'library-dialog-overlay';
         overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
         document.body.appendChild(overlay);
     }
     overlay.innerHTML = `
-        <div style="background:var(--bg-card,#1a1d2e);border:1px solid var(--border,rgba(99,102,241,0.2));border-radius:12px;padding:24px;min-width:340px;max-width:560px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.5);">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                <h3 style="margin:0;font-size:1rem;color:var(--accent,#7eb8f7);">Generation Metrics</h3>
-                <button onclick="document.getElementById('library-metrics-overlay').remove()" style="background:none;border:none;color:var(--text-muted,#8892a4);font-size:1.2rem;cursor:pointer;padding:2px 6px;">✕</button>
+        <div class="library-dialog library-metrics-dialog" role="dialog" aria-modal="true" aria-labelledby="library-metrics-title" style="max-width: 560px;">
+            <div class="library-dialog-header">
+                <h2 id="library-metrics-title">Generation metrics</h2>
+                <button type="button" class="modal-close library-metrics-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
-            <div class="job-detail-timing-grid" style="margin-bottom:16px;">
+            <div class="library-dialog-body">
+            <div class="job-detail-timing-grid">
                 <div class="timing-row"><span class="timing-label">Started</span><span class="timing-value">${startedAt}</span></div>
                 <div class="timing-row"><span class="timing-label">Completed</span><span class="timing-value">${completedAt}</span></div>
                 <div class="timing-row timing-highlight"><span class="timing-label">Total Job Time</span><span class="timing-value">${totalTime}</span></div>
@@ -1006,10 +1551,12 @@ function openLibraryMetrics(jobId, btn) {
                 <div class="timing-row"><span class="timing-label">Slowest Chunk</span><span class="timing-value">${maxChunk}</span></div>
             </div>
             ${chart}
+            </div>
         </div>`;
     if (!document.getElementById('library-metrics-overlay')) {
         document.body.appendChild(overlay);
     }
+    overlay.querySelector('.library-metrics-close')?.addEventListener('click', () => overlay.remove());
 
     // Close on Escape
     const escHandler = e => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
@@ -1077,46 +1624,44 @@ function downloadLibraryAudio(jobId) {
 // Open M4B download options modal
 function openM4BDownloadModal(jobId, title) {
     const modal = document.createElement('div');
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.95); display: flex; align-items: center; justify-content: center; z-index: 99999;';
+    modal.className = 'library-dialog-overlay';
     modal.innerHTML = `
-        <div style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
-                <h2 style="margin: 0; font-size: 1.25rem;">Download M4B Audiobook</h2>
-                <button type="button" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); padding: 0; line-height: 1;" class="modal-close">&times;</button>
+        <div class="library-dialog" role="dialog" aria-modal="true" aria-labelledby="m4b-dialog-title" style="max-width: 500px;">
+            <div class="library-dialog-header">
+                <h2 id="m4b-dialog-title">Download M4B audiobook</h2>
+                <button type="button" class="modal-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
-            <div style="padding: 20px; overflow-y: auto;">
-                <p style="margin-top: 0;">Download "${escapeHtml(title)}" as an M4B audiobook with chapter markers.</p>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Bitrate:</label>
-                    <select id="m4b-bitrate" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+            <div class="library-dialog-body">
+                <p class="library-dialog-lead">Download “${escapeHtml(title)}” as an M4B audiobook with chapter markers.</p>
+                <label class="field">
+                    <span class="field-label">Bitrate</span>
+                    <select id="m4b-bitrate">
                         <option value="64">64 kbps (smaller file)</option>
                         <option value="96">96 kbps</option>
                         <option value="128" selected>128 kbps (recommended)</option>
                         <option value="192">192 kbps (higher quality)</option>
                     </select>
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="m4b-acx-compliance" style="cursor: pointer;">
-                        <span id="m4b-acx-label">ACX Compliance (apply audiobook loudness standards)</span>
-                    </label>
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Cover Art (optional):</label>
-                    <input type="file" id="m4b-cover-art" accept="image/*" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                    <small style="display: block; margin-top: 4px; color: var(--text-muted); font-size: 0.85rem;">Recommended: square 3000x3000px PNG or JPG; minimum warning threshold: 1400x1400px.</small>
-                    <div id="m4b-cover-preview" style="display: none; margin-top: 10px; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; gap: 10px; align-items: center;">
-                        <img id="m4b-cover-preview-image" alt="Selected audiobook cover preview" style="width: 84px; height: 84px; object-fit: contain; background: #090d18; border-radius: 4px;">
+                </label>
+                <label class="toggle-row library-dialog-toggle">
+                    <span id="m4b-acx-label">ACX compliance (apply audiobook loudness standards)</span>
+                    <input type="checkbox" id="m4b-acx-compliance" class="switch">
+                </label>
+                <div class="field">
+                    <span class="field-label">Cover art (optional)</span>
+                    <input type="file" id="m4b-cover-art" accept="image/*">
+                    <span class="field-hint">Recommended: square 3000x3000px PNG or JPG; minimum warning threshold: 1400x1400px.</span>
+                    <div id="m4b-cover-preview" class="library-cover-preview" style="display: none;">
+                        <img id="m4b-cover-preview-image" alt="Selected audiobook cover preview">
                         <div>
-                            <div id="m4b-cover-dimensions" style="font-size: 0.9rem; color: var(--text-color);"></div>
-                            <div id="m4b-cover-warning" style="margin-top: 4px; font-size: 0.82rem; color: #f59e0b;"></div>
+                            <div id="m4b-cover-dimensions" class="library-cover-dimensions"></div>
+                            <div id="m4b-cover-warning" class="library-cover-warning"></div>
                         </div>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                    <button type="button" id="m4b-cancel" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); cursor: pointer;">Cancel</button>
-                    <button type="button" id="m4b-download" style="padding: 8px 16px; border-radius: 6px; border: none; background: var(--primary-color); color: white; cursor: pointer;">Download M4B</button>
-                </div>
+            </div>
+            <div class="library-dialog-footer">
+                <button type="button" id="m4b-cancel" class="btn btn-ghost">Cancel</button>
+                <button type="button" id="m4b-download" class="btn btn-primary">Download M4B</button>
             </div>
         </div>
     `;
@@ -1202,7 +1747,7 @@ function openM4BDownloadModal(jobId, title) {
                     acxCheckbox.style.cursor = 'not-allowed';
                     acxCheckbox.style.opacity = '0.5';
                     acxLabel.textContent = 'Already ACX compliant (skipped)';
-                    acxLabel.style.color = '#10b981';
+                    acxLabel.style.color = 'var(--st-green)';
                     acxLabel.style.cursor = 'default';
                 }
             }
@@ -1257,24 +1802,22 @@ function openM4BDownloadModal(jobId, title) {
         const downloadBtn = modal.querySelector('#m4b-download');
         const originalText = downloadBtn.textContent;
         downloadBtn.disabled = true;
-        downloadBtn.textContent = 'Generating...';
-        downloadBtn.style.opacity = '0.6';
-        downloadBtn.style.cursor = 'not-allowed';
+        downloadBtn.textContent = 'Generating…';
 
         // Add progress indicator
         const progressDiv = document.createElement('div');
-        progressDiv.style.cssText = 'margin-top: 12px; padding: 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; border: 1px solid rgba(99, 102, 241, 0.3);';
+        progressDiv.className = 'library-dialog-progress';
         progressDiv.innerHTML = `
-            <div style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 0.85rem; color: var(--text-color);">Generating M4B audiobook...</span>
-                <span id="m4b-progress-percent" style="font-size: 0.85rem; font-weight: 500; color: var(--primary-color);">0%</span>
+            <div class="library-dialog-progress-head">
+                <span>Generating M4B audiobook…</span>
+                <span id="m4b-progress-percent" class="library-dialog-progress-percent">0%</span>
             </div>
-            <div style="width: 100%; height: 8px; background: rgba(99, 102, 241, 0.2); border-radius: 4px; overflow: hidden;">
-                <div id="m4b-progress-bar" style="width: 0%; height: 100%; background: var(--primary-color); transition: width 0.3s ease; border-radius: 4px;"></div>
+            <div class="library-dialog-progress-track">
+                <div id="m4b-progress-bar" class="library-dialog-progress-fill" style="width: 0%;"></div>
             </div>
-            <div id="m4b-progress-status" style="margin-top: 6px; font-size: 0.8rem; color: var(--text-muted);">Initializing...</div>
+            <div id="m4b-progress-status" class="library-dialog-progress-status">Initializing…</div>
         `;
-        downloadBtn.parentNode.insertBefore(progressDiv, downloadBtn.nextSibling);
+        (modal.querySelector('.library-dialog-body') || downloadBtn.parentNode).appendChild(progressDiv);
 
         const progressBar = progressDiv.querySelector('#m4b-progress-bar');
         const progressPercent = progressDiv.querySelector('#m4b-progress-percent');
@@ -1309,7 +1852,7 @@ function openM4BDownloadModal(jobId, title) {
                         return true; // Done
                     } else if (data.status === 'error') {
                         progressStatus.textContent = `Error: ${data.error}`;
-                        progressStatus.style.color = '#ef4444';
+                        progressStatus.style.color = 'var(--st-red)';
                         return false; // Error
                     }
                 }
@@ -1363,8 +1906,6 @@ function openM4BDownloadModal(jobId, title) {
             alert('Error: ' + error.message);
             downloadBtn.disabled = false;
             downloadBtn.textContent = originalText;
-            downloadBtn.style.opacity = '';
-            downloadBtn.style.cursor = '';
             progressDiv.remove();
         }
     });
@@ -1373,27 +1914,29 @@ function openM4BDownloadModal(jobId, title) {
 // Open chapter rename modal
 function openChapterRenameModal(jobId, chapterIndex, currentTitle) {
     const modal = document.createElement('div');
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.95); display: flex; align-items: center; justify-content: center; z-index: 99999;';
+    modal.className = 'library-dialog-overlay';
     modal.innerHTML = `
-        <div style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); max-width: 400px; width: 90%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
-                <h2 style="margin: 0; font-size: 1.25rem;">Rename Chapter</h2>
-                <button type="button" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); padding: 0; line-height: 1;" class="modal-close">&times;</button>
+        <div class="library-dialog" role="dialog" aria-modal="true" aria-labelledby="chapter-rename-title" style="max-width: 420px;">
+            <div class="library-dialog-header">
+                <h2 id="chapter-rename-title">Rename chapter</h2>
+                <button type="button" class="modal-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
-            <div style="padding: 20px; overflow-y: auto;">
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Chapter Title:</label>
-                    <input type="text" id="chapter-title" value="${escapeHtml(currentTitle)}" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                    <button type="button" id="chapter-rename-cancel" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); cursor: pointer;">Cancel</button>
-                    <button type="button" id="chapter-rename-save" style="padding: 8px 16px; border-radius: 6px; border: none; background: var(--primary-color); color: white; cursor: pointer;">Save</button>
-                </div>
+            <div class="library-dialog-body">
+                <label class="field">
+                    <span class="field-label">Chapter title</span>
+                    <input type="text" id="chapter-title">
+                </label>
+            </div>
+            <div class="library-dialog-footer">
+                <button type="button" id="chapter-rename-cancel" class="btn btn-ghost">Cancel</button>
+                <button type="button" id="chapter-rename-save" class="btn btn-primary">Save</button>
             </div>
         </div>
     `;
 
     document.body.appendChild(modal);
+    const titleInput = modal.querySelector('#chapter-title');
+    if (titleInput) titleInput.value = currentTitle || '';
 
     const closeModal = () => {
         modal.remove();
@@ -1463,38 +2006,40 @@ async function openAudiobookMetadataModal(jobId) {
     }
 
     const modal = document.createElement('div');
-    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(15, 23, 42, 0.95); display: flex; align-items: center; justify-content: center; z-index: 99999;';
+    modal.className = 'library-dialog-overlay';
     modal.innerHTML = `
-        <div style="background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; width: 90%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);">
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border-color);">
-                <h2 style="margin: 0; font-size: 1.25rem;">Edit Audiobook Metadata</h2>
-                <button type="button" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); padding: 0; line-height: 1;" class="modal-close">&times;</button>
+        <div class="library-dialog" role="dialog" aria-modal="true" aria-labelledby="metadata-dialog-title" style="max-width: 520px;">
+            <div class="library-dialog-header">
+                <h2 id="metadata-dialog-title">Edit audiobook metadata</h2>
+                <button type="button" class="modal-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
-            <div style="padding: 20px; overflow-y: auto;">
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Title:</label>
-                    <input type="text" id="metadata-title" value="${escapeHtml(existingMetadata.title)}" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
+            <div class="library-dialog-body">
+                <label class="field">
+                    <span class="field-label">Title</span>
+                    <input type="text" id="metadata-title" value="${libraryEscapeAttr(existingMetadata.title)}">
+                </label>
+                <div class="library-dialog-grid">
+                    <label class="field">
+                        <span class="field-label">Author</span>
+                        <input type="text" id="metadata-author" value="${libraryEscapeAttr(existingMetadata.author)}">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Genre</span>
+                        <input type="text" id="metadata-genre" value="${libraryEscapeAttr(existingMetadata.genre)}">
+                    </label>
                 </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Author:</label>
-                    <input type="text" id="metadata-author" value="${escapeHtml(existingMetadata.author)}" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Genre:</label>
-                    <input type="text" id="metadata-genre" value="${escapeHtml(existingMetadata.genre)}" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Year:</label>
-                    <input type="text" id="metadata-year" value="${escapeHtml(existingMetadata.year)}" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color);">
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Description:</label>
-                    <textarea id="metadata-description" rows="3" style="width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); resize: vertical;">${escapeHtml(existingMetadata.description)}</textarea>
-                </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
-                    <button type="button" id="metadata-cancel" style="padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-color); cursor: pointer;">Cancel</button>
-                    <button type="button" id="metadata-save" style="padding: 8px 16px; border-radius: 6px; border: none; background: var(--primary-color); color: white; cursor: pointer;">Save</button>
-                </div>
+                <label class="field library-dialog-year">
+                    <span class="field-label">Year</span>
+                    <input type="text" id="metadata-year" value="${libraryEscapeAttr(existingMetadata.year)}">
+                </label>
+                <label class="field">
+                    <span class="field-label">Description</span>
+                    <textarea id="metadata-description" rows="3">${escapeHtml(existingMetadata.description)}</textarea>
+                </label>
+            </div>
+            <div class="library-dialog-footer">
+                <button type="button" id="metadata-cancel" class="btn btn-ghost">Cancel</button>
+                <button type="button" id="metadata-save" class="btn btn-primary">Save</button>
             </div>
         </div>
     `;
@@ -1657,6 +2202,10 @@ async function repairLibraryItem(jobId, trigger) {
 
 // Open chunk review modal for a library item
 async function restoreToReview(jobId) {
+    if (chunkReviewModalJobId) {
+        // Switching reviews: stop playback/watchers of the previous one first.
+        closeChunkReviewModal();
+    }
     chunkReviewModalJobId = jobId;
     chunkReviewModalData = null;
     libraryChunkVoiceOverrides = {};
@@ -1667,16 +2216,27 @@ async function restoreToReview(jobId) {
     const modal = document.getElementById('chunk-review-modal');
     const body = document.getElementById('chunk-review-modal-body');
     const titleEl = document.getElementById('chunk-review-modal-title');
+    const renameBtn = document.getElementById('chunk-review-rename-btn');
 
     if (overlay) overlay.classList.remove('hidden');
     if (modal) modal.classList.remove('hidden');
-    if (body) body.innerHTML = '<div class="chunk-review-loading">Loading chunks...</div>';
-    if (titleEl) titleEl.textContent = 'Review Chunks';
-    setLibraryRecompileButtonState(true, 'Loading...');
+    if (body) body.innerHTML = '<div class="chunk-review-loading">Loading chunks…</div>';
+    if (titleEl) {
+        titleEl.textContent = 'Chunk review';
+        titleEl.removeAttribute('title');
+    }
+    if (renameBtn) {
+        renameBtn.style.display = 'none';
+        renameBtn.onclick = null;
+    }
+    showLibraryReviewPanel(jobId, '__full__');
+    setLibraryRecompileButtonState(true, 'Loading…');
+    const requestToken = ++libraryReviewRequestToken;
 
     try {
         const response = await fetch(`/api/library/${jobId}/chunks`);
         const data = await response.json();
+        if (requestToken !== libraryReviewRequestToken) return;
 
         if (!response.ok || !data.success) {
             if (body) body.innerHTML = `<div class="chunk-review-error">Error: ${data.error}</div>`;
@@ -1689,6 +2249,7 @@ async function restoreToReview(jobId) {
         try {
             await requestLibraryReviewRestore(jobId);
             const reviewPayload = await fetchLibraryReviewPayload(jobId);
+            if (requestToken !== libraryReviewRequestToken) return;
             syncLibraryChunkRegenState(jobId, reviewPayload);
         } catch (statusError) {
             console.error('Error preparing Library review state:', statusError);
@@ -1696,6 +2257,7 @@ async function restoreToReview(jobId) {
         }
 
     } catch (error) {
+        if (requestToken !== libraryReviewRequestToken) return;
         console.error('Error loading chunks:', error);
         if (body) body.innerHTML = '<div class="chunk-review-error">Failed to load chunk data.</div>';
         setLibraryRecompileButtonState(true, 'Unavailable');
@@ -1728,13 +2290,27 @@ function closeChunkReviewModal() {
     chunkReviewModalData = null;
     libraryChunkVoiceOverrides = {};
     chapterReviewMode = false;
+    stopChunkSequence();
     const recompileBtn = document.getElementById('chunk-review-recompile-btn');
     if (recompileBtn) {
         recompileBtn.dataset.recompileBusy = 'false';
         recompileBtn.disabled = true;
-        recompileBtn.textContent = 'Recompile Audio';
+        recompileBtn.textContent = 'Recompile audio';
     }
-    if (titleEl) titleEl.textContent = 'Review Chunks';
+    if (titleEl) {
+        titleEl.textContent = 'Chunk review';
+        titleEl.removeAttribute('title');
+    }
+    const renameBtn = document.getElementById('chunk-review-rename-btn');
+    if (renameBtn) {
+        renameBtn.style.display = 'none';
+        renameBtn.onclick = null;
+    }
+    // Park the inline panel back in its dock and reset the chapter row buttons.
+    libraryReviewRequestToken += 1;
+    libraryReviewAnchor = null;
+    parkLibraryReviewPanel();
+    syncLibraryReviewRowButtons();
 }
 
 function renderChunkReviewModal(data) {
@@ -1746,9 +2322,22 @@ function renderChunkReviewModal(data) {
     const books = data.books || [];
     const hasChapters = data.has_chapters || false;
     const hasBooks = data.has_books || false;
-    const fullStoryAvailable = data.full_story_available || false;
     const engine = data.engine || 'kokoro';
     const jobId = data.job_id;
+
+    // Header meta + "Play all in order" live in the panel's static header.
+    const metaEl = document.getElementById('chunk-review-meta');
+    const playAllBtn = document.getElementById('chunk-review-play-all');
+    if (metaEl) {
+        const metaParts = [`Original engine: ${formatEngineName(engine)}`];
+        if (hasBooks) metaParts.push(`${books.length} books`);
+        if (hasChapters) metaParts.push(`${chapters.length} chapters`);
+        metaParts.push(`${chunks.length} ${chunks.length === 1 ? 'chunk' : 'chunks'}`);
+        metaEl.textContent = metaParts.join(' · ');
+    }
+    if (playAllBtn) {
+        playAllBtn.disabled = !chunks.some(chunk => chunk.file_url);
+    }
 
     if (chunks.length === 0) {
         body.innerHTML = '<div class="chunk-review-empty">No chunks available.</div>';
@@ -1776,23 +2365,118 @@ function renderChunkReviewModal(data) {
             }
         }
     });
+    // Speaker colors follow the production's speaker order (first appearance).
+    libraryReviewSpeakerOrder = Array.from(speakerMap.keys());
 
     // Build speaker section HTML - accordion layout
     const speakerRows = Array.from(speakerMap.entries()).map(([speaker, info]) => {
         const speakerInstruction = speakerInstructionMap.get(speaker) || '';
         const profile = speakerProfileMap.get(speaker) || {};
+        const speakerAttr = libraryEscapeAttr(speaker);
+        const color = librarySpeakerColor(speaker, libraryReviewSpeakerOrder);
         return `
-        <div class="bulk-speaker-card" data-speaker="${escapeHtml(speaker)}">
-            <div class="bulk-speaker-summary" data-speaker="${escapeHtml(speaker)}">
-                <input type="checkbox" class="bulk-speaker-checkbox" data-speaker="${escapeHtml(speaker)}">
-                <span class="bulk-expand-toggle">▶</span>
-                <span class="bulk-speaker-name">${escapeHtml(speaker)}</span>
-                <span class="bulk-speaker-count">(${info.count} chunks)</span>
-                <span class="bulk-speaker-voice">${escapeHtml(info.voiceLabel)}</span>
+        <div class="bulk-speaker-card" data-speaker="${speakerAttr}" style="--spk-color: ${color};">
+            <div class="bulk-speaker-summary" data-speaker="${speakerAttr}" aria-expanded="false" title="Show voice, effects and profile for ${speakerAttr}">
+                <input type="checkbox" class="bulk-speaker-checkbox" data-speaker="${speakerAttr}" aria-label="Select ${speakerAttr} to regenerate">
+                <span class="bulk-speaker-dot" aria-hidden="true"></span>
+                <span class="bulk-speaker-who"><span class="bulk-speaker-name">${speakerAttr}</span> <span class="bulk-speaker-count">· ${info.count} ${info.count === 1 ? 'chunk' : 'chunks'}</span></span>
+                <span class="bulk-speaker-voice" data-current-voice="${libraryEscapeAttr(info.voiceLabel)}">${escapeHtml(info.voiceLabel)}</span>
+                <button type="button" class="bulk-expand-toggle" aria-label="Voice, effects and profile for ${speakerAttr}"></button>
             </div>
-            <div class="bulk-speaker-details collapsed" data-speaker="${escapeHtml(speaker)}">
+            <div class="bulk-speaker-details collapsed" data-speaker="${speakerAttr}">
+                <div class="bulk-speaker-controls">
+                    <div class="bulk-regen-section">
+                        <div class="bulk-regen-title">Regenerate with a new voice</div>
+                        <div class="bulk-regen-row">
+                            <div class="bulk-regen-field">
+                                <label>TTS engine</label>
+                                <select class="bulk-speaker-engine-select" data-speaker="${speakerAttr}">
+                                    <option value="">-- Same engine --</option>
+                                </select>
+                            </div>
+                            <div class="bulk-regen-field">
+                                <label>Voice</label>
+                                <div class="bulk-voice-pick">
+                                    <select class="bulk-speaker-voice-select" data-speaker="${speakerAttr}">
+                                        <option value="">-- Select voice --</option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-ghost bulk-speaker-preview" disabled>Play</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bulk-prompt-filters" data-speaker="${speakerAttr}" style="display: none;">
+                            <div class="bulk-regen-row">
+                                <div class="bulk-regen-field">
+                                    <label>Gender</label>
+                                    <select class="bulk-voice-filter-gender" data-speaker="${speakerAttr}">
+                                        <option value="all">All</option>
+                                    </select>
+                                </div>
+                                <div class="bulk-regen-field">
+                                    <label>Language</label>
+                                    <select class="bulk-voice-filter-language" data-speaker="${speakerAttr}">
+                                        <option value="all">All</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bulk-qwen3-options" data-speaker="${speakerAttr}" style="display: none;">
+                            <div class="bulk-regen-row">
+                                <div class="bulk-regen-field">
+                                    <label>Language</label>
+                                    <select class="bulk-qwen3-language" data-speaker="${speakerAttr}">
+                                        <option value="Auto">Auto</option>
+                                    </select>
+                                </div>
+                                <div class="bulk-regen-field bulk-regen-field-wide">
+                                    <label>Custom instruction (optional)</label>
+                                    <input type="text" class="bulk-qwen3-instruct" data-speaker="${speakerAttr}"
+                                           value="${libraryEscapeAttr(speakerInstruction)}"
+                                           placeholder="e.g., Speak with excitement" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bulk-regen-actions">
+                            <span class="bulk-regen-hint">Tick the speaker to enable.</span>
+                            <button type="button" class="btn btn-sm btn-secondary bulk-speaker-regen" data-speaker="${speakerAttr}" disabled>
+                                Regenerate all
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bulk-fx-section">
+                        <div class="bulk-fx-title">Audio effects</div>
+                        <div class="bulk-fx-row">
+                            <div class="bulk-fx-control">
+                                <label>Speed</label>
+                                <input type="range" class="bulk-speed-slider" data-speaker="${speakerAttr}" min="0.5" max="2.0" step="0.01" value="1.0">
+                                <span class="bulk-speed-value">1.0x</span>
+                            </div>
+                            <div class="bulk-fx-control">
+                                <label>Pitch</label>
+                                <input type="range" class="bulk-pitch-slider" data-speaker="${speakerAttr}" min="-6" max="6" step="0.5" value="0">
+                                <span class="bulk-pitch-value">0</span>
+                            </div>
+                        </div>
+                        <div class="bulk-silence-section">
+                            <div class="bulk-silence-row">
+                                <span class="bulk-silence-label">Silence (seconds)</span>
+                                <label>Lead</label>
+                                <input type="number" class="bulk-leading-silence" data-speaker="${speakerAttr}" min="0" max="30" step="0.1" value="0">
+                                <span class="bulk-leading-silence-value">0s</span>
+                                <label>Trail</label>
+                                <input type="number" class="bulk-trailing-silence" data-speaker="${speakerAttr}" min="0" max="30" step="0.1" value="0">
+                                <span class="bulk-trailing-silence-value">0s</span>
+                            </div>
+                        </div>
+                        <div class="bulk-fx-actions">
+                            <button type="button" class="btn btn-sm btn-secondary bulk-speaker-apply-fx" data-speaker="${speakerAttr}" disabled>
+                                Apply FX
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div class="library-speaker-profile">
-                    <h4>Speaker Properties</h4>
+                    <h4>Speaker properties</h4>
                     <label>Character Profile
                         <textarea class="speaker-profile-description" rows="3">${escapeHtml(profile.description || '')}</textarea>
                     </label>
@@ -1803,93 +2487,11 @@ function renderChunkReviewModal(data) {
                         <textarea class="speaker-profile-design" rows="2">${escapeHtml(profile.voice_design_prompt || '')}</textarea>
                     </label>
                     <p>On Breeze generation, Voice Type is placed before each chunk's delivery direction. Profile and Voice Design Prompt are not passage instructions. Older productions may not have saved these properties.</p>
-                    <button class="btn btn-sm btn-primary save-library-speaker-profile" data-speaker="${escapeHtml(speaker)}">Save Speaker Properties</button>
-                    <span class="speaker-profile-save-status" role="status"></span>
+                    <div class="library-speaker-profile-actions">
+                        <button type="button" class="btn btn-sm btn-secondary save-library-speaker-profile" data-speaker="${speakerAttr}">Save Speaker Properties</button>
+                        <span class="speaker-profile-save-status" role="status"></span>
+                    </div>
                     <p>Saved for this production only. Save first, then regenerate affected chunks to hear changes; existing audio and the source project are not changed automatically.</p>
-                </div>
-                <div class="bulk-speaker-controls">
-                    <div class="bulk-fx-section">
-                        <div class="bulk-fx-title">Audio Effects</div>
-                        <div class="bulk-fx-row">
-                            <div class="bulk-fx-control">
-                                <label>Speed</label>
-                                <input type="range" class="bulk-speed-slider" data-speaker="${escapeHtml(speaker)}" min="0.5" max="2.0" step="0.01" value="1.0">
-                                <span class="bulk-speed-value">1.0x</span>
-                            </div>
-                            <div class="bulk-fx-control">
-                                <label>Pitch</label>
-                                <input type="range" class="bulk-pitch-slider" data-speaker="${escapeHtml(speaker)}" min="-6" max="6" step="0.5" value="0">
-                                <span class="bulk-pitch-value">0</span>
-                            </div>
-                            <button class="btn btn-sm btn-primary bulk-speaker-apply-fx" data-speaker="${escapeHtml(speaker)}" disabled>
-                                Apply FX
-                            </button>
-                        </div>
-                    </div>
-                    <div class="bulk-silence-section">
-                        <div class="bulk-silence-row">
-                            <span style="margin-right: 8px; font-size: 0.85em;">Silence:</span>
-                            <label style="font-size: 0.85em;">Lead</label>
-                            <input type="number" class="bulk-leading-silence" data-speaker="${escapeHtml(speaker)}" min="0" max="30" step="0.1" value="0" style="width: 60px;">
-                            <span class="bulk-leading-silence-value" style="font-size: 0.85em; margin-right: 12px;">0s</span>
-                            <label style="font-size: 0.85em;">Trail</label>
-                            <input type="number" class="bulk-trailing-silence" data-speaker="${escapeHtml(speaker)}" min="0" max="30" step="0.1" value="0" style="width: 60px;">
-                            <span class="bulk-trailing-silence-value" style="font-size: 0.85em;">0s</span>
-                        </div>
-                    </div>
-                    <div class="bulk-regen-section">
-                        <div class="bulk-regen-title">Regenerate</div>
-                        <div class="bulk-regen-row">
-                            <div class="bulk-regen-field">
-                                <label>TTS Engine</label>
-                                <select class="bulk-speaker-engine-select" data-speaker="${escapeHtml(speaker)}">
-                                    <option value="">-- Same engine --</option>
-                                </select>
-                            </div>
-                            <div class="bulk-regen-field">
-                                <label>Voice</label>
-                                <select class="bulk-speaker-voice-select" data-speaker="${escapeHtml(speaker)}">
-                                    <option value="">-- Select voice --</option>
-                                </select>
-                                <button type="button" class="btn btn-sm bulk-speaker-preview" disabled>Play</button>
-                            </div>
-                            <button class="btn btn-sm btn-warning bulk-speaker-regen" data-speaker="${escapeHtml(speaker)}" disabled>
-                                Regenerate All
-                            </button>
-                        </div>
-                        <div class="bulk-prompt-filters" data-speaker="${escapeHtml(speaker)}" style="display: none; margin-top: 8px;">
-                            <div class="bulk-regen-row" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <div class="bulk-regen-field">
-                                    <label>Gender</label>
-                                    <select class="bulk-voice-filter-gender" data-speaker="${escapeHtml(speaker)}" style="min-width: 140px;">
-                                        <option value="all">All</option>
-                                    </select>
-                                </div>
-                                <div class="bulk-regen-field">
-                                    <label>Language</label>
-                                    <select class="bulk-voice-filter-language" data-speaker="${escapeHtml(speaker)}" style="min-width: 160px;">
-                                        <option value="all">All</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bulk-qwen3-options" data-speaker="${escapeHtml(speaker)}" style="display: none;">
-                            <div class="bulk-regen-row" style="margin-top: 8px;">
-                                <div class="bulk-regen-field">
-                                    <label>Language</label>
-                                    <select class="bulk-qwen3-language" data-speaker="${escapeHtml(speaker)}">
-                                        <option value="Auto">Auto</option>
-                                    </select>
-                                </div>
-                                <div class="bulk-regen-field" style="flex: 2;">
-                                    <label>Custom Instruction (optional)</label>
-                                    <input type="text" class="bulk-qwen3-instruct" data-speaker="${escapeHtml(speaker)}" 
-                                           value="${escapeHtml(speakerInstruction)}"
-                                           placeholder="e.g., Speak with excitement" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1915,21 +2517,18 @@ function renderChunkReviewModal(data) {
             chapterChunks = chunksByChapter.get(chapterNum) || [];
         }
         const chapterTitle = chapter.title || `Chapter ${chapterIdx + 1}`;
-        const chunkRows = chapterChunks.map(({ chunk, idx }) => 
+        const chunkRows = chapterChunks.map(({ chunk, idx }) =>
             renderLibraryChunkRow(jobId, chunk, engine, idx)
         ).join('');
 
         return `
             <div class="chapter-section" data-chapter-index="${chapterIdx}">
-                <div class="chapter-header" data-chapter-index="${chapterIdx}">
-                    <span class="chapter-toggle">▶</span>
-                    <label class="chapter-select">
-                        <input type="checkbox" class="chapter-rebuild-checkbox" data-chapter-index="${chapterIdx}">
-                    </label>
+                <div class="chapter-header" data-chapter-index="${chapterIdx}" aria-expanded="false">
+                    <button type="button" class="chapter-toggle" aria-label="Show or hide the chunks of ${libraryEscapeAttr(chapterTitle)}"></button>
                     <span class="chapter-title">${escapeHtml(chapterTitle)}</span>
-                    <span class="chapter-chunk-count">${chapterChunks.length} chunks</span>
-                    <button class="btn btn-xs btn-secondary chapter-rebuild-btn" data-chapter-index="${chapterIdx}" type="button">
-                        Rebuild Chapter
+                    <span class="chapter-chunk-count">${chapterChunks.length} ${chapterChunks.length === 1 ? 'chunk' : 'chunks'}</span>
+                    <button class="btn btn-xs btn-ghost chapter-rebuild-btn" data-chapter-index="${chapterIdx}" type="button" title="Rebuild this chapter's audio file from its current chunks">
+                        Rebuild chapter
                     </button>
                 </div>
                 <div class="chapter-chunks collapsed" data-chapter-index="${chapterIdx}">
@@ -1948,16 +2547,16 @@ function renderChunkReviewModal(data) {
             const bookChapters = chapters
                 .filter(ch => (ch.book_index ?? bookIdx) === bookIdx || chapterIndices.has(ch.index))
                 .sort((a, b) => (a.book_order ?? a.index ?? 0) - (b.book_order ?? b.index ?? 0));
-            const chapterBlocks = bookChapters.map((chapter, chapterNum) => 
+            const chapterBlocks = bookChapters.map((chapter, chapterNum) =>
                 buildChapterSection(chapter, chapterNum)
             ).join('');
             const bookTitle = book.title || `Book ${bookIdx + 1}`;
             return `
                 <div class="book-section" data-book-index="${bookIdx}">
-                    <div class="book-header" data-book-index="${bookIdx}">
-                        <span class="book-toggle">▶</span>
+                    <div class="book-header" data-book-index="${bookIdx}" aria-expanded="false">
+                        <button type="button" class="book-toggle" aria-label="Show or hide the chapters of ${libraryEscapeAttr(bookTitle)}"></button>
                         <span class="book-title">${escapeHtml(bookTitle)}</span>
-                        <span class="book-chapter-count">${bookChapters.length} chapters</span>
+                        <span class="book-chapter-count">${bookChapters.length} ${bookChapters.length === 1 ? 'chapter' : 'chapters'}</span>
                     </div>
                     <div class="book-chapters collapsed" data-book-index="${bookIdx}">
                         ${chapterBlocks}
@@ -1971,42 +2570,18 @@ function renderChunkReviewModal(data) {
         chunkContent = chunks.map((chunk, idx) => renderLibraryChunkRow(jobId, chunk, engine, idx)).join('');
     }
 
-    const chapterInfo = hasBooks
-        ? `<span><strong>Books:</strong> ${books.length}</span><span><strong>Chapters:</strong> ${chapters.length}</span>`
-        : (hasChapters ? `<span><strong>Chapters:</strong> ${chapters.length}</span>` : '');
-    const fullStoryControls = '';
     const chapterRebuildControls = chapterReviewMode && data.review_chapter_index !== null
         ? `
-            <button class="btn btn-sm btn-secondary" id="chunk-review-rebuild-chapter" type="button">
-                Rebuild Chapter Audio File
-            </button>
-        `
-        : '';
-    const batchControls = chunks.length
-        ? `
-            <label class="chunk-review-select-all">
-                <input type="checkbox" id="chunk-review-select-all">
-                <span>Select all</span>
-            </label>
-            <button class="btn btn-sm btn-secondary" id="chunk-review-rebuild-selected" type="button" disabled>
-                Regen Selected Speakers
-            </button>
+            <div class="chunk-review-chapter-tools">
+                <span>Rebuild this chapter's audio file from its current chunks, without recompiling the whole production.</span>
+                <button class="btn btn-sm btn-ghost" id="chunk-review-rebuild-chapter" type="button">
+                    Rebuild chapter audio file
+                </button>
+            </div>
         `
         : '';
 
     body.innerHTML = `
-        <div class="chunk-review-header">
-            <div class="chunk-review-meta">
-                <span><strong>Original Engine:</strong> ${formatEngineName(engine)}</span>
-                ${chapterInfo}
-                <span><strong>Chunks:</strong> ${chunks.length}</span>
-            </div>
-            <div class="chunk-review-actions">
-                ${batchControls}
-                ${chapterRebuildControls}
-                ${fullStoryControls}
-            </div>
-        </div>
         <section id="library-regen-progress" class="library-regen-progress" hidden aria-live="polite">
             <div class="library-regen-progress-heading">
                 <strong id="library-regen-progress-title">Regenerating selected speakers</strong>
@@ -2025,29 +2600,30 @@ function renderChunkReviewModal(data) {
             <div id="library-regen-progress-statuses" class="library-regen-progress-statuses"></div>
         </section>
         <div class="bulk-speaker-section">
-            <div class="library-regen-controls" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-                <button type="button" class="btn btn-secondary" data-regen-action="pause">Pause regeneration</button>
-                <button type="button" class="btn btn-secondary" data-regen-action="resume">Resume regeneration</button>
-                <button type="button" class="btn btn-secondary" data-regen-action="cancel">Stop queued regeneration</button>
-                <span id="library-regen-control-status" role="status">Controls affect this production. The current chunk finishes first.</span>
-            </div>
             <div class="bulk-speaker-header">
-                <strong>Bulk Speaker Regeneration</strong>
-                <span class="bulk-speaker-hint">Select speakers and choose a voice to regenerate all their chunks</span>
+                <span class="bulk-speaker-hint">Regenerate every chunk of a speaker with a new voice</span>
+                <label class="chunk-review-select-all">
+                    <input type="checkbox" id="chunk-review-select-all">
+                    <span>Select all</span>
+                </label>
+                <button class="btn btn-sm btn-secondary" id="chunk-review-rebuild-selected" type="button" disabled>
+                    ${libraryBulkRegenLabel(0)}
+                </button>
             </div>
             ${speakerRows}
-        </div>
-        <div class="chunk-review-sequence">
-            <button class="btn btn-sm btn-secondary chunk-review-play-icon" id="chunk-review-play-all" type="button" aria-label="Start audio review">
-                ▶
-            </button>
-            <span class="chunk-review-play-label" id="chunk-review-play-all-label">Start Audio Review</span>
+            <div class="library-regen-controls">
+                <span id="library-regen-control-status" class="library-regen-control-status" role="status">Pause, resume or stop queued regeneration for this production. A chunk that is already rendering finishes first.</span>
+                <button type="button" class="btn btn-ghost btn-xs" data-regen-action="pause">Pause</button>
+                <button type="button" class="btn btn-ghost btn-xs" data-regen-action="resume">Resume</button>
+                <button type="button" class="btn btn-ghost btn-xs" data-regen-action="cancel">Stop queued</button>
+            </div>
         </div>
         <div class="chunk-review-table">
             ${chunkContent}
         </div>
+        ${chapterRebuildControls}
     `;
-    
+
     // Store original engine for reference
     body.dataset.originalEngine = engine;
 
@@ -2106,6 +2682,9 @@ function wireBatchRebuildEvents(jobId, chunks, engine) {
         if (!rebuildSelected) return;
         const selected = checkboxes.filter(box => box.checked);
         rebuildSelected.disabled = selected.length === 0 || Boolean(libraryBulkRegenWatcher);
+        if (!libraryBulkRegenWatcher && rebuildSelected.dataset.busy !== 'true') {
+            rebuildSelected.textContent = libraryBulkRegenLabel(selected.length);
+        }
     };
 
     if (selectAll) {
@@ -2142,6 +2721,10 @@ function wireBatchRebuildEvents(jobId, chunks, engine) {
                 const voiceSelect = card.querySelector('.bulk-speaker-voice-select');
                 if (!voiceSelect || !voiceSelect.value) {
                     missingVoices.push(speaker);
+                    // Open the speaker so its voice picker is visible.
+                    card.querySelector('.bulk-speaker-details')?.classList.remove('collapsed');
+                    card.classList.add('is-open');
+                    card.querySelector('.bulk-speaker-summary')?.setAttribute('aria-expanded', 'true');
                 }
             });
             if (missingVoices.length) {
@@ -2149,9 +2732,9 @@ function wireBatchRebuildEvents(jobId, chunks, engine) {
                 return;
             }
 
-            const originalText = rebuildSelected.textContent;
             rebuildSelected.disabled = true;
-            rebuildSelected.textContent = 'Regenerating...';
+            rebuildSelected.dataset.busy = 'true';
+            rebuildSelected.textContent = 'Regenerating…';
             try {
                 await requestLibraryReviewRestore(jobId);
                 setLibraryRecompileButtonState(true);
@@ -2183,9 +2766,10 @@ function wireBatchRebuildEvents(jobId, chunks, engine) {
                 console.error('Bulk regen selected error:', error);
                 alert(error.message || 'Failed to regenerate selected speakers');
             } finally {
-                rebuildSelected.textContent = libraryBulkRegenWatcher
-                    ? 'Regeneration in progress...'
-                    : originalText;
+                rebuildSelected.dataset.busy = 'false';
+                if (libraryBulkRegenWatcher) {
+                    rebuildSelected.textContent = 'Regeneration in progress…';
+                }
                 updateSelectedState();
             }
         });
@@ -2233,17 +2817,11 @@ function wireChapterToggleEvents() {
         header.addEventListener('click', () => {
             const chapterIdx = header.getAttribute('data-chapter-index');
             const chunksContainer = document.querySelector(`.chapter-chunks[data-chapter-index="${chapterIdx}"]`);
-            const toggle = header.querySelector('.chapter-toggle');
-            
+
             if (chunksContainer) {
                 const isCollapsed = chunksContainer.classList.contains('collapsed');
-                if (isCollapsed) {
-                    chunksContainer.classList.remove('collapsed');
-                    if (toggle) toggle.textContent = '▼';
-                } else {
-                    chunksContainer.classList.add('collapsed');
-                    if (toggle) toggle.textContent = '▶';
-                }
+                chunksContainer.classList.toggle('collapsed', !isCollapsed);
+                header.setAttribute('aria-expanded', String(isCollapsed));
             }
         });
     });
@@ -2270,33 +2848,39 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
         statusBadge = '<span class="review-chip error">Failed</span>';
     }
 
-    // Speaker tag display
-    const speakerTag = speaker ? `<span class="library-chunk-speaker">${escapeHtml(speaker)}</span>` : '';
-    
-    // Truncate text for preview (first 80 chars)
-    const textPreview = text.length > 80 ? text.substring(0, 80) + '...' : text;
+    // Speaker label, colored like the rest of the app (production speaker order)
+    const speakerColor = librarySpeakerColor(speaker || 'default', libraryReviewSpeakerOrder);
+    const speakerTag = `<span class="library-chunk-speaker" title="${libraryEscapeAttr(speaker || 'default')}">${escapeHtml(speaker || 'default')}</span>`;
+    const durationLabel = formatLibraryDuration(chunk.duration_seconds);
 
+    // Full text; CSS clamps it while the row is closed. Status chips sit in their own slot under
+    // the text so the duration and action columns stay aligned across rows.
     return `
-        <div class="library-chunk-card" data-chunk-id="${chunkId}" data-idx="${idx}">
+        <div class="library-chunk-card" data-chunk-id="${chunkId}" data-idx="${idx}" style="--spk-color: ${speakerColor};">
             <div class="library-chunk-summary" data-chunk-id="${chunkId}">
-                <button class="btn btn-xs btn-secondary library-chunk-play" data-audio-url="${audioUrl}" ${audioUrl ? '' : 'disabled'}>
-                    ▶
-                </button>
-                <span class="chunk-expand-toggle">▶</span>
-                ${statusBadge}
+                <button type="button" class="library-chunk-play" data-audio-url="${audioUrl}" aria-label="Play chunk" ${audioUrl ? '' : 'disabled'}>▶</button>
                 ${speakerTag}
-                <span class="library-chunk-preview">${escapeHtml(textPreview)}</span>
+                <div class="library-chunk-main">
+                    <span class="library-chunk-preview">${escapeHtml(text)}</span>
+                    <span class="library-chunk-status">${statusBadge}</span>
+                </div>
+                <span class="library-chunk-duration">${durationLabel}</span>
+                <div class="library-chunk-actions">
+                    <span class="chunk-expand-toggle" aria-hidden="true"></span>
+                    <button type="button" class="btn btn-ghost btn-xs library-chunk-edit" aria-expanded="false">Edit</button>
+                    <button type="button" class="btn btn-ghost btn-xs library-chunk-regen" data-chunk-id="${chunkId}">Regenerate</button>
+                </div>
             </div>
             <div class="library-chunk-details collapsed" data-chunk-id="${chunkId}">
-                <div class="chunk-detail-section">
-                    <div class="chunk-detail-label">Voice: <span class="library-chunk-voice-label">${escapeHtml(voiceLabel)}</span></div>
+                <div class="chunk-detail-section chunk-text-col">
+                    <div class="chunk-detail-label">Voice <span class="library-chunk-voice-label">${escapeHtml(voiceLabel)}</span></div>
                     <div class="chunk-text-section">
-                        <label for="chunk-direction-${escapeHtml(chunkId)}">Voice Direction:</label>
-                        <textarea id="chunk-direction-${escapeHtml(chunkId)}" class="library-chunk-direction" data-chunk-id="${chunkId}" rows="2" placeholder="e.g. Quietly controlled, with restrained tension.">${escapeHtml(getChunkDirection(chunk))}</textarea>
+                        <label for="chunk-direction-${libraryEscapeAttr(chunkId)}">Voice Direction:</label>
+                        <textarea id="chunk-direction-${libraryEscapeAttr(chunkId)}" class="library-chunk-direction" data-chunk-id="${chunkId}" rows="2" placeholder="e.g. Quietly controlled, with restrained tension.">${escapeHtml(getChunkDirection(chunk))}</textarea>
                         <small>Delivery guidance, not spoken text. Used by Breeze and other direction-capable engines. Enter instructions without tags; clear to remove the chunk direction. Saved when Regenerate succeeds.</small>
                         <div class="chunk-index-emotion-control" ${(chunk.engine || engine) === 'index_tts' ? '' : 'hidden'}>
-                            <label for="chunk-emotion-strength-${escapeHtml(chunkId)}">IndexTTS emotion strength:</label>
-                            <input id="chunk-emotion-strength-${escapeHtml(chunkId)}" class="chunk-index-emotion-strength" type="number" min="0" max="1" step="0.05" value="${Number(chunk.index_tts_emotion_strength ?? 0.6)}">
+                            <label for="chunk-emotion-strength-${libraryEscapeAttr(chunkId)}">IndexTTS emotion strength:</label>
+                            <input id="chunk-emotion-strength-${libraryEscapeAttr(chunkId)}" class="chunk-index-emotion-strength" type="number" min="0" max="1" step="0.05" value="${Number(chunk.index_tts_emotion_strength ?? 0.6)}">
                             <small>0 disables emotional guidance; 1 gives stronger emotion. Saved for this chunk when regeneration succeeds. Does not change global settings.</small>
                         </div>
                     </div>
@@ -2305,8 +2889,46 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                         <textarea class="library-chunk-textarea" data-chunk-id="${chunkId}" rows="3">${escapeHtml(text)}</textarea>
                     </div>
                 </div>
+                <div class="chunk-detail-section chunk-regen-section">
+                    <div class="chunk-regen-title">Regenerate with</div>
+                    <div class="chunk-regen-row">
+                        <select class="library-chunk-engine-select" data-chunk-id="${chunkId}" aria-label="TTS engine for this chunk">
+                            <option value="">-- Same engine --</option>
+                        </select>
+                        <select class="library-chunk-voice-select" data-chunk-id="${chunkId}" data-current-voice-label="${libraryEscapeAttr(voiceLabel)}" aria-label="Voice for this chunk">
+                            <option value="">${escapeHtml(currentVoiceLabel)}</option>
+                        </select>
+                    </div>
+                    <div class="chunk-prompt-filters" data-chunk-id="${chunkId}" style="display: none;">
+                        <div class="chunk-prompt-filters-grid">
+                            <label>
+                                <span>Gender</span>
+                                <select class="chunk-voice-filter-gender" data-chunk-id="${chunkId}">
+                                    <option value="all">All</option>
+                                </select>
+                            </label>
+                            <label>
+                                <span>Language</span>
+                                <select class="chunk-voice-filter-language" data-chunk-id="${chunkId}">
+                                    <option value="all">All</option>
+                                </select>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="chunk-qwen3-options" data-chunk-id="${chunkId}" style="display: none;">
+                        <div class="chunk-regen-row">
+                            <select class="chunk-qwen3-language" data-chunk-id="${chunkId}">
+                                <option value="Auto">Auto</option>
+                            </select>
+                            <input type="text" class="chunk-qwen3-instruct" data-chunk-id="${chunkId}" 
+                                   value="${libraryEscapeAttr(instruction)}"
+                                   placeholder="Custom instruction (optional)" />
+                        </div>
+                    </div>
+                    <p class="chunk-regen-note">Use Regenerate in the row above. The new take replaces this chunk; recompile to update the chapter.</p>
+                </div>
                 <div class="chunk-detail-section chunk-fx-section">
-                    <div class="chunk-fx-title">Audio Effects</div>
+                    <div class="chunk-fx-title">Audio effects</div>
                     <div class="chunk-fx-row">
                         <div class="chunk-fx-control">
                             <label>Speed</label>
@@ -2318,63 +2940,21 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                             <input type="range" class="chunk-pitch-slider" data-chunk-id="${chunkId}" min="-6" max="6" step="0.5" value="${(chunk.voice_assignment?.fx?.pitch ?? chunk.fx_applied?.pitch ?? 0).toFixed(1)}">
                             <span class="chunk-pitch-value">${(chunk.voice_assignment?.fx?.pitch ?? chunk.fx_applied?.pitch ?? 0).toFixed(1)}</span>
                         </div>
-                        <button class="btn btn-sm btn-secondary library-chunk-preview-fx" data-chunk-id="${chunkId}" disabled>
-                            ▶ Preview
-                        </button>
-                        <button class="btn btn-sm btn-primary library-chunk-apply-fx" data-chunk-id="${chunkId}" disabled>
-                            Apply FX
-                        </button>
+                    </div>
+                    <div class="chunk-fx-actions">
+                        <button type="button" class="btn btn-sm btn-ghost library-chunk-preview-fx" data-chunk-id="${chunkId}" disabled>Preview</button>
+                        <button type="button" class="btn btn-sm btn-secondary library-chunk-apply-fx" data-chunk-id="${chunkId}" disabled>Apply FX</button>
                     </div>
                 </div>
                 <div class="chunk-detail-section chunk-silence-section">
                     <div class="chunk-silence-row">
-                        <span style="margin-right: 8px; font-size: 0.85em;">Silence:</span>
-                        <label style="font-size: 0.85em;">Lead</label>
-                        <input type="number" class="chunk-leading-silence" data-chunk-id="${chunkId}" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.leading_silence_ms ?? chunk.silence_applied?.leading ?? 0) / 1000).toFixed(1)}" style="width: 60px;">
-                        <span class="chunk-leading-silence-value" style="font-size: 0.85em; margin-right: 12px;">${((chunk.voice_assignment?.leading_silence_ms ?? chunk.silence_applied?.leading ?? 0) / 1000).toFixed(1)}s</span>
-                        <label style="font-size: 0.85em;">Trail</label>
-                        <input type="number" class="chunk-trailing-silence" data-chunk-id="${chunkId}" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.trailing_silence_ms ?? chunk.silence_applied?.trailing ?? 0) / 1000).toFixed(1)}" style="width: 60px;">
-                        <span class="chunk-trailing-silence-value" style="font-size: 0.85em;">${((chunk.voice_assignment?.trailing_silence_ms ?? chunk.silence_applied?.trailing ?? 0) / 1000).toFixed(1)}s</span>
-                    </div>
-                </div>
-                <div class="chunk-detail-section chunk-regen-section">
-                    <div class="chunk-regen-title">Regenerate</div>
-                    <div class="chunk-regen-row">
-                        <select class="library-chunk-engine-select" data-chunk-id="${chunkId}">
-                            <option value="">-- Same engine --</option>
-                        </select>
-                        <select class="library-chunk-voice-select" data-chunk-id="${chunkId}" data-current-voice-label="${escapeHtml(voiceLabel)}">
-                            <option value="">${escapeHtml(currentVoiceLabel)}</option>
-                        </select>
-                        <button class="btn btn-sm btn-warning library-chunk-regen" data-chunk-id="${chunkId}">
-                            Regenerate
-                        </button>
-                    </div>
-                    <div class="chunk-prompt-filters" data-chunk-id="${chunkId}" style="display: none; margin-top: 8px;">
-                        <div style="display: grid; grid-template-columns: repeat(2, minmax(140px, 1fr)); gap: 10px; align-items: end;">
-                            <label style="display: flex; flex-direction: column; gap: 4px;">
-                                <span>Gender</span>
-                                <select class="chunk-voice-filter-gender" data-chunk-id="${chunkId}">
-                                    <option value="all">All</option>
-                                </select>
-                            </label>
-                            <label style="display: flex; flex-direction: column; gap: 4px;">
-                                <span>Language</span>
-                                <select class="chunk-voice-filter-language" data-chunk-id="${chunkId}">
-                                    <option value="all">All</option>
-                                </select>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="chunk-qwen3-options" data-chunk-id="${chunkId}" style="display: none;">
-                        <div class="chunk-regen-row" style="margin-top: 8px;">
-                            <select class="chunk-qwen3-language" data-chunk-id="${chunkId}">
-                                <option value="Auto">Auto</option>
-                            </select>
-                            <input type="text" class="chunk-qwen3-instruct" data-chunk-id="${chunkId}" 
-                                   value="${escapeHtml(instruction)}"
-                                   placeholder="Custom instruction (optional)" style="flex: 2;" />
-                        </div>
+                        <span class="chunk-silence-label">Silence (seconds)</span>
+                        <label>Lead</label>
+                        <input type="number" class="chunk-leading-silence" data-chunk-id="${chunkId}" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.leading_silence_ms ?? chunk.silence_applied?.leading ?? 0) / 1000).toFixed(1)}">
+                        <span class="chunk-leading-silence-value">${((chunk.voice_assignment?.leading_silence_ms ?? chunk.silence_applied?.leading ?? 0) / 1000).toFixed(1)}s</span>
+                        <label>Trail</label>
+                        <input type="number" class="chunk-trailing-silence" data-chunk-id="${chunkId}" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.trailing_silence_ms ?? chunk.silence_applied?.trailing ?? 0) / 1000).toFixed(1)}">
+                        <span class="chunk-trailing-silence-value">${((chunk.voice_assignment?.trailing_silence_ms ?? chunk.silence_applied?.trailing ?? 0) / 1000).toFixed(1)}s</span>
                     </div>
                 </div>
             </div>
@@ -2400,6 +2980,18 @@ function escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Attribute-safe escaping (& < > " '). At runtime the global escapeHtml can be another
+// script's copy that leaves quotes alone (voice-manager.js loads after this file), so every
+// value interpolated into an attribute uses this helper instead.
+function libraryEscapeAttr(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function handleLibraryChunkPlayClick(btn) {
     const url = btn.getAttribute('data-audio-url');
     if (!url) return;
@@ -2422,9 +3014,10 @@ function handleLibraryChunkPlayClick(btn) {
     libraryActiveAudio = audio;
     libraryActivePlayButton = btn;
 
-    // Update button to show stop state
-    btn.textContent = '■ Stop';
+    // Update button to show stop state (the icon is drawn by CSS from .playing)
+    btn.textContent = '■';
     btn.classList.add('playing');
+    btn.setAttribute('aria-label', 'Stop chunk');
 
     audio.addEventListener('ended', () => {
         resetLibraryPlayButton(btn);
@@ -2463,6 +3056,7 @@ function resetLibraryPlayButton(btn) {
     if (btn) {
         btn.textContent = '▶';
         btn.classList.remove('playing');
+        btn.setAttribute('aria-label', 'Play chunk');
     }
 }
 
@@ -2496,11 +3090,11 @@ function stopChunkSequence(keepHighlight = false, preserveResume = false) {
         }
     }
     if (chunkSequenceButton) {
-        chunkSequenceButton.textContent = '▶';
         chunkSequenceButton.classList.remove('playing');
+        chunkSequenceButton.setAttribute('aria-label', 'Play all chunks in order');
     }
     if (chunkSequenceLabel) {
-        chunkSequenceLabel.textContent = 'Start Audio Review';
+        chunkSequenceLabel.textContent = 'Play all in order';
     }
     chunkSequenceButton = null;
     chunkSequenceLabel = null;
@@ -2565,11 +3159,11 @@ function startChunkSequence(items, startIndex = 0) {
     });
     playIndex(chunkSequenceIndex);
     if (chunkSequenceButton) {
-        chunkSequenceButton.textContent = '■';
         chunkSequenceButton.classList.add('playing');
+        chunkSequenceButton.setAttribute('aria-label', 'Stop playing chunks');
     }
     if (chunkSequenceLabel) {
-        chunkSequenceLabel.textContent = 'Stop Audio Review';
+        chunkSequenceLabel.textContent = 'Stop playback';
     }
 }
 
@@ -2602,63 +3196,29 @@ function wireChunkReviewEvents(jobId, chunks, engine) {
             if (result?.paused && status && body.isConnected) status.textContent = result.message;
         }).catch(() => {});
 
-    const playAllButton = body.querySelector('#chunk-review-play-all');
-    const playAllLabel = body.querySelector('#chunk-review-play-all-label');
-    if (playAllButton) {
-        playAllButton.addEventListener('click', () => {
-            if (chunkSequenceAudio) {
-                stopChunkSequence(true);
-                return;
-            }
-            const cards = Array.from(body.querySelectorAll('.library-chunk-card'));
-            const items = cards.map(card => {
-                const playButton = card.querySelector('.library-chunk-play');
-                return {
-                    card,
-                    url: playButton?.getAttribute('data-audio-url') || '',
-                    index: Number(card.getAttribute('data-idx'))
-                };
-            }).filter(item => item.url);
-            let startIndex = 0;
-            const preferredIndex = chunkSequenceStartIndex ?? chunkSequenceResumeIndex;
-            if (preferredIndex !== null && preferredIndex !== undefined) {
-                const preferredPos = items.findIndex(item => item.index === preferredIndex);
-                if (preferredPos >= 0) {
-                    startIndex = preferredPos;
-                } else {
-                    const nextPos = items.findIndex(item => item.index > preferredIndex);
-                    if (nextPos >= 0) {
-                        startIndex = nextPos;
-                    }
-                }
-            }
-            chunkSequenceButton = playAllButton;
-            chunkSequenceLabel = playAllLabel || null;
-            startChunkSequence(items, startIndex);
-        });
-    }
+    // "Play all in order" is bound once on the panel's static header (handleLibraryReviewPlayAll).
 
-    // Chunk card expand/collapse toggle
+    // Chunk card expand/collapse toggle ("Edit" or a click on the row)
     body.querySelectorAll('.library-chunk-summary').forEach(summary => {
         summary.addEventListener('click', (e) => {
-            // Don't toggle if clicking the play button
-            if (e.target.closest('.library-chunk-play')) return;
-            
-            const chunkId = summary.getAttribute('data-chunk-id');
-            const details = summary.closest('.library-chunk-card')?.querySelector('.library-chunk-details');
-            const toggle = summary.querySelector('.chunk-expand-toggle');
-            
+            // Don't toggle if clicking the play or regenerate buttons
+            if (e.target.closest('.library-chunk-play') || e.target.closest('.library-chunk-regen')) return;
+
+            const card = summary.closest('.library-chunk-card');
+            const details = card?.querySelector('.library-chunk-details');
+            const editButton = summary.querySelector('.library-chunk-edit');
+
             if (details) {
                 const isCollapsed = details.classList.contains('collapsed');
+                details.classList.toggle('collapsed', !isCollapsed);
+                card.classList.toggle('is-open', isCollapsed);
+                if (editButton) {
+                    editButton.textContent = isCollapsed ? 'Done' : 'Edit';
+                    editButton.setAttribute('aria-expanded', String(isCollapsed));
+                }
                 if (isCollapsed) {
-                    details.classList.remove('collapsed');
-                    if (toggle) toggle.textContent = '▼';
-                    const card = summary.closest('.library-chunk-card');
                     setChunkSequenceStartFromCard(card);
                     highlightManualChunkSelection(card);
-                } else {
-                    details.classList.add('collapsed');
-                    if (toggle) toggle.textContent = '▶';
                 }
             }
         });
@@ -2767,19 +3327,14 @@ function wireChunkReviewEvents(jobId, chunks, engine) {
             // Don't toggle if clicking the checkbox
             if (e.target.closest('.bulk-speaker-checkbox')) return;
             
-            const speaker = summary.getAttribute('data-speaker');
-            const details = body.querySelector(`.bulk-speaker-details[data-speaker="${speaker}"]`);
-            const toggle = summary.querySelector('.bulk-expand-toggle');
-            
+            const card = summary.closest('.bulk-speaker-card');
+            const details = card?.querySelector('.bulk-speaker-details');
+
             if (details) {
                 const isCollapsed = details.classList.contains('collapsed');
-                if (isCollapsed) {
-                    details.classList.remove('collapsed');
-                    if (toggle) toggle.textContent = '▼';
-                } else {
-                    details.classList.add('collapsed');
-                    if (toggle) toggle.textContent = '▶';
-                }
+                details.classList.toggle('collapsed', !isCollapsed);
+                card.classList.toggle('is-open', isCollapsed);
+                summary.setAttribute('aria-expanded', String(isCollapsed));
             }
         });
     });
@@ -2797,6 +3352,14 @@ function wireChunkReviewEvents(jobId, chunks, engine) {
             const card = select.closest('.bulk-speaker-card');
             const checkbox = card?.querySelector('.bulk-speaker-checkbox');
             if (checkbox) updateBulkRegenButtonState(checkbox);
+            // The row's mono chip shows the voice the speaker will be regenerated with.
+            const chip = card?.querySelector('.bulk-speaker-voice');
+            if (chip) {
+                const picked = select.value ? (select.selectedOptions?.[0]?.textContent || select.value) : '';
+                const pickedLabel = picked.replace(/^Current:\s*/, '').trim();
+                chip.textContent = pickedLabel || chip.dataset.currentVoice || '';
+                chip.classList.toggle('is-changed', Boolean(pickedLabel) && pickedLabel !== chip.dataset.currentVoice);
+            }
         });
     });
 
@@ -4248,7 +4811,7 @@ async function triggerBulkSpeakerRegen(
     voicePayload = { ...(voicePayload || {}), leading_silence_ms: Math.round(leadingSilenceSec * 1000), trailing_silence_ms: Math.round(trailingSilenceSec * 1000) };
 
     button.disabled = true;
-    button.textContent = `Regenerating ${speakerChunks.length}...`;
+    button.textContent = `Regenerating ${speakerChunks.length}…`;
 
     try {
         if (!skipRestore) {
@@ -4301,7 +4864,7 @@ async function triggerBulkSpeakerRegen(
         }
         button.textContent = 'Queued!';
         setTimeout(() => {
-            button.textContent = 'Regenerate All';
+            button.textContent = 'Regenerate all';
             button.disabled = false;
         }, 2000);
         return queuedChunkIds;
@@ -4311,7 +4874,7 @@ async function triggerBulkSpeakerRegen(
         if (!skipRestore) {
             alert(error.message || 'Failed to queue bulk regeneration');
         }
-        button.textContent = 'Regenerate All';
+        button.textContent = 'Regenerate all';
         button.disabled = false;
         await refreshLibraryRecompileState(jobId);
         return false;
@@ -4329,7 +4892,7 @@ async function triggerLibraryChunkRegen(jobId, chunkId, button) {
         return;
     }
 
-    setRegenButtonBusy(button, true, '⟳ Queued...');
+    setRegenButtonBusy(button, true, 'Queued…');
 
     // Get engine override from per-chunk dropdown
     const chunkEngineSelect = card?.querySelector('.library-chunk-engine-select');
@@ -4518,16 +5081,19 @@ function updateLibraryChunkStatus(chunkId, status) {
 
     const regenButton = card.querySelector('.library-chunk-regen');
     if (status === 'queued') {
-        setRegenButtonBusy(regenButton, true, '⟳ Queued...');
+        setRegenButtonBusy(regenButton, true, 'Queued…');
     } else if (status === 'running') {
-        setRegenButtonBusy(regenButton, true, '⟳ Rendering...');
+        setRegenButtonBusy(regenButton, true, 'Rendering…');
     } else if (status === 'completed' || status === 'failed' || status === 'unknown') {
         setRegenButtonBusy(regenButton, false);
     }
 
     if (badge) {
+        const slot = summary.querySelector('.library-chunk-status');
         const toggle = summary.querySelector('.chunk-expand-toggle');
-        if (toggle) {
+        if (slot) {
+            slot.insertAdjacentHTML('beforeend', badge);
+        } else if (toggle) {
             toggle.insertAdjacentHTML('afterend', badge);
         }
     }
@@ -4661,7 +5227,7 @@ function renderLibraryBulkRegenProgress(watcher, payload = {}) {
 
     setLibraryRecompileButtonState(
         remaining > 0 || Boolean(payload.review?.has_active_regen),
-        remaining > 0 ? `Regenerating ${finished} of ${total}...` : ''
+        remaining > 0 ? `Regenerating ${finished} of ${total}…` : ''
     );
     setLibraryBulkActionState(remaining > 0 || Boolean(payload.review?.has_active_regen));
     return { ...counts, total, finished, remaining };
@@ -4943,7 +5509,7 @@ async function recompileLibraryAudio() {
 
     button.dataset.recompileBusy = 'true';
     button.disabled = true;
-    button.textContent = 'Recompiling...';
+    button.textContent = 'Recompiling…';
 
     try {
         await requestLibraryReviewRestore(jobId);
@@ -4992,7 +5558,7 @@ async function recompileLibraryAudio() {
             setLibraryRecompileButtonState(!reviewStateLoaded || hasActiveRegen);
         } else {
             button.disabled = true;
-            button.textContent = 'Recompile Audio';
+            button.textContent = 'Recompile audio';
         }
     }
 }
@@ -5058,7 +5624,7 @@ async function triggerChunkPreviewFx(jobId, chunkId, button) {
     if (!button.dataset.originalText) {
         button.dataset.originalText = originalText;
     }
-    button.textContent = '⏳ Loading...';
+    button.textContent = 'Loading…';
     button.disabled = true;
     
     try {
@@ -5080,7 +5646,7 @@ async function triggerChunkPreviewFx(jobId, chunkId, button) {
         previewAudio = new Audio(audioUrl);
         previewButton = button;
 
-        button.textContent = '■ Stop';
+        button.textContent = 'Stop';
         button.disabled = false;
         button.classList.add('previewing');
         
@@ -5139,7 +5705,7 @@ async function triggerChunkApplyFx(jobId, chunkId, button) {
     const pitch = parseFloat(pitchSlider?.value || 0);
     
     button.disabled = true;
-    button.textContent = 'Applying...';
+    button.textContent = 'Applying…';
     
     try {
         // First restore the job to review mode if not already
@@ -5179,14 +5745,14 @@ async function triggerChunkApplyFx(jobId, chunkId, button) {
         }
         
         setTimeout(() => {
-            button.textContent = 'Apply';
+            button.textContent = 'Apply FX';
             button.disabled = true;
         }, 1500);
         
     } catch (error) {
         console.error('Apply FX error:', error);
         alert(error.message || 'Failed to apply effects');
-        button.textContent = 'Apply';
+        button.textContent = 'Apply FX';
         button.disabled = false;
     }
 }
@@ -5209,7 +5775,7 @@ async function triggerBulkSpeakerApplyFx(jobId, speaker, chunks, button) {
     }
     
     button.disabled = true;
-    button.textContent = `Applying to ${speakerChunks.length}...`;
+    button.textContent = `Applying to ${speakerChunks.length}…`;
     
     try {
         // First restore the job to review mode if not already
@@ -5311,8 +5877,8 @@ function _openLibraryAwrMainModal() {
         overlay.innerHTML = `
             <div class="modal hidden" id="lib-awr-registry-modal" style="max-width:680px;width:95%;z-index:1300;">
                 <div class="modal-header">
-                    <h3>Alt Word Registry</h3>
-                    <button class="modal-close" id="lib-awr-reg-close">&times;</button>
+                    <h3>Alt word registry</h3>
+                    <button type="button" class="modal-close" id="lib-awr-reg-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
                 </div>
                 <div class="modal-body">
                     <p class="awr-description">
@@ -5320,7 +5886,7 @@ function _openLibraryAwrMainModal() {
                         Use this to replace words the engine mispronounces with phonetic alternatives.
                     </p>
                     <div class="awr-toolbar">
-                        <button class="btn btn-primary btn-sm" id="lib-awr-reg-add-btn">＋ Add Entry</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="lib-awr-reg-add-btn"><span class="ms" aria-hidden="true">add</span>Add entry</button>
                     </div>
                     <div class="awr-table-wrapper">
                         <table class="awr-table">
@@ -5363,7 +5929,7 @@ function _renderLibraryAwrRegTable() {
     const tbody = document.getElementById('lib-awr-reg-tbody');
     if (!tbody) return;
     if (_libraryAwrList.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="awr-empty">No entries yet. Click <strong>＋ Add Entry</strong> to get started.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" class="awr-empty">No entries yet. Use <strong>Add entry</strong> to get started.</td></tr>';
         return;
     }
     tbody.innerHTML = _libraryAwrList.map((entry, idx) => `
@@ -5371,8 +5937,8 @@ function _renderLibraryAwrRegTable() {
             <td class="awr-original-cell">${escapeHtml(entry.original)}</td>
             <td class="awr-replacement-cell">${escapeHtml(entry.replacement)}</td>
             <td class="awr-actions-cell">
-                <button class="awr-edit-btn" data-idx="${idx}" title="Edit">✏️</button>
-                <button class="awr-delete-btn" data-idx="${idx}" title="Delete">🗑️</button>
+                <button type="button" class="awr-edit-btn" data-idx="${idx}" title="Edit" aria-label="Edit entry"><span class="ms" aria-hidden="true">edit</span></button>
+                <button type="button" class="awr-delete-btn" data-idx="${idx}" title="Delete" aria-label="Delete entry"><span class="ms" aria-hidden="true">delete</span></button>
             </td>
         </tr>`).join('');
     tbody.querySelectorAll('.awr-edit-btn').forEach(btn => {
@@ -5400,7 +5966,7 @@ function _ensureLibraryAwrEntryModal() {
         <div class="modal" id="lib-awr-entry-modal" style="max-width:520px;width:95%;z-index:1601;">
             <div class="modal-header">
                 <h3 id="lib-awr-entry-title">Add Alt Word Entry</h3>
-                <button class="modal-close" id="lib-awr-entry-close">&times;</button>
+                <button type="button" class="modal-close" id="lib-awr-entry-close" aria-label="Close"><span class="ms" aria-hidden="true">close</span></button>
             </div>
             <div class="modal-body">
                 <div class="awr-entry-fields">
@@ -5448,8 +6014,8 @@ function _ensureLibraryAwrEntryModal() {
                             </div>
                         </div>
                         <div class="awr-preview-buttons">
-                            <button class="btn btn-sm btn-secondary" id="lib-awr-play-original" disabled>▶ Play Original</button>
-                            <button class="btn btn-sm btn-secondary" id="lib-awr-play-replacement" disabled>▶ Play Replacement</button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="lib-awr-play-original" disabled><span class="ms ms-fill" aria-hidden="true">play_arrow</span>Play original</button>
+                            <button type="button" class="btn btn-sm btn-secondary" id="lib-awr-play-replacement" disabled><span class="ms ms-fill" aria-hidden="true">play_arrow</span>Play replacement</button>
                             <span class="awr-preview-status" id="lib-awr-preview-status"></span>
                         </div>
                     </div>
@@ -5764,7 +6330,7 @@ async function openTimeCodesModal(jobId, title) {
     const introInput = document.getElementById('timecodes-intro-seconds');
     const output = document.getElementById('timecodes-output');
 
-    if (titleEl) titleEl.textContent = `Time Codes — ${title || 'Untitled'}`;
+    if (titleEl) titleEl.textContent = `Time codes — ${title || 'Untitled'}`;
     if (loadingEl) loadingEl.classList.remove('hidden');
     if (errorEl) { errorEl.classList.add('hidden'); errorEl.textContent = ''; }
     if (resultEl) resultEl.classList.add('hidden');

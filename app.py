@@ -11488,6 +11488,85 @@ def m4b_progress_endpoint(job_id):
     return jsonify(progress_info)
 
 
+_LIBRARY_DURATION_CACHE: Dict[str, Tuple[Tuple[int, int], Optional[float]]] = {}
+_LIBRARY_DURATION_CACHE_LOCK = threading.Lock()
+_LIBRARY_DURATION_CACHE_MAX_ENTRIES = 8192
+
+
+def _probe_audio_duration_seconds(path: Path) -> Optional[float]:
+    """Measure an audio file's duration from its header. Returns None when unreadable."""
+    try:
+        info = sf.info(str(path))
+        frames = int(getattr(info, "frames", 0) or 0)
+        samplerate = int(getattr(info, "samplerate", 0) or 0)
+        if frames > 0 and samplerate > 0:
+            return frames / float(samplerate)
+    except Exception:
+        pass
+    if path.suffix.lower() == ".wav":
+        try:
+            import wave
+            with wave.open(str(path), "rb") as handle:
+                rate = handle.getframerate()
+                if rate:
+                    return handle.getnframes() / float(rate)
+        except Exception:
+            pass
+    try:
+        ffprobe = find_system_tool("ffprobe")
+    except Exception:
+        ffprobe = None
+    if ffprobe:
+        try:
+            result = subprocess.run(
+                [str(ffprobe), "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+                capture_output=True, text=True, timeout=10, check=False,
+            )
+            value = float((result.stdout or "").strip().splitlines()[0])
+            if value > 0 and math.isfinite(value):
+                return value
+        except Exception:
+            pass
+    return None
+
+
+def _library_audio_duration(path: Path) -> Optional[float]:
+    """Duration in seconds for a Library audio file, cached by path + mtime + size.
+
+    The listing is rebuilt often, so files are only measured again when they change.
+    Unreadable files are cached as None too (until they change) and never raise.
+    """
+    try:
+        stat_result = path.stat()
+    except OSError:
+        return None
+    key = str(path)
+    signature = (int(stat_result.st_mtime_ns), int(stat_result.st_size))
+    with _LIBRARY_DURATION_CACHE_LOCK:
+        cached = _LIBRARY_DURATION_CACHE.get(key)
+    if cached is not None and cached[0] == signature:
+        return cached[1]
+    duration = _probe_audio_duration_seconds(path)
+    if duration is not None:
+        duration = round(duration, 3)
+    with _LIBRARY_DURATION_CACHE_LOCK:
+        if len(_LIBRARY_DURATION_CACHE) >= _LIBRARY_DURATION_CACHE_MAX_ENTRIES:
+            _LIBRARY_DURATION_CACHE.clear()
+        _LIBRARY_DURATION_CACHE[key] = (signature, duration)
+    return duration
+
+
+def _library_production_duration(full_story: Optional[Dict[str, Any]], sections: List[Dict[str, Any]]) -> Optional[float]:
+    """Whole-production duration: the full story when present, else the sum of its sections."""
+    if full_story and full_story.get("duration_seconds") is not None:
+        return full_story["duration_seconds"]
+    durations = [section.get("duration_seconds") for section in sections or []]
+    if durations and all(isinstance(value, (int, float)) for value in durations):
+        return round(float(sum(durations)), 3)
+    return None
+
+
 def _build_library_listing():
     """Scan disk and return library metadata list."""
     library_items = []
@@ -11508,7 +11587,7 @@ def _build_library_listing():
             created_ts = None
             full_story_entry = None
             outputs = metadata.get("books") if metadata.get("book_mode") else metadata.get("chapters")
-            for chapter in outputs or []:
+            for position, chapter in enumerate(outputs or []):
                 rel_path = chapter.get("relative_path")
                 if not rel_path:
                     continue
@@ -11534,6 +11613,10 @@ def _build_library_listing():
                     "file_size": file_size,
                     "format": file_format,
                     "missing_file": not file_exists,
+                    "duration_seconds": _library_audio_duration(file_path) if file_exists else None,
+                    # Index in metadata["chapters"], which the chapter rename route addresses.
+                    # Book rows come from metadata["books"], so they have no chapter position.
+                    "position": None if metadata.get("book_mode") else position,
                 })
 
             manifest_path = job_dir / "review_manifest.json"
@@ -11579,6 +11662,8 @@ def _build_library_listing():
                             "file_size": file_size,
                             "format": file_format,
                             "missing_file": not file_exists,
+                            "duration_seconds": _library_audio_duration(file_path) if file_exists else None,
+                            "position": None,
                         })
                         existing_paths.add(rel_path)
 
@@ -11593,7 +11678,8 @@ def _build_library_listing():
                         "output_file": f"/static/audio/{job_id}/{full_meta['relative_path']}",
                         "relative_path": full_meta['relative_path'],
                         "file_size": stat.st_size,
-                        "format": full_path.suffix.lstrip('.')
+                        "format": full_path.suffix.lstrip('.'),
+                        "duration_seconds": _library_audio_duration(full_path),
                     }
 
             # Read engine and timing_metrics from chunks_metadata.json once for both branches
@@ -11635,6 +11721,7 @@ def _build_library_listing():
                     "books": chapters_data if metadata.get("book_mode") else [],
                     "chapters": chapters_data,
                     "full_story": full_story_entry,
+                    "duration_seconds": _library_production_duration(full_story_entry, chapters_data),
                     "has_chunks": _lib_has_chunks,
                     "engine": _lib_engine,
                     "timing_metrics": _lib_timing_metrics,
@@ -11661,6 +11748,7 @@ def _build_library_listing():
                     "books": [],
                     "chapters": [],
                     "full_story": full_story_entry,
+                    "duration_seconds": _library_production_duration(full_story_entry, []),
                     "has_chunks": _lib_has_chunks,
                     "engine": _lib_engine,
                     "timing_metrics": _lib_timing_metrics,
@@ -11705,6 +11793,7 @@ def _build_library_listing():
                     "relative_path": rel_path,
                     "file_size": stat.st_size,
                     "format": file_path.suffix.lstrip('.'),
+                    "duration_seconds": _library_audio_duration(file_path),
                 })
 
             if chapters_data:
@@ -11731,6 +11820,7 @@ def _build_library_listing():
                     "books": [],
                     "chapters": chapters_data,
                     "full_story": None,
+                    "duration_seconds": _library_production_duration(None, chapters_data),
                     "has_chunks": has_chunks,
                     "engine": engine,
                 })
@@ -11751,6 +11841,7 @@ def _build_library_listing():
                         engine = chunks_meta.get("engine")
                 except Exception:
                     pass
+            output_duration = _library_audio_duration(output_file)
             library_items.append({
                 "job_id": job_id,
                 "output_file": f"/static/audio/{job_id}/{output_file.name}",
@@ -11765,8 +11856,10 @@ def _build_library_listing():
                     "output_file": f"/static/audio/{job_id}/{output_file.name}",
                     "relative_path": output_file.name,
                     "file_size": stat.st_size,
-                    "format": output_file.suffix.lstrip('.')
+                    "format": output_file.suffix.lstrip('.'),
+                    "duration_seconds": output_duration,
                 }],
+                "duration_seconds": output_duration,
                 "engine": engine,
             })
 
