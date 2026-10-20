@@ -65,6 +65,10 @@
     border-bottom: none;
 }
 
+#voices-tab .voices-header .screen-title-group > .help-icon {
+    align-self: center;
+}
+
 #voices-tab .voices-subtabs .subtab-count:empty {
     display: none;
 }
