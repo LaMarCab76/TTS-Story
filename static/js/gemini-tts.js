@@ -53,7 +53,12 @@ window.loadGeminiTtsCatalog = (refresh = false) => {
     return geminiCatalogPromise;
 };
 document.addEventListener('DOMContentLoaded', () => {
-    window.loadGeminiTtsCatalog();
+    window.loadGeminiTtsCatalog().then(data => {
+        // The automatic load already lists hosted designs; replace the "click refresh" prompt.
+        const status = document.getElementById('gemini-voices-manager-status');
+        if (!status || !data || data.success === false) return;
+        status.textContent = data.warning || (!data.design_available ? 'Save your Gemini TTS API key in Settings to list and design hosted voices.' : '');
+    });
     document.getElementById('gemini-voices-refresh')?.addEventListener('click', async event => {
         const status = document.getElementById('gemini-voices-manager-status');
         event.currentTarget.disabled = true;
@@ -94,18 +99,28 @@ window.renderGeminiVoiceManager = () => {
     const status = document.getElementById('gemini-voices-manager-status');
     const player = document.getElementById('gemini-voices-manager-player');
     const voices = geminiManagedVoices(window.geminiTtsVoices, document.getElementById('gemini-voices-filter')?.value || '');
+    const managedCount = geminiManagedVoices(window.geminiTtsVoices).length;
+    window.studioVoicesCount?.('gemini-hosted', managedCount || '');
     list.replaceChildren();
     const toolbar = document.createElement('div');
     toolbar.className = 'gemini-voice-toolbar';
-    const action = (label, handler) => {
+    const summary = document.createElement('span');
+    summary.className = 'gemini-voice-toolbar-summary';
+    toolbar.append(summary);
+    const action = (label, handler, className = 'btn btn-ghost btn-sm') => {
         const button = document.createElement('button');
-        button.type = 'button'; button.className = 'btn btn-secondary'; button.textContent = label;
+        button.type = 'button'; button.className = className; button.textContent = label;
         button.disabled = geminiManagerDeleting; button.onclick = handler; toolbar.append(button);
         return button;
     };
     action('Select visible', () => { voices.forEach(v => geminiManagerSelection.add(v.short_name)); window.renderGeminiVoiceManager(); });
     action('Clear selection', () => { geminiManagerSelection.clear(); window.renderGeminiVoiceManager(); });
     const selected = geminiManagedVoices(window.geminiTtsVoices).filter(v => geminiManagerSelection.has(v.short_name));
+    const plural = managedCount === 1 ? '' : 's';
+    summary.textContent = selected.length ? `${selected.length} selected`
+        : (voices.length === managedCount ? `${managedCount} custom voice${plural}` : `${voices.length} of ${managedCount} custom voice${plural}`);
+    // Nothing to select or delete yet: the empty message below says what to do.
+    toolbar.hidden = !managedCount;
     const bulkDelete = action(`Delete selected (${selected.length})`, async () => {
         if (geminiManagerDeleting || !selected.length || !window.confirm(`Permanently delete ${selected.length} Google voices?\n\n${selected.map(v => v.display_name + ' (' + v.short_name + ')').join('\n')}\n\nProjects using these voices will need replacements for future generation. Existing audio is unchanged. This cannot be undone.`)) return;
         geminiManagerDeleting = true; window.renderGeminiVoiceManager();
@@ -122,28 +137,32 @@ window.renderGeminiVoiceManager = () => {
             await window.loadGeminiTtsCatalog(true);
             status.textContent = `${deleted.length} voice(s) deleted. Existing audio is unchanged.` + (failed.length ? ` Failed: ${failed.map(v => v.name + ': ' + v.error).join('; ')}` : '');
         } finally { geminiManagerDeleting = false; window.renderGeminiVoiceManager(); }
-    });
+    }, 'btn btn-danger btn-sm');
     bulkDelete.disabled = geminiManagerDeleting || !selected.length;
     list.append(toolbar);
     if (!voices.length) {
         const empty = document.createElement('p');
-        empty.textContent = 'No matching custom voices. Refresh to check Google’s saved voice library.';
+        empty.className = 'gemini-manager-empty';
+        empty.textContent = managedCount
+            ? 'No matching custom voices. Clear the search or refresh to check Google’s saved voice library.'
+            : 'No custom voices yet. Design a new voice, or refresh to check Google’s saved voice library.';
         list.append(empty);
     }
     for (const voice of voices) {
         const row = document.createElement('div');
         row.className = 'gemini-voice-row';
         const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox'; checkbox.checked = geminiManagerSelection.has(voice.short_name);
+        checkbox.type = 'checkbox'; checkbox.className = 'voices-check'; checkbox.checked = geminiManagerSelection.has(voice.short_name);
         checkbox.disabled = geminiManagerDeleting; checkbox.setAttribute('aria-label', `Select ${voice.display_name}`);
         checkbox.onchange = () => { if (checkbox.checked) geminiManagerSelection.add(voice.short_name); else geminiManagerSelection.delete(voice.short_name); window.renderGeminiVoiceManager(); };
         const title = document.createElement('strong');
-        title.textContent = voice.display_name;
+        // Every row here is a designed voice, so the catalog's "Designed: " prefix is redundant.
+        title.textContent = String(voice.display_name || '').replace(/^Designed:\s*/, '') || voice.short_name;
         const id = document.createElement('small');
         id.textContent = voice.short_name;
         const identity = document.createElement('div'); identity.className = 'gemini-voice-identity'; identity.append(title, id);
         const play = document.createElement('button');
-        play.type = 'button'; play.className = 'btn btn-secondary'; play.textContent = '▶'; play.setAttribute('aria-label', `Play ${voice.display_name}`);
+        play.type = 'button'; play.className = 'btn-circle gemini-play'; play.textContent = '▶'; play.setAttribute('aria-label', `Play ${voice.display_name}`);
         play.onclick = () => {
             player.hidden = false;
             player.dataset.voiceId = voice.short_name;
@@ -152,7 +171,7 @@ window.renderGeminiVoiceManager = () => {
             player.play().catch(() => { status.textContent = 'Preview could not be played.'; });
         };
         const remove = document.createElement('button');
-        remove.type = 'button'; remove.className = 'btn btn-secondary'; remove.textContent = 'Delete';
+        remove.type = 'button'; remove.className = 'btn btn-ghost btn-sm gemini-delete'; remove.textContent = 'Delete';
         remove.disabled = geminiManagerDeleting;
         remove.onclick = async () => {
             if (geminiManagerDeleting || !window.confirm(`Permanently delete "${voice.display_name}" (${voice.short_name}) from Google?\n\nAny projects using this voice will need another voice for future generation or regeneration. Existing audio files are not changed. This cannot be undone.`)) return;
@@ -265,7 +284,7 @@ window.openGeminiVoiceDesigner = ({name = '', description = '', onSelect = null,
     if (container) dialog.dataset.geminiInlineDesigner = 'true';
     dialog.style.cssText = container
         ? 'width:100%;box-sizing:border-box;border:1px solid var(--border-color,#777);border-radius:12px;padding:16px;margin-top:16px'
-        : 'width:min(760px,90vw);max-height:85vh;overflow:auto;background:#101827;color:#eee;border:1px solid #777;border-radius:12px;padding:24px';
+        : 'width:min(640px,92vw);max-height:85vh;overflow:auto;background:var(--st-panel,#1f1c19);color:var(--st-text,#ece6dc);border:1px solid var(--st-border-control,#36322c);border-radius:10px;padding:22px 24px;box-shadow:0 24px 48px rgba(0,0,0,0.45)';
     dialog.innerHTML = `
         <div data-design-form>
         <h2>Gemini Voice Design</h2>
@@ -277,7 +296,7 @@ window.openGeminiVoiceDesigner = ({name = '', description = '', onSelect = null,
         <p>Google supplies the audition text. Its preview is not the standardized local-engine passage.</p>
         <button type="button" class="btn btn-primary" data-action="create">Create voices (billable)</button>
         <button type="button" class="btn btn-secondary" data-action="refresh">Refresh current candidates</button>
-        <p>This audition shows only the candidates generated here. Browse all saved designs under Available Voices → Gemini Custom Voices · Cloud.</p>
+        <p>This audition shows only the candidates generated here. Browse all saved designs under Voices → Gemini cloud voices.</p>
         </div>
         <p data-status role="status"></p>
         <div data-results></div>
@@ -395,7 +414,7 @@ window.openGeminiVoiceDesigner = ({name = '', description = '', onSelect = null,
         setBusy(true);
         try { await refresh(); status.textContent = auditionVoiceIds.size
             ? 'Current audition refreshed. Other saved voices are available in the voice library.'
-            : 'Generate candidates to begin this audition. Existing voices are in Available Voices → Gemini Custom Voices · Cloud.'; }
+            : 'Generate candidates to begin this audition. Existing voices are in Voices → Gemini cloud voices.'; }
         finally { setBusy(false); }
     };
     dialog.querySelector('[data-action="create"]').onclick = async () => {

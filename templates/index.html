@@ -428,181 +428,251 @@
             </div>
         </div>
 
-        <!-- Available Voices Tab -->
-        <div id="voices-tab" class="tab-content screen">
-            <div class="screen-header">
+        <!-- Voices Tab -->
+        <div id="voices-tab" class="tab-content screen voices-screen">
+            <div class="screen-header voices-header">
                 <div class="screen-title-group">
                     <h1 class="screen-title">Voices</h1>
                     <span class="screen-subtitle">Built-in, reference and designed voices</span>
                 </div>
+                <div class="screen-actions">
+                    <button type="button" class="help-icon" data-help-id="available-voices" aria-label="Help: Voices">?</button>
+                </div>
             </div>
-            <div class="screen-body">
-            <div class="section">
-                <div class="section-title-inline">
-                    <h2>Available Voices</h2>
-                    <button type="button" class="help-icon" data-help-id="available-voices" aria-label="Help: Available Voices">?</button>
-                </div>
-                <p class="help-text">Browse built-in, custom, and prompt-based voice libraries.</p>
+            <div class="subtabs voices-subtabs" role="tablist" aria-label="Voice libraries">
+                <button type="button" class="subtab voices-subtab is-active" role="tab" id="voices-subtab-prompts" aria-selected="true" aria-controls="chatterbox-voices-section" data-voices-target="prompts">Voice prompts<span class="subtab-count" data-voices-count="prompts"></span></button>
+                <button type="button" class="subtab voices-subtab" role="tab" id="voices-subtab-kokoro" aria-selected="false" aria-controls="kokoro-voices-section" data-voices-target="kokoro" tabindex="-1">Kokoro<span class="subtab-count" data-voices-count="kokoro"></span></button>
+                <button type="button" class="subtab voices-subtab" role="tab" id="voices-subtab-custom" aria-selected="false" aria-controls="custom-voices-section" data-voices-target="custom" tabindex="-1">Kokoro blends<span class="subtab-count" data-voices-count="custom"></span></button>
+                <button type="button" class="subtab voices-subtab" role="tab" id="voices-subtab-qwen" aria-selected="false" aria-controls="qwen-voices-section" data-voices-target="qwen" tabindex="-1">Voice creation<span class="subtab-count" data-voices-count="qwen"></span></button>
+                <button type="button" class="subtab voices-subtab" role="tab" id="voices-subtab-gemini-hosted" aria-selected="false" aria-controls="gemini-hosted-voices-section" data-voices-target="gemini-hosted" tabindex="-1">Gemini cloud voices<span class="subtab-count" data-voices-count="gemini-hosted"></span></button>
             </div>
-            <div class="voices-accordion">
-                <div class="section voices-section collapsed" data-voices-section="gemini-hosted" id="gemini-hosted-voices-section">
-                    <div class="voices-section-header">
-                        <div><h2>Gemini Custom Voices · Cloud</h2><p class="help-text">Manage designed voices stored in your Google project, including older candidates. These are not local voice samples.</p></div>
-                        <span class="voices-section-toggle">▶</span>
-                    </div>
-                    <div class="voices-section-content">
-                        <button type="button" class="btn btn-secondary" id="gemini-voices-refresh">Load / refresh voices</button>
-                        <button type="button" class="btn btn-primary" onclick="window.openGeminiVoiceDesigner()">Design new voice</button>
-                        <label style="display:block;margin-top:12px">Filter custom voices<input id="gemini-voices-filter" type="search" placeholder="Search name or voice ID" style="width:100%"></label>
-                        <p id="gemini-voices-manager-status" role="status">Click Load / refresh voices to retrieve your hosted designs.</p>
-                        <audio id="gemini-voices-manager-player" controls preload="none" hidden></audio>
-                        <div id="gemini-voices-manager-list"></div>
-                    </div>
-                </div>
-                <div class="section voices-section collapsed" data-voices-section="kokoro">
-                    <div class="voices-section-header">
-                        <div>
-                            <div class="section-title-inline">
-                                <h2>Kokoro Voices</h2>
-                                <button type="button" class="help-icon" data-help-id="kokoro-voices" aria-label="Help: Kokoro Voices">?</button>
-                            </div>
-                            <p class="help-text">Explore all Kokoro voices. Click any voice to hear a preview sample.</p>
-                        </div>
-                        <span class="voices-section-toggle">▶</span>
-                    </div>
-                    <div class="voices-section-content">
-                        <div id="voice-sample-status" class="sample-status info" style="margin-bottom: 15px;">
-                            Loading voice preview status...
-                        </div>
-                        <div id="voice-sample-controls" class="sample-controls">
-                            <button id="generate-voice-samples-btn" class="btn btn-primary" onclick="generateSamples(false)">
-                                Generate Voice Previews
-                            </button>
-                            <button class="btn btn-secondary" onclick="generateSamples(true)">
-                                Regenerate (Overwrite)
-                            </button>
-                        </div>
-                        <div id="voice-library"></div>
-                    </div>
-                </div>
+            <div class="screen-body voices-body" id="voices-body">
+                <!-- Voice prompts -->
+                <section class="voices-panel voices-prompts" id="chatterbox-voices-section" data-voices-section="prompts" role="tabpanel" aria-labelledby="voices-subtab-prompts">
+                    <p class="voices-intro">Reference recordings for cloning engines (Chatterbox, VoxCPM, Qwen3 Clone, OmniVoice, IndexTTS and others). Use 10–15 seconds of one clean speaker and add an exact transcript when the engine needs one. <button type="button" class="help-icon" data-help-id="voice-prompts" aria-label="Help: Voice prompts">?</button></p>
 
-                <div class="section voices-section collapsed" id="custom-voices-section" data-voices-section="custom">
-                    <div class="voices-section-header">
-                        <div>
-                            <div class="section-title-inline">
-                                <h2>Custom Kokoro Voice Blends</h2>
-                                <button type="button" class="help-icon" data-help-id="custom-kokoro-blends" aria-label="Help: Custom Kokoro Voice Blends">?</button>
-                            </div>
-                            <p class="help-text">Blend two Kokoro voices and manage your custom library.</p>
+                    <div class="voices-toolbar" id="voice-list-controls">
+                        <div class="search-box voices-search">
+                            <span class="ms" aria-hidden="true">search</span>
+                            <input type="text" id="voice-search-input" placeholder="Search voices" aria-label="Search voices" autocomplete="off">
                         </div>
-                        <div class="voices-section-actions">
-                            <button class="btn btn-primary" id="create-custom-voice-btn">New Custom Voice</button>
-                            <span class="voices-section-toggle">▶</span>
-                        </div>
+                        <select id="voice-filter-source" class="voices-filter" aria-label="Filter by source">
+                            <option value="all">All sources</option>
+                            <option value="local">Local only</option>
+                            <option value="external">External (GitHub)</option>
+                        </select>
+                        <select id="voice-filter-gender" class="voices-filter" aria-label="Filter by gender">
+                            <option value="all">All genders</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                        <select id="voice-filter-language" class="voices-filter" aria-label="Filter by language">
+                            <option value="all">All languages</option>
+                        </select>
+                        <span class="voices-count" id="voice-list-stats"><span id="voice-count-display">0 voices</span></span>
+                        <span class="voices-toolbar-spacer" aria-hidden="true"></span>
+                        <button type="button" class="btn btn-ghost" id="load-external-voices-btn">Load external voices</button>
+                        <button type="button" class="btn btn-primary voices-add-btn" id="voice-add-btn" aria-haspopup="dialog"><span class="ms" aria-hidden="true">add</span>Add voice</button>
                     </div>
-                    <div class="voices-section-content">
-                        <div id="custom-voices-list" class="custom-voices-grid">
-                            <p class="help-text">Loading custom voices...</p>
-                        </div>
-                    </div>
-                </div>
 
-                <div class="section voices-section collapsed" id="qwen-voices-section" data-voices-section="qwen">
-                    <div class="voices-section-header">
-                        <div>
-                            <div class="section-title-inline">
-                                <h2>Voice Creation</h2>
-                                <button type="button" class="help-icon" data-help-id="qwen-voice-creation" aria-label="Help: Voice Creation">?</button>
-                            </div>
-                            <p class="help-text">Design a voice using AI, preview it, then save it to your prompts.</p>
-                        </div>
-                        <span class="voices-section-toggle">▶</span>
+                    <div class="chatterbox-dropzone voices-dropzone" id="chatterbox-dropzone">
+                        <input type="file" id="chatterbox-dropzone-input" class="voices-visually-hidden" accept=".wav,.mp3,.m4a,.flac,.ogg" multiple tabindex="-1" aria-hidden="true">
+                        <span class="voices-dropzone-icon" aria-hidden="true"></span>
+                        <span class="voices-dropzone-copy">Drop WAV, MP3, M4A, FLAC or OGG clips to bulk import. Clips of 5 s or longer are kept and named after the file.</span>
+                        <button type="button" class="btn-link voices-dropzone-browse">Browse files</button>
                     </div>
-                    <div class="voices-section-content">
-                        <div class="form-group" style="margin-bottom: 16px;">
-                            <label>Voice Design Engine</label>
-                            <div class="btn-group" id="voice-creation-engine-toggle" role="group">
-                                <button type="button" class="btn btn-secondary active" data-voice-engine="qwen3" id="voice-creation-qwen3-btn">Qwen3-TTS</button>
-                                <button type="button" class="btn btn-secondary" data-voice-engine="breeze" id="voice-creation-breeze-btn">Breeze TTS 2</button>
-                                <button type="button" class="btn btn-secondary" data-voice-engine="omnivoice" id="voice-creation-omnivoice-btn">OmniVoice</button>
-                                <button type="button" class="btn btn-secondary" onclick="window.openGeminiVoiceDesigner()">Gemini Voice Design (cloud)</button>
+                    <div class="dropzone-status voices-dropzone-log" id="chatterbox-dropzone-status" aria-live="polite"></div>
+
+                    <div class="voice-batch-toolbar voices-selection-bar" id="voice-batch-toolbar" hidden>
+                        <span class="voices-selection-count" id="voice-selected-count">0 selected</span>
+                        <span class="voices-toolbar-spacer" aria-hidden="true"></span>
+                        <button type="button" class="btn btn-ghost btn-sm" id="voice-batch-export-btn" disabled>Export</button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="voice-batch-transcribe-btn" disabled>Generate transcripts</button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="voice-batch-archive-btn" disabled>Archive</button>
+                        <button type="button" class="btn btn-danger btn-sm" id="voice-batch-delete-btn" disabled>Delete</button>
+                    </div>
+
+                    <div class="voices-table-wrap voice-list-table-container">
+                        <table class="voice-list-table voices-table" id="chatterbox-voice-table">
+                            <thead>
+                                <tr>
+                                    <th class="select-col" scope="col"><input type="checkbox" id="voice-select-all" class="voices-check" aria-label="Select all voices"></th>
+                                    <th class="sortable sort-asc name-col" data-sort="name" scope="col" tabindex="0">Name <span class="sort-icon"></span></th>
+                                    <th class="sortable gender-col" data-sort="gender" scope="col" tabindex="0">Gender <span class="sort-icon"></span></th>
+                                    <th class="sortable language-col" data-sort="language" scope="col" tabindex="0">Language <span class="sort-icon"></span></th>
+                                    <th class="sortable duration-col" data-sort="duration" scope="col" tabindex="0">Duration <span class="sort-icon"></span></th>
+                                    <th class="sortable source-col" data-sort="source" scope="col" tabindex="0">Source <span class="sort-icon"></span></th>
+                                    <th class="transcript-col" scope="col">Transcript</th>
+                                    <th class="actions-col" scope="col"><span class="voices-visually-hidden">Actions</span></th>
+                                </tr>
+                            </thead>
+                            <tbody id="chatterbox-voice-list">
+                                <tr class="voices-empty-row"><td colspan="8" class="voices-empty">Loading voice prompts…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="voices-archive voice-archive-section" id="voice-archive-section">
+                        <button type="button" class="voices-archive-toggle" id="voice-archive-toggle" aria-expanded="false" aria-controls="voice-archive-body">
+                            <span class="voices-archive-title">Archived voices</span>
+                            <span class="voices-archive-count" data-voices-count="archived">0</span>
+                            <span class="voices-toolbar-spacer" aria-hidden="true"></span>
+                            <span class="ms voices-archive-chevron" aria-hidden="true">expand_more</span>
+                        </button>
+                        <div class="voices-archive-body" id="voice-archive-body" hidden>
+                            <p class="voices-archive-empty" id="voice-archive-empty">No archived voices. Archiving hides a voice from speaker pickers without deleting the file.</p>
+                            <div class="voices-archive-content" id="voice-archive-content" hidden>
+                                <div class="voice-batch-toolbar voices-selection-bar" id="voice-archive-toolbar" hidden>
+                                    <span class="voices-selection-count" id="voice-archive-selected-count">0 selected</span>
+                                    <span class="voices-toolbar-spacer" aria-hidden="true"></span>
+                                    <button type="button" class="btn btn-ghost btn-sm" id="voice-archive-export-btn" disabled>Export</button>
+                                    <button type="button" class="btn btn-ghost btn-sm" id="voice-archive-restore-btn" disabled>Unarchive</button>
+                                    <button type="button" class="btn btn-danger btn-sm" id="voice-archive-delete-btn" disabled>Delete</button>
+                                </div>
+                                <div class="voices-table-wrap voices-table-wrap-flat voice-list-table-container">
+                                    <table class="voice-list-table voices-table" id="chatterbox-voice-archive-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="select-col" scope="col"><input type="checkbox" id="voice-archive-select-all" class="voices-check" aria-label="Select all archived voices"></th>
+                                                <th class="sortable sort-asc name-col" data-sort="name" scope="col" tabindex="0">Name <span class="sort-icon"></span></th>
+                                                <th class="sortable gender-col" data-sort="gender" scope="col" tabindex="0">Gender <span class="sort-icon"></span></th>
+                                                <th class="sortable language-col" data-sort="language" scope="col" tabindex="0">Language <span class="sort-icon"></span></th>
+                                                <th class="sortable duration-col" data-sort="duration" scope="col" tabindex="0">Duration <span class="sort-icon"></span></th>
+                                                <th class="sortable source-col" data-sort="source" scope="col" tabindex="0">Source <span class="sort-icon"></span></th>
+                                                <th class="transcript-col" scope="col">Transcript</th>
+                                                <th class="actions-col" scope="col"><span class="voices-visually-hidden">Actions</span></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="chatterbox-voice-archive-list">
+                                            <tr class="voices-empty-row"><td colspan="8" class="voices-empty">No archived voices.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Kokoro built-in voices -->
+                <section class="voices-panel voices-kokoro" id="kokoro-voices-section" data-voices-section="kokoro" role="tabpanel" aria-labelledby="voices-subtab-kokoro" hidden>
+                    <div class="voices-kokoro-bar">
+                        <div class="voices-kokoro-status">
+                            <div id="voice-sample-status" class="sample-status info" role="status">Loading voice preview status…</div>
+                            <button type="button" class="help-icon" data-help-id="kokoro-voices" aria-label="Help: Kokoro voices">?</button>
+                        </div>
+                        <div id="voice-sample-controls" class="sample-controls voices-sample-controls">
+                            <button type="button" id="regenerate-voice-samples-btn" class="btn btn-ghost" onclick="generateSamples(true)">Regenerate all</button>
+                            <button type="button" id="generate-voice-samples-btn" class="btn btn-secondary" onclick="generateSamples(false)">Generate missing previews</button>
+                        </div>
+                    </div>
+                    <div id="voice-library" class="voices-kokoro-grid"></div>
+                </section>
+
+                <!-- Kokoro blends -->
+                <section class="voices-panel voices-blends" id="custom-voices-section" data-voices-section="custom" role="tabpanel" aria-labelledby="voices-subtab-custom" hidden>
+                    <div class="voices-panel-bar">
+                        <p class="voices-intro">Mix built-in Kokoro voices from one language into a new voice. Blends appear in every Kokoro voice picker. <button type="button" class="help-icon" data-help-id="custom-kokoro-blends" aria-label="Help: Kokoro blends">?</button></p>
+                        <button type="button" class="btn btn-primary voices-add-btn" id="create-custom-voice-btn" aria-haspopup="dialog"><span class="ms" aria-hidden="true">add</span>New blend</button>
+                    </div>
+                    <div id="custom-voices-list" class="custom-voices-grid voices-blend-list">
+                        <p class="voices-empty">Loading blends…</p>
+                    </div>
+                </section>
+
+                <!-- Voice creation (Qwen3 / Breeze / OmniVoice, Gemini designer) -->
+                <section class="voices-panel voices-creation" id="qwen-voices-section" data-voices-section="qwen" role="tabpanel" aria-labelledby="voices-subtab-qwen" hidden>
+                    <p class="voices-intro">Describe a voice, generate a preview, then save it to Voice prompts so any cloning engine can use it. <button type="button" class="help-icon" data-help-id="qwen-voice-creation" aria-label="Help: Voice creation">?</button></p>
+                    <div class="creation-panel">
+                        <div class="creation-engine-row">
+                            <span class="creation-engine-label" id="voice-creation-engine-label">Design engine</span>
+                            <div class="seg btn-group creation-engine-seg" id="voice-creation-engine-toggle" role="group" aria-labelledby="voice-creation-engine-label">
+                                <button type="button" class="seg-item active" data-voice-engine="qwen3" id="voice-creation-qwen3-btn" aria-pressed="true">Qwen3-TTS</button>
+                                <button type="button" class="seg-item" data-voice-engine="breeze" id="voice-creation-breeze-btn" aria-pressed="false">Breeze TTS 2</button>
+                                <button type="button" class="seg-item" data-voice-engine="omnivoice" id="voice-creation-omnivoice-btn" aria-pressed="false">OmniVoice</button>
+                            </div>
+                            <span class="voices-toolbar-spacer" aria-hidden="true"></span>
+                            <button type="button" class="btn btn-ghost btn-sm creation-gemini-btn" onclick="window.openGeminiVoiceDesigner()" aria-haspopup="dialog"><span class="ms" aria-hidden="true">cloud</span>Gemini voice design</button>
                         </div>
 
                         <!-- Shared Qwen3 / Breeze voice-design fields -->
-                        <div id="voice-creation-qwen3-fields">
-                            <div class="qwen-voice-grid">
-                                <div class="form-group">
-                                    <label for="qwen-voice-name">Voice Name</label>
+                        <div id="voice-creation-qwen3-fields" class="creation-fields">
+                            <div class="creation-grid creation-grid-4">
+                                <label class="field">
+                                    <span class="field-label">Voice name</span>
                                     <input type="text" id="qwen-voice-name" placeholder="e.g. Velvet Noir">
-                                </div>
-                                <div class="form-group">
-                                    <label for="qwen-voice-gender">Gender</label>
+                                </label>
+                                <label class="field">
+                                    <span class="field-label">Gender</span>
                                     <select id="qwen-voice-gender">
-                                        <option value="">— Not specified —</option>
+                                        <option value="">Not specified</option>
                                         <option value="Male">Male</option>
                                         <option value="Female">Female</option>
                                     </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="qwen-voice-language">Language</label>
+                                </label>
+                                <label class="field">
+                                    <span class="field-label">Language</span>
                                     <select id="qwen-voice-language">
                                         <option value="Auto">Auto</option>
                                     </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="qwen-voice-description">Short Description</label>
+                                </label>
+                                <label class="field">
+                                    <span class="field-label">Short description</span>
                                     <input type="text" id="qwen-voice-description" placeholder="Moody, intimate noir narrator">
-                                </div>
+                                </label>
                             </div>
-                            <div class="form-group">
-                                <label for="qwen-voice-text">Sample Text</label>
-                                <textarea id="qwen-voice-text" rows="3" placeholder="Type a short script for the preview clip..."></textarea>
+                            <div class="creation-grid creation-grid-2">
+                                <label class="field">
+                                    <span class="field-label">Sample text</span>
+                                    <textarea id="qwen-voice-text" rows="3" placeholder="Type a short script for the preview clip..."></textarea>
+                                </label>
+                                <label class="field">
+                                    <span class="field-label">Voice style instruction</span>
+                                    <textarea id="qwen-voice-instruct" rows="3" placeholder="e.g., Speak with controlled intensity and a smoky, cinematic tone."></textarea>
+                                </label>
                             </div>
-                            <div class="form-group">
-                                <label for="qwen-voice-instruct">Voice Style Instruction</label>
-                                <textarea id="qwen-voice-instruct" rows="3" placeholder="e.g., Speak with controlled intensity and a smoky, cinematic tone."></textarea>
+                            <div class="qwen-voice-actions creation-actions">
+                                <button type="button" class="btn btn-primary" id="qwen-voice-generate-btn" disabled title="Checking voice-design engine availability…">Generate preview</button>
+                                <button type="button" class="btn btn-secondary" id="qwen-voice-save-btn" disabled>Save to voice prompts</button>
+                                <span class="creation-status" id="qwen-voice-status" role="status"></span>
                             </div>
-                            <div class="qwen-voice-actions">
-                                <button type="button" class="btn btn-primary" id="qwen-voice-generate-btn" disabled title="Checking voice-design engine availability…">Generate Preview</button>
-                                <button type="button" class="btn btn-secondary" id="qwen-voice-save-btn" disabled>Save to Voice Prompts</button>
-                                <span class="help-text" id="qwen-voice-status"></span>
-                            </div>
-                            <div id="qwen-voice-unavailable" class="engine-action-notice hidden">
+                            <div id="qwen-voice-unavailable" class="engine-action-notice creation-notice hidden">
+                                <span class="ms" aria-hidden="true">info</span>
                                 <span id="voice-creation-unavailable-message">The selected voice-design engine must be installed before voices can be generated.</span>
-                                <button type="button" class="btn btn-secondary btn-sm" id="voice-creation-open-engine-settings">Open Engine Settings</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="voice-creation-open-engine-settings">Open engine settings</button>
                             </div>
-                            <div class="qwen-voice-preview">
+                            <div class="qwen-voice-preview creation-preview">
+                                <span class="creation-preview-label">Preview</span>
                                 <audio id="qwen-voice-preview" controls></audio>
+                                <span class="creation-preview-empty">Generate a preview to listen to it here.</span>
                             </div>
                         </div>
 
                         <!-- OmniVoice fields -->
-                        <div id="voice-creation-omnivoice-fields" style="display: none;">
-                            <div class="qwen-voice-grid">
-                                <div class="form-group">
-                                    <label for="omnivoice-vc-name">Voice Name</label>
+                        <div id="voice-creation-omnivoice-fields" class="creation-fields" style="display: none;">
+                            <div class="creation-grid creation-grid-3">
+                                <label class="field">
+                                    <span class="field-label">Voice name</span>
                                     <input type="text" id="omnivoice-vc-name" placeholder="e.g. Velvet Noir">
-                                </div>
-                                <div class="form-group">
-                                    <label for="omnivoice-vc-gender">Gender</label>
+                                </label>
+                                <label class="field">
+                                    <span class="field-label">Gender</span>
                                     <select id="omnivoice-vc-gender">
-                                        <option value="">— Not specified —</option>
+                                        <option value="">Not specified</option>
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
                                     </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="omnivoice-vc-description">Short Description</label>
+                                </label>
+                                <label class="field">
+                                    <span class="field-label">Short description</span>
                                     <input type="text" id="omnivoice-vc-description" placeholder="Moody, intimate noir narrator">
-                                </div>
+                                </label>
                             </div>
-                            <div class="form-group">
-                                <label for="omnivoice-vc-text">Sample Text</label>
+                            <label class="field">
+                                <span class="field-label">Sample text</span>
                                 <textarea id="omnivoice-vc-text" rows="3" placeholder="Type a short script for the preview clip..."></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label>Voice Instruction <small style="font-weight:normal;opacity:.7;">(click to toggle)</small></label>
+                            </label>
+                            <div class="field">
+                                <span class="field-label">Voice instruction <span class="field-label-note">· click a tag to toggle it, one per group</span></span>
                                 <div id="omnivoice-vc-instruct-tags" class="omnivoice-tag-picker">
                                     <span class="omnivoice-tag-group-label">Gender</span>
                                     <button type="button" class="omnivoice-tag" data-instruct="female">female</button>
@@ -633,155 +703,38 @@
                                     <button type="button" class="omnivoice-tag" data-instruct="portuguese accent">portuguese accent</button>
                                     <button type="button" class="omnivoice-tag" data-instruct="russian accent">russian accent</button>
                                 </div>
-                                <small id="omnivoice-vc-instruct-preview" style="display:block;margin-top:4px;opacity:.8;">No tags selected — select at least one above.</small>
+                                <small id="omnivoice-vc-instruct-preview" class="field-hint">No tags selected — select at least one above.</small>
                             </div>
-                            <div class="qwen-voice-actions">
-                                <button type="button" class="btn btn-primary" id="omnivoice-vc-generate-btn">Generate Preview</button>
-                                <button type="button" class="btn btn-secondary" id="omnivoice-vc-save-btn" disabled>Save to Voice Prompts</button>
-                                <span class="help-text" id="omnivoice-vc-status"></span>
+                            <div class="qwen-voice-actions creation-actions">
+                                <button type="button" class="btn btn-primary" id="omnivoice-vc-generate-btn">Generate preview</button>
+                                <button type="button" class="btn btn-secondary" id="omnivoice-vc-save-btn" disabled>Save to voice prompts</button>
+                                <span class="creation-status" id="omnivoice-vc-status" role="status"></span>
                             </div>
-                            <div class="qwen-voice-preview">
+                            <div class="qwen-voice-preview creation-preview">
+                                <span class="creation-preview-label">Preview</span>
                                 <audio id="omnivoice-vc-preview" controls></audio>
+                                <span class="creation-preview-empty">Generate a preview to listen to it here.</span>
                             </div>
                         </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="section voices-section collapsed" id="chatterbox-voices-section" data-voices-section="prompts">
-                    <div class="voices-section-header">
-                        <div>
-                            <div class="section-title-inline">
-                                <h2>Voice Prompts</h2>
-                                <button type="button" class="help-icon" data-help-id="voice-prompts" aria-label="Help: Voice Prompts">?</button>
-                            </div>
-                            <p class="help-text">Manage reference voice libraries for Chatterbox, VoxCPM, Qwen3, and cloning-capable LocalAI models.</p>
+                <!-- Gemini hosted (cloud) voices -->
+                <section class="voices-panel voices-gemini" id="gemini-hosted-voices-section" data-voices-section="gemini-hosted" role="tabpanel" aria-labelledby="voices-subtab-gemini-hosted" hidden>
+                    <p class="voices-intro">Designed voices stored in your Google project, including older audition candidates. They are hosted by Google and are not local voice prompts.</p>
+                    <div class="voices-toolbar">
+                        <div class="search-box voices-search">
+                            <span class="ms" aria-hidden="true">search</span>
+                            <input id="gemini-voices-filter" type="search" placeholder="Search name or voice ID" aria-label="Filter Gemini cloud voices" autocomplete="off">
                         </div>
-                        <span class="voices-section-toggle">▶</span>
+                        <span class="voices-toolbar-spacer" aria-hidden="true"></span>
+                        <button type="button" class="btn btn-ghost" id="gemini-voices-refresh">Load / refresh voices</button>
+                        <button type="button" class="btn btn-primary voices-add-btn" onclick="window.openGeminiVoiceDesigner()" aria-haspopup="dialog"><span class="ms" aria-hidden="true">add</span>Design new voice</button>
                     </div>
-                    <div class="voices-section-content">
-                        <form id="chatterbox-voice-form" class="chatterbox-voice-form">
-                            <div class="form-group">
-                                <label for="chatterbox-voice-name">Voice Name</label>
-                                <input type="text" id="chatterbox-voice-name" placeholder="e.g. Detective Rowan">
-                            </div>
-                            <div class="form-group">
-                                <label for="chatterbox-voice-file">Audio File</label>
-                                <input type="file" id="chatterbox-voice-file" accept=".wav,.mp3,.m4a,.flac,.ogg">
-                            </div>
-                            <div class="form-group">
-                                <label for="chatterbox-voice-transcript">Exact Transcript (recommended)</label>
-                                <textarea id="chatterbox-voice-transcript" rows="3" placeholder="Enter exactly what is spoken in this sample."></textarea>
-                                <small>Required when this sample is sent to a LocalAI voice-cloning model.</small>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn btn-primary">Save Voice</button>
-                            </div>
-                        </form>
-                        <div class="chatterbox-dropzone" id="chatterbox-dropzone">
-                            <input type="file" id="chatterbox-dropzone-input" accept=".wav,.mp3,.m4a,.flac,.ogg" multiple>
-                            <div class="dropzone-content">
-                                <h3>Bulk import via drag & drop</h3>
-                                <p>Drop multiple WAV/MP3 clips (5–10s). We'll keep any clips ≥5s and name them after the file.</p>
-                                <button type="button" class="btn btn-secondary btn-sm">Browse Files</button>
-                            </div>
-                            <div class="dropzone-status" id="chatterbox-dropzone-status"></div>
-                        </div>
-                        
-                        <!-- Voice List Filters -->
-                        <div class="voice-list-controls" id="voice-list-controls">
-                            <div class="voice-filter-row">
-                                <input type="text" id="voice-search-input" placeholder="Search voices..." class="voice-search-input">
-                                <select id="voice-filter-source" class="voice-filter-select">
-                                    <option value="all">All Sources</option>
-                                    <option value="local">Local Only</option>
-                                    <option value="external">External (GitHub)</option>
-                                </select>
-                                <select id="voice-filter-gender" class="voice-filter-select">
-                                    <option value="all">All Genders</option>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
-                                <select id="voice-filter-language" class="voice-filter-select">
-                                    <option value="all">All Languages</option>
-                                </select>
-                                <button type="button" class="btn btn-secondary btn-sm" id="load-external-voices-btn">
-                                    Load External Voices
-                                </button>
-                            </div>
-                            <div class="voice-list-stats" id="voice-list-stats">
-                                <span id="voice-count-display">0 voices</span>
-                            </div>
-                        </div>
-
-                        <div class="voice-batch-toolbar" id="voice-batch-toolbar">
-                            <div class="voice-batch-summary">
-                                <span id="voice-selected-count">0 selected</span>
-                            </div>
-                            <div class="voice-batch-actions">
-                                <button type="button" class="btn btn-secondary btn-sm" id="voice-batch-export-btn" disabled>Export</button>
-                                <button type="button" class="btn btn-secondary btn-sm" id="voice-batch-transcribe-btn" disabled>Generate Transcripts</button>
-                                <button type="button" class="btn btn-secondary btn-sm" id="voice-batch-archive-btn" disabled>Archive</button>
-                                <button type="button" class="btn btn-danger btn-sm" id="voice-batch-delete-btn" disabled>Delete</button>
-                            </div>
-                        </div>
-                        
-                        <!-- Voice List Table -->
-                        <div class="voice-list-table-container">
-                            <table class="voice-list-table" id="chatterbox-voice-table">
-                                <thead>
-                                    <tr>
-                                        <th class="select-col"><input type="checkbox" id="voice-select-all" aria-label="Select all voices"></th>
-                                        <th class="sortable" data-sort="name">Name <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="gender">Gender <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="language">Language <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="duration">Duration <span class="sort-icon"></span></th>
-                                        <th class="sortable" data-sort="source">Source <span class="sort-icon"></span></th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="chatterbox-voice-list">
-                                    <tr><td colspan="7" class="help-text">No saved voices yet. Add one above.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="voice-archive-section" id="voice-archive-section">
-                            <div class="section-title-inline" style="margin-top: 18px;">
-                                <h3>Archived Voices</h3>
-                            </div>
-                            <p class="help-text">Hidden voices live here until you restore them.</p>
-                            <div class="voice-batch-toolbar" id="voice-archive-toolbar">
-                                <div class="voice-batch-summary">
-                                    <span id="voice-archive-selected-count">0 selected</span>
-                                </div>
-                                <div class="voice-batch-actions">
-                                    <button type="button" class="btn btn-secondary btn-sm" id="voice-archive-export-btn" disabled>Export</button>
-                                    <button type="button" class="btn btn-secondary btn-sm" id="voice-archive-restore-btn" disabled>Unarchive</button>
-                                    <button type="button" class="btn btn-danger btn-sm" id="voice-archive-delete-btn" disabled>Delete</button>
-                                </div>
-                            </div>
-                            <div class="voice-list-table-container">
-                                <table class="voice-list-table" id="chatterbox-voice-archive-table">
-                                    <thead>
-                                        <tr>
-                                            <th class="select-col"><input type="checkbox" id="voice-archive-select-all" aria-label="Select all archived voices"></th>
-                                            <th class="sortable" data-sort="name">Name <span class="sort-icon"></span></th>
-                                            <th class="sortable" data-sort="gender">Gender <span class="sort-icon"></span></th>
-                                            <th class="sortable" data-sort="language">Language <span class="sort-icon"></span></th>
-                                            <th class="sortable" data-sort="duration">Duration <span class="sort-icon"></span></th>
-                                            <th class="sortable" data-sort="source">Source <span class="sort-icon"></span></th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="chatterbox-voice-archive-list">
-                                        <tr><td colspan="7" class="help-text">No archived voices.</td></tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+                    <p id="gemini-voices-manager-status" class="voices-status-line" role="status">Click Load / refresh voices to retrieve your hosted designs.</p>
+                    <audio id="gemini-voices-manager-player" class="voices-player" controls preload="none" hidden></audio>
+                    <div id="gemini-voices-manager-list" class="gemini-manager-list"></div>
+                </section>
             </div>
         </div>
 
@@ -3013,93 +2966,131 @@
         </div>
     </div>
 
+    <!-- Kokoro blend modal (Voices › Kokoro blends) -->
     <div class="modal-overlay hidden" id="custom-voice-modal-overlay">
-        <div class="modal hidden" id="custom-voice-modal">
+        <div class="modal hidden voices-modal" id="custom-voice-modal" role="dialog" aria-modal="true" aria-labelledby="custom-voice-modal-title">
             <div class="modal-header">
-                <h3 id="custom-voice-modal-title">Create Custom Voice</h3>
-                <button class="modal-close" id="custom-voice-modal-close">&times;</button>
+                <h3 id="custom-voice-modal-title">New blend</h3>
+                <button type="button" class="modal-close" id="custom-voice-modal-close" aria-label="Close">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="custom-voice-form">
-                    <div class="form-group">
-                        <label for="custom-voice-name">Voice Name</label>
-                        <input type="text" id="custom-voice-name" maxlength="80" required>
-                        <small>Displayed throughout the app. Keep it short and descriptive.</small>
+                <form id="custom-voice-form" class="voices-modal-form">
+                    <div class="voices-modal-grid">
+                        <label class="field">
+                            <span class="field-label">Name</span>
+                            <input type="text" id="custom-voice-name" maxlength="80" required placeholder="e.g. Warm narrator blend">
+                            <span class="field-hint">Shown in every Kokoro voice picker. Keep it short.</span>
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Language</span>
+                            <select id="custom-voice-lang" required>
+                                <option value="a">American English</option>
+                                <option value="b">British English</option>
+                                <option value="e">Spanish</option>
+                                <option value="f">French</option>
+                                <option value="h">Hindi</option>
+                                <option value="j">Japanese</option>
+                                <option value="z">Mandarin Chinese</option>
+                                <option value="p">Brazilian Portuguese</option>
+                            </select>
+                            <span class="field-hint">Only voices from this language can be blended.</span>
+                        </label>
                     </div>
-                    <div class="form-group">
-                        <label for="custom-voice-lang">Language</label>
-                        <select id="custom-voice-lang" required>
-                            <option value="a">American English</option>
-                            <option value="b">British English</option>
-                            <option value="e">Spanish</option>
-                            <option value="f">French</option>
-                            <option value="h">Hindi</option>
-                            <option value="j">Japanese</option>
-                            <option value="z">Mandarin Chinese</option>
-                            <option value="p">Brazilian Portuguese</option>
-                        </select>
-                        <small>Only voices from this language can be blended.</small>
-                    </div>
-                    <div class="form-group">
-                        <label>Components</label>
+                    <div class="field">
+                        <span class="field-label">Components</span>
+                        <div class="component-head" aria-hidden="true"><span>Voice</span><span>Weight</span><span></span></div>
                         <div id="custom-voice-components" class="component-rows"></div>
-                        <button type="button" class="btn btn-secondary" id="add-component-btn">Add Component</button>
-                        <small>Each component is an existing Kokoro voice plus an optional weight.</small>
+                        <div class="component-footer">
+                            <button type="button" class="btn btn-ghost btn-sm" id="add-component-btn"><span class="ms" aria-hidden="true">add</span>Add component</button>
+                            <span class="field-hint">Each component is a built-in Kokoro voice with an optional weight.</span>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="custom-voice-notes">Notes (optional)</label>
+                    <label class="field">
+                        <span class="field-label">Notes <span class="field-label-note">(optional)</span></span>
                         <textarea id="custom-voice-notes" rows="3" placeholder="Describe the blend or who it’s for..."></textarea>
-                    </div>
+                    </label>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="custom-voice-cancel">Cancel</button>
-                <button class="btn btn-primary" id="custom-voice-save">Save Voice</button>
+                <button type="button" class="btn btn-ghost" id="custom-voice-cancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="custom-voice-save">Save blend</button>
             </div>
         </div>
     </div>
 
     <!-- Edit Voice Metadata Modal -->
     <div id="edit-voice-modal-overlay" class="modal-overlay hidden"></div>
-    <div id="edit-voice-modal" class="modal hidden">
+    <div id="edit-voice-modal" class="modal hidden voices-modal" role="dialog" aria-modal="true" aria-labelledby="edit-voice-modal-title">
         <div class="modal-header">
-            <h3>Edit Voice</h3>
-            <button class="modal-close" id="edit-voice-close">&times;</button>
+            <h3 id="edit-voice-modal-title">Edit voice</h3>
+            <button type="button" class="modal-close" id="edit-voice-close" aria-label="Close">&times;</button>
         </div>
         <div class="modal-body">
-            <form id="edit-voice-form">
+            <form id="edit-voice-form" class="voices-modal-form">
                 <input type="hidden" id="edit-voice-id">
-                <div class="form-group">
-                    <label for="edit-voice-name">Display Name</label>
+                <label class="field">
+                    <span class="field-label">Display name</span>
                     <input type="text" id="edit-voice-name" placeholder="e.g., Sonia British Female">
-                    <small>A friendly name for this voice prompt.</small>
+                </label>
+                <div class="voices-modal-grid">
+                    <label class="field">
+                        <span class="field-label">Gender</span>
+                        <select id="edit-voice-gender">
+                            <option value="">Not specified</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Language</span>
+                        <select id="edit-voice-language">
+                            <option value="">Not specified</option>
+                        </select>
+                    </label>
                 </div>
-                <div class="form-group">
-                    <label for="edit-voice-gender">Gender</label>
-                    <select id="edit-voice-gender">
-                        <option value="">— Not specified —</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="edit-voice-language">Language</label>
-                    <select id="edit-voice-language">
-                        <option value="">— Not specified —</option>
-                    </select>
-                    <small>The language/accent of this voice sample.</small>
-                </div>
-                <div class="form-group">
-                    <label for="edit-voice-transcript">Exact Transcript</label>
+                <label class="field">
+                    <span class="field-label">Exact transcript</span>
                     <textarea id="edit-voice-transcript" rows="4" placeholder="Enter exactly what is spoken in the audio sample."></textarea>
-                    <small>Required to use this sample with LocalAI voice cloning. Generated samples are filled automatically when their preview text is known.</small>
-                </div>
+                    <span class="field-hint">Required to use this sample with LocalAI voice cloning. Generated samples are filled automatically when their preview text is known.</span>
+                </label>
             </form>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" id="edit-voice-cancel">Cancel</button>
-            <button class="btn btn-primary" id="edit-voice-save">Save Changes</button>
+            <button type="button" class="btn btn-ghost" id="edit-voice-cancel">Cancel</button>
+            <button type="button" class="btn btn-primary" id="edit-voice-save">Save changes</button>
         </div>
+    </div>
+
+    <!-- Add Voice Prompt Modal (Voices › Voice prompts › Add voice) -->
+    <div id="add-voice-modal-overlay" class="modal-overlay hidden"></div>
+    <div id="add-voice-modal" class="modal hidden voices-modal" role="dialog" aria-modal="true" aria-labelledby="add-voice-modal-title">
+        <form id="chatterbox-voice-form" class="voices-modal-shell">
+            <div class="modal-header">
+                <h3 id="add-voice-modal-title">Add voice</h3>
+                <button type="button" class="modal-close" id="add-voice-modal-close" aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body voices-modal-form">
+                <p class="voices-modal-lede">Upload one clean recording of a single speaker, ideally 10–15 seconds long.</p>
+                <label class="field">
+                    <span class="field-label">Voice name</span>
+                    <input type="text" id="chatterbox-voice-name" placeholder="e.g. Detective Rowan">
+                </label>
+                <label class="field">
+                    <span class="field-label">Audio file</span>
+                    <input type="file" id="chatterbox-voice-file" accept=".wav,.mp3,.m4a,.flac,.ogg">
+                    <span class="field-hint">WAV, MP3, M4A, FLAC or OGG.</span>
+                </label>
+                <label class="field">
+                    <span class="field-label">Exact transcript <span class="field-label-note">(recommended)</span></span>
+                    <textarea id="chatterbox-voice-transcript" rows="3" placeholder="Enter exactly what is spoken in this sample."></textarea>
+                    <span class="field-hint">Required when this sample is sent to a LocalAI voice-cloning model.</span>
+                </label>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-ghost" id="add-voice-cancel">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="add-voice-save">Save voice</button>
+            </div>
+        </form>
     </div>
 
     <!-- Alt Word Registry Modal -->

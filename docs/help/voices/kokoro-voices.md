@@ -1,10 +1,10 @@
 # Kokoro Voices and Previews
 
-Kokoro includes built-in voices grouped by language. Open [Available Voices](app:voices) and expand **Kokoro Voices** to browse them.
+Kokoro includes built-in voices grouped by language. Open [Voices](app:voices) and select the **Kokoro** sub-tab to browse them. Each language has its own card listing its voices with their gender and voice code.
 
-![Kokoro voice browser showing language filters and preview actions](../../../static/help/screenshots/kokoro-voice-browser.png)
+![Kokoro voice browser showing language groups and preview actions](../../../static/help/screenshots/kokoro-voice-browser.png)
 
-*Filter the catalog by language, then generate and compare previews before assigning a voice to a speaker.*
+*Browse the catalog by language, then generate and compare previews before assigning a voice to a speaker.*
 
 ## Choose the correct language group
 
@@ -23,7 +23,9 @@ Choose a voice from the same language group as the text. A voice can sometimes p
 
 ## Generate and play previews
 
-The Kokoro preview area can generate sample audio for the voice catalog. Preview generation loads the local Kokoro engine and can take longer on the first run. Existing previews can be overwritten when you deliberately regenerate them.
+The status line at the top of the Kokoro sub-tab shows how many voices still lack a preview sample. **Generate missing previews** creates samples only for those voices; **Regenerate all** deliberately overwrites every existing preview. Preview generation loads the local Kokoro engine and can take longer on the first run.
+
+Click a voice's play button to hear its preview and click it again to stop. Voices without a preview show a muted speaker icon instead. An **In use** pill marks voices that are currently assigned to a speaker on Generate.
 
 Use the same short test sentence when comparing several voices. Include one proper name, a number, and representative punctuation from the manuscript. A catalog preview is useful for tone, but a **Quick Test** from the speaker assignment modal is more representative because it uses the job's current text and voice settings.
 
