@@ -996,6 +996,9 @@ function displayLibraryItems(items, preservePage = false) {
         const count = query ? `${filtered.length} of ${items.length} ${noun}` : `${items.length} ${noun}`;
         subtitle.textContent = items.length ? `${count} · ${formatLibraryBytes(totalBytes)}` : count;
     }
+    // Like Queue's "Clear queue": nothing to clear on an empty library (unfiltered count, not the search hits).
+    const clearLibraryBtn = document.getElementById('clear-library-btn');
+    if (clearLibraryBtn) clearLibraryBtn.disabled = items.length === 0;
     let navigation = document.getElementById('library-pagination');
     if (!navigation) {
         navigation = document.createElement('div');
@@ -2390,14 +2393,14 @@ function renderChunkReviewModal(data) {
                         <div class="bulk-regen-row">
                             <div class="bulk-regen-field">
                                 <label>TTS engine</label>
-                                <select class="bulk-speaker-engine-select" data-speaker="${speakerAttr}">
+                                <select class="bulk-speaker-engine-select" data-speaker="${speakerAttr}" aria-label="TTS engine for ${speakerAttr}">
                                     <option value="">-- Same engine --</option>
                                 </select>
                             </div>
                             <div class="bulk-regen-field">
                                 <label>Voice</label>
                                 <div class="bulk-voice-pick">
-                                    <select class="bulk-speaker-voice-select" data-speaker="${speakerAttr}">
+                                    <select class="bulk-speaker-voice-select" data-speaker="${speakerAttr}" aria-label="Voice for ${speakerAttr}">
                                         <option value="">-- Select voice --</option>
                                     </select>
                                     <button type="button" class="btn btn-sm btn-ghost bulk-speaker-preview" disabled>Play</button>
@@ -2408,13 +2411,13 @@ function renderChunkReviewModal(data) {
                             <div class="bulk-regen-row">
                                 <div class="bulk-regen-field">
                                     <label>Gender</label>
-                                    <select class="bulk-voice-filter-gender" data-speaker="${speakerAttr}">
+                                    <select class="bulk-voice-filter-gender" data-speaker="${speakerAttr}" aria-label="Voice gender filter for ${speakerAttr}">
                                         <option value="all">All</option>
                                     </select>
                                 </div>
                                 <div class="bulk-regen-field">
                                     <label>Language</label>
-                                    <select class="bulk-voice-filter-language" data-speaker="${speakerAttr}">
+                                    <select class="bulk-voice-filter-language" data-speaker="${speakerAttr}" aria-label="Voice language filter for ${speakerAttr}">
                                         <option value="all">All</option>
                                     </select>
                                 </div>
@@ -2424,13 +2427,13 @@ function renderChunkReviewModal(data) {
                             <div class="bulk-regen-row">
                                 <div class="bulk-regen-field">
                                     <label>Language</label>
-                                    <select class="bulk-qwen3-language" data-speaker="${speakerAttr}">
+                                    <select class="bulk-qwen3-language" data-speaker="${speakerAttr}" aria-label="Qwen3 language for ${speakerAttr}">
                                         <option value="Auto">Auto</option>
                                     </select>
                                 </div>
                                 <div class="bulk-regen-field bulk-regen-field-wide">
                                     <label>Custom instruction (optional)</label>
-                                    <input type="text" class="bulk-qwen3-instruct" data-speaker="${speakerAttr}"
+                                    <input type="text" class="bulk-qwen3-instruct" data-speaker="${speakerAttr}" aria-label="Custom instruction for ${speakerAttr}"
                                            value="${libraryEscapeAttr(speakerInstruction)}"
                                            placeholder="e.g., Speak with excitement" />
                                 </div>
@@ -2448,12 +2451,12 @@ function renderChunkReviewModal(data) {
                         <div class="bulk-fx-row">
                             <div class="bulk-fx-control">
                                 <label>Speed</label>
-                                <input type="range" class="bulk-speed-slider" data-speaker="${speakerAttr}" min="0.5" max="2.0" step="0.01" value="1.0">
+                                <input type="range" class="bulk-speed-slider" data-speaker="${speakerAttr}" aria-label="Speed for ${speakerAttr}" min="0.5" max="2.0" step="0.01" value="1.0">
                                 <span class="bulk-speed-value">1.0x</span>
                             </div>
                             <div class="bulk-fx-control">
                                 <label>Pitch</label>
-                                <input type="range" class="bulk-pitch-slider" data-speaker="${speakerAttr}" min="-6" max="6" step="0.5" value="0">
+                                <input type="range" class="bulk-pitch-slider" data-speaker="${speakerAttr}" aria-label="Pitch for ${speakerAttr}" min="-6" max="6" step="0.5" value="0">
                                 <span class="bulk-pitch-value">0</span>
                             </div>
                         </div>
@@ -2461,10 +2464,10 @@ function renderChunkReviewModal(data) {
                             <div class="bulk-silence-row">
                                 <span class="bulk-silence-label">Silence (seconds)</span>
                                 <label>Lead</label>
-                                <input type="number" class="bulk-leading-silence" data-speaker="${speakerAttr}" min="0" max="30" step="0.1" value="0">
+                                <input type="number" class="bulk-leading-silence" data-speaker="${speakerAttr}" aria-label="Leading silence for ${speakerAttr} (seconds)" min="0" max="30" step="0.1" value="0">
                                 <span class="bulk-leading-silence-value">0s</span>
                                 <label>Trail</label>
-                                <input type="number" class="bulk-trailing-silence" data-speaker="${speakerAttr}" min="0" max="30" step="0.1" value="0">
+                                <input type="number" class="bulk-trailing-silence" data-speaker="${speakerAttr}" aria-label="Trailing silence for ${speakerAttr} (seconds)" min="0" max="30" step="0.1" value="0">
                                 <span class="bulk-trailing-silence-value">0s</span>
                             </div>
                         </div>
@@ -2885,8 +2888,8 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                         </div>
                     </div>
                     <div class="chunk-text-section">
-                        <label>Text:</label>
-                        <textarea class="library-chunk-textarea" data-chunk-id="${chunkId}" rows="3">${escapeHtml(text)}</textarea>
+                        <label for="chunk-text-${libraryEscapeAttr(chunkId)}">Text:</label>
+                        <textarea id="chunk-text-${libraryEscapeAttr(chunkId)}" class="library-chunk-textarea" data-chunk-id="${chunkId}" rows="3">${escapeHtml(text)}</textarea>
                     </div>
                 </div>
                 <div class="chunk-detail-section chunk-regen-section">
@@ -2917,7 +2920,7 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                     </div>
                     <div class="chunk-qwen3-options" data-chunk-id="${chunkId}" style="display: none;">
                         <div class="chunk-regen-row">
-                            <select class="chunk-qwen3-language" data-chunk-id="${chunkId}">
+                            <select class="chunk-qwen3-language" data-chunk-id="${chunkId}" aria-label="Qwen3 language for this chunk">
                                 <option value="Auto">Auto</option>
                             </select>
                             <input type="text" class="chunk-qwen3-instruct" data-chunk-id="${chunkId}" 
@@ -2932,12 +2935,12 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                     <div class="chunk-fx-row">
                         <div class="chunk-fx-control">
                             <label>Speed</label>
-                            <input type="range" class="chunk-speed-slider" data-chunk-id="${chunkId}" min="0.5" max="2.0" step="0.01" value="${(chunk.voice_assignment?.speed ?? chunk.fx_applied?.speed ?? 1.0).toFixed(2)}">
+                            <input type="range" class="chunk-speed-slider" data-chunk-id="${chunkId}" aria-label="Speed for this chunk" min="0.5" max="2.0" step="0.01" value="${(chunk.voice_assignment?.speed ?? chunk.fx_applied?.speed ?? 1.0).toFixed(2)}">
                             <span class="chunk-speed-value">${(chunk.voice_assignment?.speed ?? chunk.fx_applied?.speed ?? 1.0).toFixed(2)}x</span>
                         </div>
                         <div class="chunk-fx-control">
                             <label>Pitch</label>
-                            <input type="range" class="chunk-pitch-slider" data-chunk-id="${chunkId}" min="-6" max="6" step="0.5" value="${(chunk.voice_assignment?.fx?.pitch ?? chunk.fx_applied?.pitch ?? 0).toFixed(1)}">
+                            <input type="range" class="chunk-pitch-slider" data-chunk-id="${chunkId}" aria-label="Pitch for this chunk" min="-6" max="6" step="0.5" value="${(chunk.voice_assignment?.fx?.pitch ?? chunk.fx_applied?.pitch ?? 0).toFixed(1)}">
                             <span class="chunk-pitch-value">${(chunk.voice_assignment?.fx?.pitch ?? chunk.fx_applied?.pitch ?? 0).toFixed(1)}</span>
                         </div>
                     </div>
@@ -2950,10 +2953,10 @@ function renderLibraryChunkRow(jobId, chunk, engine, idx) {
                     <div class="chunk-silence-row">
                         <span class="chunk-silence-label">Silence (seconds)</span>
                         <label>Lead</label>
-                        <input type="number" class="chunk-leading-silence" data-chunk-id="${chunkId}" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.leading_silence_ms ?? chunk.silence_applied?.leading ?? 0) / 1000).toFixed(1)}">
+                        <input type="number" class="chunk-leading-silence" data-chunk-id="${chunkId}" aria-label="Leading silence for this chunk (seconds)" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.leading_silence_ms ?? chunk.silence_applied?.leading ?? 0) / 1000).toFixed(1)}">
                         <span class="chunk-leading-silence-value">${((chunk.voice_assignment?.leading_silence_ms ?? chunk.silence_applied?.leading ?? 0) / 1000).toFixed(1)}s</span>
                         <label>Trail</label>
-                        <input type="number" class="chunk-trailing-silence" data-chunk-id="${chunkId}" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.trailing_silence_ms ?? chunk.silence_applied?.trailing ?? 0) / 1000).toFixed(1)}">
+                        <input type="number" class="chunk-trailing-silence" data-chunk-id="${chunkId}" aria-label="Trailing silence for this chunk (seconds)" min="0" max="30" step="0.1" value="${((chunk.voice_assignment?.trailing_silence_ms ?? chunk.silence_applied?.trailing ?? 0) / 1000).toFixed(1)}">
                         <span class="chunk-trailing-silence-value">${((chunk.voice_assignment?.trailing_silence_ms ?? chunk.silence_applied?.trailing ?? 0) / 1000).toFixed(1)}s</span>
                     </div>
                 </div>

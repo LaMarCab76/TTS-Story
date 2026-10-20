@@ -6643,7 +6643,7 @@ function displayInlineVoiceAssignments(speakers, speakerEmotions = {}) {
                         <label>${speaker}</label>
                         <input type="search" class="localai-sample-filter" placeholder="Filter LocalAI voices and TTS-Story samples…" hidden />
                         <div class="voice-sample-row">
-                        <select class="voice-select" data-speaker="${speaker}">
+                        <select class="voice-select" data-speaker="${speaker}" aria-label="Voice">
                             <option value="">Select a voice…</option>
                         </select>
                         <button type="button" class="btn btn-sm" data-role="gemini-selected-preview" data-label-play="Play" hidden disabled>Play</button>
