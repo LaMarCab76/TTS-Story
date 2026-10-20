@@ -2529,7 +2529,7 @@
                         <option value="gemini_tts">Gemini Flash TTS</option>
                         <option value="gemini_tts_lite">Gemini Flash-Lite TTS</option>
                     </select>
-                    <p class="help-text">Up to four concurrent candidates per speaker. Speakers run sequentially; Pause finishes the current speaker first. Pending Gemini auditions are kept without new charges. Speakers with a previously selected Gemini candidate receive a new audition; their current voice stays assigned until a replacement is chosen. Google chooses the preview passage. Open Speaker Properties to select each voice, even for a single candidate. Hosted voices require Gemini for narration.</p>
+                    <p class="help-text">Up to four concurrent candidates per speaker. Speakers run sequentially; Pause finishes the current speaker first. Pending Gemini auditions are kept without new charges. Speakers with a previously selected Gemini candidate receive a new audition; their current voice stays assigned until a replacement is chosen. Google chooses the preview passage. Open each speaker in the Cast list to select its voice, even for a single candidate. Hosted voices require Gemini for narration.</p>
                 </div>
                 <div class="form-group">
                     <label for="speaker-batch-prefix">Name prefix</label>
@@ -2538,7 +2538,7 @@
                 <div class="form-group">
                     <label for="speaker-batch-candidate-count">Candidates per speaker</label>
                     <input type="number" id="speaker-batch-candidate-count" min="1" max="10" step="1" value="1">
-                    <p class="help-text">Local engines assign a single candidate automatically. Multiple candidates—and all Gemini candidates—are selected in Speaker Properties.</p>
+                    <p class="help-text">Local engines assign a single candidate automatically. Multiple candidates—and all Gemini candidates—are selected by opening the speaker in the Cast list.</p>
                 </div>
                 <div class="batch-progress" id="speaker-batch-progress" style="display: none;">
                     <div class="batch-progress-track">

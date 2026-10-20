@@ -497,7 +497,7 @@ async function generateAndSaveVoiceCandidates(speaker, displayName, statusEl, en
     const payload = buildSpeakerVoiceDesignPayload(speaker, displayName);
     const { profile } = findSpeakerProfile(speaker);
     const designEngine = normalizeVoiceDesignEngine(engineOverride || profile?.voice_design_engine);
-    if (designEngine === 'gemini') throw new Error('Use Generate Voice in Speaker Properties to audition and select hosted Gemini voices. Local sample batch creation does not support hosted IDs.');
+    if (designEngine === 'gemini') throw new Error('Open the speaker in the Cast list and use Generate voice to audition and select hosted Gemini voices. Local sample batch creation does not support hosted IDs.');
     await requireVoiceDesignBackend(designEngine);
     const engineConfig = getVoiceDesignEngineConfig(designEngine);
     const requestedCount = Number.parseInt(profile?.voice_candidate_count, 10);
@@ -589,7 +589,7 @@ async function generateSpeakerVoicePromptBatch(speaker, displayName, statusEl, d
         const candidates = await generateAndSaveVoiceCandidates(speaker, displayName, statusEl, designEngine);
         if (candidates.length > 1) {
             speakerVoiceDesignCandidates[speakerKey] = candidates;
-            if (statusEl) statusEl.textContent = `Created ${candidates.length} candidates for ${displayName || speaker}; select one in Speaker Properties.`;
+            if (statusEl) statusEl.textContent = `Created ${candidates.length} candidates for ${displayName || speaker}; open the speaker in the Cast list to select one.`;
         } else {
             delete speakerVoiceDesignCandidates[speakerKey];
             const promptValue = (candidates[0]?.prompt_path || candidates[0]?.file_name || '').trim();
@@ -796,7 +796,7 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
     }
     if (completeSummary) {
         completeSummary.textContent = bulkVoiceGenerationState.design_engine === 'gemini'
-            ? `New auditions created for ${successCount - reusedCount} speakers; ${reusedCount} pending auditions retained without new requests. Open Speaker Properties to review them; current voice assignments are unchanged.${failures.length ? ` Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}` : ''}`
+            ? `New auditions created for ${successCount - reusedCount} speakers; ${reusedCount} pending auditions retained without new requests. Open each speaker in the Cast list to review them; current voice assignments are unchanged.${failures.length ? ` Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}` : ''}`
             : failures.length
             ? `Generated ${getVoiceDesignEngineConfig(bulkVoiceGenerationState.design_engine).label} voices for ${successCount} of ${speakers.length} speakers. Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}`
             : `Voices ready for all ${speakers.length} speakers. ${bulkVoiceGenerationState.design_engine === 'gemini' ? 'Existing Gemini auditions were preserved. Open each speaker to preview and select a hosted voice, including single candidates.' : 'Speakers configured for multiple candidates still require a final selection.'}`;
@@ -4508,7 +4508,7 @@ function setupEventListeners() {
                     Math.min(Number.parseInt(resumeRequested ? bulkVoiceGenerationState.candidate_count : batchCandidateCountInput?.value, 10) || 1, batchDesignEngine === 'gemini' ? 4 : 10)
                 );
                 if (batchCandidateCountInput) batchCandidateCountInput.value = String(batchCandidateCount);
-                if (batchDesignEngine === 'gemini' && !window.confirm(`Generate Gemini hosted voice candidates for this cast? Up to ${batchCandidateCount} candidates per remaining speaker will be billed by Google. Pending auditions will be kept without new requests. Previously selected auditions will receive new candidates without changing the assigned voice.\n\nKeep this page open while generation runs. Pause stops after the current speaker. Select voices afterward in Speaker Properties.`)) return;
+                if (batchDesignEngine === 'gemini' && !window.confirm(`Generate Gemini hosted voice candidates for this cast? Up to ${batchCandidateCount} candidates per remaining speaker will be billed by Google. Pending auditions will be kept without new requests. Previously selected auditions will receive new candidates without changing the assigned voice.\n\nKeep this page open while generation runs. Pause stops after the current speaker. Select voices afterward by opening each speaker in the Cast list.`)) return;
                 await requireVoiceDesignBackend(batchDesignEngine);
                 (currentStats?.speakers || []).forEach(speaker => {
                     updateSpeakerProfileEntry(speaker, {
@@ -5625,7 +5625,7 @@ async function assignGeminiSpeakerVoice(speaker, id, label, designEngine = 'gemi
     }
     const selects = Array.from(document.querySelectorAll('#inline-voice-assignment-list .voice-select, #speaker-edit-modal-body .voice-select'))
         .filter(select => (select.dataset.speaker || select.closest('.voice-assignment-row')?.dataset.speaker) === speaker);
-    if (!selects.length) throw new Error('Speaker voice dropdown is no longer available. Reopen Speaker Properties; your candidates remain saved.');
+    if (!selects.length) throw new Error('Speaker voice dropdown is no longer available. Reopen the speaker from the Cast list; your candidates remain saved.');
     for (const select of selects) {
         if (!Array.from(select.options).some(option => option.value === id)) select.add(new Option(label, id));
         select.value = id;
@@ -6133,7 +6133,7 @@ function openSpeakerEditModal(speaker) {
 function closeSpeakerEditModal() {
     const geminiDesigner = document.querySelector('#speaker-profile-summary [data-gemini-inline-designer]');
     if (geminiDesigner?.dataset.busy === 'true') {
-        showNotification('Please wait for Gemini voice creation or cleanup to finish before closing Speaker Properties.', 'info');
+        showNotification('Please wait for Gemini voice creation or cleanup to finish before closing this speaker.', 'info');
         return;
     }
     geminiDesigner?.geminiDispose?.();

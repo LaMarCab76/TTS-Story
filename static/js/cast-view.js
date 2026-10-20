@@ -45,7 +45,13 @@ function castSpeakerColor(name) {
         : '#c4b8a5';
 }
 
+// The row open in the drawer is the one being edited. A re-analysis while the
+// drawer is open rebuilds a fresh (unassigned) copy in the hidden list, and
+// closeSpeakerEditModal puts the edited row back in its place, so prefer it.
 function castAssignmentRow(speaker) {
+    const drawerRow = Array.from(document.querySelectorAll('#speaker-edit-modal-body .voice-assignment-row'))
+        .find(row => row.dataset.speaker === speaker);
+    if (drawerRow) return drawerRow;
     if (typeof getAssignmentRows !== 'function') return null;
     return getAssignmentRows().find(row => row.dataset.speaker === speaker) || null;
 }
@@ -340,8 +346,8 @@ function castRenderNow(options = {}) {
     }
     if (emotionSegments) {
         const note = castMakeEl('p', 'cast-footnote cast-emotion-note');
-        const segments = emotionSegments === 1 ? '1 segment is' : `${emotionSegments} segments are`;
-        note.append(castIcon('theater_comedy'), `Emotion tags in ${segments} sent as Qwen3 instructions.`);
+        const segments = `${emotionSegments} ${emotionSegments === 1 ? 'segment' : 'segments'}`;
+        note.append(castIcon('theater_comedy'), `Emotion tags in ${segments} are sent as Qwen3 instructions.`);
         list.appendChild(note);
     }
     if (focusedPlay) castPlayButtonFor(focusedSpeaker)?.focus({ preventScroll: true });
