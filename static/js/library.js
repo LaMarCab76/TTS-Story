@@ -27,58 +27,6 @@ function setActiveLibraryPlayer(player, updateControls) {
     activeLibraryUpdateControls = updateControls;
 }
 
-function closeChapterActionMenus(root = document) {
-    root.querySelectorAll('.chapter-action-menu').forEach(menu => {
-        menu.classList.add('hidden');
-        menu.innerHTML = '';
-        menu.style.left = '';
-        menu.style.top = '';
-    });
-}
-
-function ensureChapterActionMenu(container) {
-    if (!container) return null;
-    let menu = container.querySelector('.chapter-action-menu');
-    if (!menu) {
-        menu = document.createElement('div');
-        menu.className = 'chapter-action-menu hidden';
-        container.appendChild(menu);
-    }
-    return menu;
-}
-
-function showChapterActionMenu({ menu, button, container, items }) {
-    if (!menu || !button || !container) return;
-    menu.innerHTML = '';
-    items.forEach(({ label, onClick }) => {
-        const itemButton = document.createElement('button');
-        itemButton.type = 'button';
-        itemButton.className = 'chapter-action-menu-item';
-        itemButton.textContent = label;
-        itemButton.addEventListener('click', (event) => {
-            event.stopPropagation();
-            onClick();
-            closeChapterActionMenus(container);
-        });
-        menu.appendChild(itemButton);
-    });
-
-    menu.classList.remove('hidden');
-    const containerRect = container.getBoundingClientRect();
-    const buttonRect = button.getBoundingClientRect();
-    const left = buttonRect.left - containerRect.left;
-    const top = buttonRect.bottom - containerRect.top + 6;
-    menu.style.left = `${left}px`;
-    menu.style.top = `${top}px`;
-
-    requestAnimationFrame(() => {
-        const maxLeft = container.clientWidth - menu.offsetWidth - 8;
-        if (menu.offsetWidth && left > maxLeft) {
-            menu.style.left = `${Math.max(8, maxLeft)}px`;
-        }
-    });
-}
-
 function ensureChunkReviewCloseHandlers() {
     const modalOverlay = document.getElementById('chunk-review-modal-overlay');
     const modalCloseBtn = document.getElementById('chunk-review-modal-close');
@@ -963,10 +911,6 @@ function renderChapterControls(item) {
     `;
 }
 
-function renderFullStoryBanner() {
-    return '';
-}
-
 const LIBRARY_PAGE_SIZE = 20;
 let libraryBrowseItems = [];
 let libraryBrowsePage = 0;
@@ -1613,10 +1557,6 @@ function playFullStory(jobId, fileUrl, relativePath) {
         relative_path: relativePath,
         title: 'Full Story'
     };
-}
-
-function downloadFullStory(jobId, relativePath) {
-    window.location.href = `/api/download/${jobId}?file=${encodeURIComponent(relativePath)}`;
 }
 
 // Download regular audio format
@@ -2480,16 +2420,16 @@ function renderChunkReviewModal(data) {
                 </div>
                 <div class="library-speaker-profile">
                     <h4>Speaker properties</h4>
-                    <label>Character Profile
+                    <label>Character profile
                         <textarea class="speaker-profile-description" rows="3">${escapeHtml(profile.description || '')}</textarea>
                     </label>
-                    <label>Voice Type — stable vocal identity
+                    <label>Voice type — stable vocal identity
                         <textarea class="speaker-profile-voice" rows="2" placeholder="High-pitched, squeaky, comically pompous.">${escapeHtml(profile.voice || '')}</textarea>
                     </label>
-                    <label>Voice Design Prompt
+                    <label>Voice design prompt
                         <textarea class="speaker-profile-design" rows="2">${escapeHtml(profile.voice_design_prompt || '')}</textarea>
                     </label>
-                    <p>On Breeze generation, Voice Type is placed before each chunk's delivery direction. Profile and Voice Design Prompt are not passage instructions. Older productions may not have saved these properties.</p>
+                    <p>On Breeze generation, the voice type is placed before each chunk's delivery direction. The character profile and voice design prompt are not passage instructions. Older productions may not have saved these properties.</p>
                     <div class="library-speaker-profile-actions">
                         <button type="button" class="btn btn-sm btn-secondary save-library-speaker-profile" data-speaker="${speakerAttr}">Save Speaker Properties</button>
                         <span class="speaker-profile-save-status" role="status"></span>

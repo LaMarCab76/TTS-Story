@@ -61,7 +61,7 @@ The voice selector changes with the engine:
 - Cloning engines show locally saved **Voice Samples**.
 - Azure Speech, Edge TTS, and ElevenLabs use catalogs loaded from their services.
 
-If a cloud selector is empty, return to that engine's Settings panel and load its catalog again. If a cloning selector is empty, add a clean reference recording in [Available Voices](app:voices); see [Reference Voice Prompts](help:voice-prompts).
+If a cloud selector is empty, return to that engine's Settings panel and load its catalog again. If a cloning selector is empty, add a clean reference recording in [Voices → Voice prompts](app:voices/prompts); see [Reference Voice Prompts](help:voice-prompts).
 
 ![Analyzed speakers with compatible voice assignments on the Generate page](../../../static/help/screenshots/voice-assignments.png)
 

@@ -4938,6 +4938,8 @@ def _run_queued_job(job_data: Dict[str, Any], *, cloud_slot: bool = False) -> No
     try:
         with queue_lock:
             job_entry = jobs.get(job_id)
+            if job_entry:
+                job_entry.pop("_dispatched", None)
             if not job_entry or job_entry.get("status") in {
                 "paused", "archived", "deleted", "cancelled"
             }:
@@ -5017,6 +5019,10 @@ def process_job_worker():
                 inactive = not job_entry or job_entry.get("status") in {
                     "paused", "archived", "deleted", "cancelled"
                 }
+                if not inactive:
+                    # Taken off job_queue: runs next (or waits for a cloud slot).
+                    # _compute_queue_positions ranks these first; _run_queued_job clears it.
+                    job_entry["_dispatched"] = True
             if inactive:
                 job_queue.task_done()
                 continue
@@ -5030,6 +5036,7 @@ def process_job_worker():
                         with queue_lock:
                             if job_id in jobs:
                                 jobs[job_id]["status"] = "cancelled"
+                                jobs[job_id].pop("_dispatched", None)
                         _persist_job_state(job_id)
                         job_queue.task_done()
                         continue
@@ -10349,7 +10356,7 @@ def get_job_details(job_id: str):
             if not job_entry:
                 return jsonify({"success": False, "error": "Job not found"}), 404
             stored_speakers = job_entry.get("speakers")
-            text = _load_job_text(job_entry.get("text_path")) if (include_text or not stored_speakers) else ""
+            text_path = job_entry.get("text_path")
             payload = {
                 "job_id": job_id,
                 "status": job_entry.get("status"),
@@ -10357,8 +10364,8 @@ def get_job_details(job_id: str):
                 "started_at": job_entry.get("started_at"),
                 "completed_at": job_entry.get("completed_at"),
                 "engine": job_entry.get("engine"),
-                "speakers": stored_speakers or _extract_speakers_for_text(text),
-                "text": text if include_text else None,
+                "speakers": stored_speakers,
+                "text": None,
                 "title": job_entry.get("_queue_title") or _queue_title_hint_from_entry(job_entry) or _queue_title_from_text(job_entry.get("text_preview", "")),
                 "text_title": _queue_title_from_text(job_entry.get("text_preview", "")),
                 "error": job_entry.get("error") or "",
@@ -10374,6 +10381,19 @@ def get_job_details(job_id: str):
                 "total_chunks": job_entry.get("total_chunks"),
                 "processed_chunks": job_entry.get("processed_chunks"),
             }
+        # Manuscript I/O and speaker extraction run outside queue_lock (the worker's progress
+        # updates and /api/queue wait on it). Jobs restored from the DB have no stored
+        # speakers: extract them once and keep them on the entry for later light refreshes.
+        text = _load_job_text(text_path) if (include_text or not stored_speakers) else ""
+        if include_text:
+            payload["text"] = text
+        if not stored_speakers:
+            payload["speakers"] = _extract_speakers_for_text(text)
+            if text:
+                with queue_lock:
+                    live_entry = jobs.get(job_id)
+                    if live_entry is not None and not live_entry.get("speakers"):
+                        live_entry["speakers"] = payload["speakers"]
         return jsonify({"success": True, "job": payload})
     except Exception as exc:
         logger.error("Failed to load job details %s: %s", job_id, exc, exc_info=True)
@@ -10487,6 +10507,14 @@ def update_library_title(job_id: str):
     metadata = load_job_metadata(job_dir) or {}
     metadata["collection_title"] = title
     save_job_metadata(job_dir, metadata)
+
+    # The Job Queue caches each job's title (and keeps the submit-time collection title on
+    # the entry): refresh both so the queue row and job details show the new name.
+    with queue_lock:
+        job_entry = jobs.get(job_id)
+        if job_entry is not None:
+            job_entry["collection_title"] = title
+            job_entry.pop("_queue_title", None)
 
     return jsonify({"success": True, "title": title})
 
@@ -11100,6 +11128,9 @@ def generate_audio():
                 "engine": config.get("tts_engine"),
                 "resume_from_chunk_index": 0,
                 "word_replacements": word_replacements,
+                # Submit-time estimate; /api/queue falls back to it once the dispatcher has
+                # taken the payload off job_queue (e.g. a cloud job waiting for a slot).
+                "estimated_total_chunks": estimated_chunks,
                 **_submitted_queue_title_hints(data, text),
             }
             jobs[job_id]["job_payload"] = _build_job_payload(job_id, text, jobs[job_id])
@@ -11490,7 +11521,11 @@ def m4b_progress_endpoint(job_id):
 
 _LIBRARY_DURATION_CACHE: Dict[str, Tuple[Tuple[int, int], Optional[float]]] = {}
 _LIBRARY_DURATION_CACHE_LOCK = threading.Lock()
+# Cap for lookups made outside a listing build. Each build prunes entries for files it no
+# longer sees, so the cache normally holds exactly the Library's audio files.
 _LIBRARY_DURATION_CACHE_MAX_ENTRIES = 8192
+# Paths measured by the listing build running on this thread (None outside a build).
+_LIBRARY_DURATION_SCAN = threading.local()
 
 
 def _probe_audio_duration_seconds(path: Path) -> Optional[float]:
@@ -11542,6 +11577,9 @@ def _library_audio_duration(path: Path) -> Optional[float]:
     except OSError:
         return None
     key = str(path)
+    seen = getattr(_LIBRARY_DURATION_SCAN, "seen", None)
+    if seen is not None:
+        seen.add(key)
     signature = (int(stat_result.st_mtime_ns), int(stat_result.st_size))
     with _LIBRARY_DURATION_CACHE_LOCK:
         cached = _LIBRARY_DURATION_CACHE.get(key)
@@ -11551,10 +11589,22 @@ def _library_audio_duration(path: Path) -> Optional[float]:
     if duration is not None:
         duration = round(duration, 3)
     with _LIBRARY_DURATION_CACHE_LOCK:
-        if len(_LIBRARY_DURATION_CACHE) >= _LIBRARY_DURATION_CACHE_MAX_ENTRIES:
-            _LIBRARY_DURATION_CACHE.clear()
+        _LIBRARY_DURATION_CACHE.pop(key, None)
+        # During a listing build the cache is bounded by the files on disk (the build prunes
+        # the rest), so a library larger than the cap still keeps every duration. Outside a
+        # build, evict the oldest entries (dicts keep insertion order), never the whole cache.
+        while seen is None and len(_LIBRARY_DURATION_CACHE) >= _LIBRARY_DURATION_CACHE_MAX_ENTRIES:
+            _LIBRARY_DURATION_CACHE.pop(next(iter(_LIBRARY_DURATION_CACHE)), None)
         _LIBRARY_DURATION_CACHE[key] = (signature, duration)
     return duration
+
+
+def _prune_library_duration_cache(seen_paths: set) -> None:
+    """Drop cached durations for files a complete listing build did not visit (deleted/moved)."""
+    with _LIBRARY_DURATION_CACHE_LOCK:
+        stale = [key for key in _LIBRARY_DURATION_CACHE if key not in seen_paths]
+        for key in stale:
+            _LIBRARY_DURATION_CACHE.pop(key, None)
 
 
 def _library_production_duration(full_story: Optional[Dict[str, Any]], sections: List[Dict[str, Any]]) -> Optional[float]:
@@ -11568,7 +11618,23 @@ def _library_production_duration(full_story: Optional[Dict[str, Any]], sections:
 
 
 def _build_library_listing():
-    """Scan disk and return library metadata list."""
+    """Scan disk and return library metadata list.
+
+    Durations of the files this scan visits stay cached; entries for files it no longer
+    sees are pruned afterwards (instead of clearing the whole cache when it fills up).
+    """
+    seen_paths: set = set()
+    _LIBRARY_DURATION_SCAN.seen = seen_paths
+    try:
+        library_items = _scan_library_listing()
+    finally:
+        _LIBRARY_DURATION_SCAN.seen = None
+    _prune_library_duration_cache(seen_paths)
+    return library_items
+
+
+def _scan_library_listing():
+    """Scan disk and return library metadata list (see _build_library_listing)."""
     library_items = []
 
     if not OUTPUT_DIR.exists():
@@ -13372,12 +13438,15 @@ def _queue_title_from_text(text: Optional[str]) -> str:
     cleaned = re.sub(r"\[direction\](?:(?!\[/direction\]).)*$", " ", cleaned, flags=re.I | re.S)
     cleaned = re.sub(r"\[/?[^\]\r\n]*\]", " ", cleaned)
     cleaned = re.sub(r"\[[^\]\r\n]*$", " ", cleaned)
+    # Pause controls ("CHAPTER ONE******", "silent.*** Then") are not title text; dropping
+    # them first also lets "silent.***" end a sentence (the Library strips them the same way).
+    cleaned = re.sub(r"\*{3,}", " ", cleaned)
     for raw_line in cleaned.splitlines():
         line = " ".join(raw_line.split()).lstrip("#").strip()
         if not re.search(r"\w", line):
             continue
         end = _queue_title_sentence_end(line)
-        return _truncate_queue_title(line[:end] if end else line)
+        return _truncate_queue_title(sanitize_display_title(line[:end] if end else line))
     return ""
 
 
@@ -13464,19 +13533,23 @@ def _snapshot_job_queue() -> Tuple[List[str], Dict[str, int]]:
 def _compute_queue_positions(pending_ids: List[str], jobs_map: Dict[str, Dict[str, Any]]) -> Dict[str, int]:
     """1-based position of every visible ``queued`` job in real dispatch order.
 
-    Jobs already taken off ``job_queue`` by the dispatcher but still ``queued``
-    (e.g. waiting for a cloud slot) run next, so they come first.
+    Jobs the dispatcher already took off ``job_queue`` (flagged ``_dispatched``) but
+    that are still ``queued`` (e.g. waiting for a cloud slot) run next, so they come
+    first. Any other queued job missing from ``job_queue`` is in the short window
+    between submit/resume and ``job_queue.put()``, so it goes last.
     """
     def visible_queued(job_id: str) -> bool:
         info = jobs_map.get(job_id)
         return bool(info) and info.get("status") == "queued" and info.get("job_type") not in QUEUE_HIDDEN_JOB_TYPES
 
+    def created(job_id: str) -> str:
+        return jobs_map[job_id].get("created_at") or ""
+
     pending_set = set(pending_ids)
-    dispatched = sorted(
-        (job_id for job_id in jobs_map if job_id not in pending_set and visible_queued(job_id)),
-        key=lambda job_id: jobs_map[job_id].get("created_at") or "",
-    )
-    ordered = dispatched + [job_id for job_id in pending_ids if visible_queued(job_id)]
+    outside = [job_id for job_id in jobs_map if job_id not in pending_set and visible_queued(job_id)]
+    dispatched = sorted((job_id for job_id in outside if jobs_map[job_id].get("_dispatched")), key=created)
+    not_yet_queued = sorted((job_id for job_id in outside if not jobs_map[job_id].get("_dispatched")), key=created)
+    ordered = dispatched + [job_id for job_id in pending_ids if visible_queued(job_id)] + not_yet_queued
     return {job_id: index + 1 for index, job_id in enumerate(ordered)}
 
 
@@ -13535,7 +13608,9 @@ def get_queue():
                         "title": cached_title or text_title,
                         "text_title": text_title,
                         "queue_position": queue_positions.get(job_id),
-                        "estimated_total_chunks": chunk_estimates.get(job_id),
+                        "estimated_total_chunks": chunk_estimates.get(job_id) or (
+                            job_info.get("estimated_total_chunks") if job_info.get("status") == "queued" else None
+                        ),
                         **_queue_output_summary(job_info),
                     })
 

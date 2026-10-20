@@ -1,6 +1,6 @@
 # Reference Voice Prompts
 
-A voice prompt is a clean audio clip used by a cloning engine to guide voice identity and delivery. TTS-Story manages uploaded files and generated voice-design samples on the **Voice prompts** sub-tab of [Voices](app:voices).
+A voice prompt is a clean audio clip used by a cloning engine to guide voice identity and delivery. TTS-Story manages uploaded files and generated voice-design samples on the **Voice prompts** sub-tab of [Voices](app:voices/prompts).
 
 ![Voice Prompts manager with upload, filtering, preview, and library actions](../../../static/help/screenshots/voice-prompts.png)
 

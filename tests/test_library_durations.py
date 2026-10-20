@@ -163,3 +163,41 @@ def test_book_rows_report_durations_but_no_chapter_position(library_dir):
         pytest.approx(0.5, abs=0.01), pytest.approx(0.75, abs=0.01),
     ]
     assert item["duration_seconds"] == pytest.approx(1.25, abs=0.01)
+
+
+def test_library_larger_than_the_cache_cap_keeps_every_duration(monkeypatch, library_dir):
+    # Before: the cache cleared itself completely at the cap, so a big Library re-measured
+    # every file on every listing rebuild.
+    monkeypatch.setattr(app_module, "_LIBRARY_DURATION_CACHE_MAX_ENTRIES", 4)
+    for index in range(10):
+        _write_wav(library_dir / f"job-{index:02d}" / "output.wav", 0.25)
+    calls = []
+    real_probe = app_module._probe_audio_duration_seconds
+
+    def counting_probe(path):
+        calls.append(str(path))
+        return real_probe(path)
+
+    monkeypatch.setattr(app_module, "_probe_audio_duration_seconds", counting_probe)
+
+    first = app_module._build_library_listing()
+    assert len(first) == 10
+    assert len(calls) == 10
+    second = app_module._build_library_listing()
+    assert len(second) == 10
+    assert len(calls) == 10, "the second build must reuse every cached duration"
+    assert all(item["duration_seconds"] == pytest.approx(0.25, abs=0.01) for item in second)
+
+
+def test_listing_build_prunes_durations_of_deleted_files(library_dir):
+    keep = _write_wav(library_dir / "keep-job" / "output.wav", 0.5)
+    gone = _write_wav(library_dir / "gone-job" / "output.wav", 0.5)
+    app_module._build_library_listing()
+    assert {str(keep), str(gone)} <= set(app_module._LIBRARY_DURATION_CACHE)
+
+    gone.unlink()
+    gone.parent.rmdir()
+    app_module._build_library_listing()
+
+    assert str(keep) in app_module._LIBRARY_DURATION_CACHE
+    assert str(gone) not in app_module._LIBRARY_DURATION_CACHE

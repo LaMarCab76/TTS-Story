@@ -168,7 +168,7 @@
       "id": "workflow-map",
       "file": "start-here/workflow-map.md",
       "title": "How the Pages Work Together",
-      "summary": "See how Generate, Job Queue, Library, Available Voices, and Settings share one workflow.",
+      "summary": "See how Generate, Job Queue, Library, Voices, and Settings share one workflow.",
       "keywords": ["workflow", "generate", "queue", "library", "voices", "settings"],
       "related": ["welcome", "job-queue", "audio-library"]
     },
@@ -193,8 +193,8 @@
       "id": "input-text",
       "file": "create-audio/input-text.md",
       "title": "Enter or Import Your Text",
-      "summary": "Paste a story or import supported document formats while keeping a clean source copy.",
-      "keywords": ["paste", "document", "pdf", "docx", "epub", "drag drop", "input"],
+      "summary": "Paste a manuscript or import supported document formats while keeping a clean source copy.",
+      "keywords": ["paste", "document", "pdf", "docx", "epub", "drag drop", "input", "manuscript", "script view", "raw tags", "load document", "clear"],
       "related": ["speaker-tags", "prep-text", "projects"]
     },
     {
@@ -202,7 +202,7 @@
       "file": "create-audio/speaker-tags.md",
       "title": "Speaker and Expression Tags",
       "summary": "Structure multi-voice text correctly and use paralinguistic tags only with engines that support them.",
-      "keywords": ["speaker tags", "narrator", "alice", "paralinguistic", "laugh", "sigh"],
+      "keywords": ["speaker tags", "narrator", "alice", "paralinguistic", "laugh", "sigh", "insert tag", "raw tags", "tag issues", "auto-fix"],
       "related": ["text-statistics", "assign-voices", "engine-chatterbox"]
     },
     {
@@ -226,7 +226,7 @@
       "file": "create-audio/text-statistics.md",
       "title": "Analyze Text and Review Statistics",
       "summary": "Use automatic analysis to confirm speaker count, chunks, word count, and duration before generating.",
-      "keywords": ["analyze", "statistics", "speakers", "chunks", "duration"],
+      "keywords": ["analyze", "statistics", "speakers", "chunks", "duration", "manuscript footer", "words"],
       "related": ["speaker-tags", "assign-voices", "generation-times"]
     },
     {
@@ -234,7 +234,7 @@
       "file": "create-audio/assign-voices.md",
       "title": "Assign and Test Voices",
       "summary": "Build individual speaker profiles and assign each detected speaker a compatible, tested voice.",
-      "keywords": ["voice assignment", "speaker", "speaker properties", "Build Profile", "quick test", "pitch", "speed", "FX"],
+      "keywords": ["voice assignment", "speaker", "speaker properties", "Build Profile", "quick test", "pitch", "speed", "FX", "cast", "edit speaker", "speaker drawer", "mark as ready", "rename", "review"],
       "related": ["available-voices", "voice-prompts", "auto-assign-voices"]
     },
     {
@@ -242,7 +242,7 @@
       "file": "create-audio/generation-options.md",
       "title": "Generation and Output Options",
       "summary": "Choose the job engine, format, bitrate, ACX processing, and chapter behavior.",
-      "keywords": ["MP3", "WAV", "OGG", "bitrate", "ACX", "generate", "output"],
+      "keywords": ["MP3", "WAV", "OGG", "bitrate", "ACX", "generate", "output", "format", "generate audio"],
       "related": ["chapters-and-sections", "audiobook-exports", "settings-audio"]
     },
     {
@@ -250,7 +250,7 @@
       "file": "create-audio/chapters-and-sections.md",
       "title": "Chapters, Books, and Sections",
       "summary": "Review automatic heading detection before creating separate chapter files or a combined story.",
-      "keywords": ["chapter", "book", "section", "heading", "split", "full story"],
+      "keywords": ["chapter", "book", "section", "heading", "split", "full story", "chapters", "headings", "separate file per chapter", "also build full story", "review sections"],
       "related": ["generation-options", "audiobook-exports", "audio-library"]
     },
     {
@@ -258,7 +258,7 @@
       "file": "create-audio/projects.md",
       "title": "Save and Restore Projects",
       "summary": "Preserve in-progress text, assignments, and generation choices before experimenting.",
-      "keywords": ["project", "save", "load", "restore", "draft"],
+      "keywords": ["project", "save", "load", "restore", "draft", "project switcher", "projects"],
       "related": ["data-storage", "input-text", "quick-start"]
     },
 
@@ -470,7 +470,7 @@
       "file": "jobs/review-and-regenerate.md",
       "title": "Review and Regenerate Chunks",
       "summary": "Correct text, voice, pronunciation, and FX at chunk or speaker level without redoing a whole book.",
-      "keywords": ["review chunks", "regenerate", "speaker", "edit text", "FX", "recompile"],
+      "keywords": ["review chunks", "regenerate", "speaker", "edit text", "FX", "recompile", "chunk review", "recompile audio", "rebuild chapter audio file"],
       "related": ["alt-word-registry", "library-editing-repair", "audio-quality"]
     },
     {
@@ -487,7 +487,7 @@
       "file": "library/audio-library.md",
       "title": "Use the Audio Library",
       "summary": "Play full stories or chapters, rename collections, inspect metrics, and download completed work.",
-      "keywords": ["library", "play", "chapter", "download", "metrics", "time codes", "alt words"],
+      "keywords": ["library", "play", "chapter", "download", "metrics", "time codes", "alt words", "more actions", "edit metadata", "rename title"],
       "related": ["job-review", "library-editing-repair", "audiobook-exports"]
     },
     {
@@ -560,8 +560,8 @@
       "id": "settings",
       "file": "settings/settings.md",
       "title": "Settings Reference",
-      "summary": "Understand global defaults, engine tabs, save behavior, and when per-job choices override settings.",
-      "keywords": ["settings", "default engine", "save", "reset", "configuration"],
+      "summary": "Understand global defaults, the Settings sections, save behavior, and when per-job choices override settings.",
+      "keywords": ["settings", "default engine", "save", "reset", "configuration", "general", "engines", "text prep", "remote admin", "save settings", "reset to defaults"],
       "related": ["settings-audio", "engine-overview", "data-storage"]
     },
     {
@@ -569,7 +569,7 @@
       "file": "settings/engine-management.md",
       "title": "Install, Remove, and Reinstall TTS Engines",
       "summary": "Manage optional local engines, isolated environments, first-run downloads, live progress, restarts, and safe removal.",
-      "keywords": ["install engine", "uninstall engine", "reinstall", "isolated environment", "venv", "model download", "restart", "red chip", "green chip"],
+      "keywords": ["install engine", "uninstall engine", "reinstall", "isolated environment", "venv", "model download", "restart", "status dot", "needs setup", "not installed", "remove engine", "repair"],
       "related": ["engine-overview", "first-run", "gpu-cpu-errors", "engine-localai-tts"]
     },
     {

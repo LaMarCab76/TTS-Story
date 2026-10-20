@@ -2745,13 +2745,6 @@ function createPresetAssignment(voiceName, speakerKey) {
     return assignment;
 }
 
-function getSharedPreviewText() {
-    const shared = document.getElementById('global-voice-preview-text');
-    const value = shared?.value?.trim();
-    if (value) return value;
-    return 'This is a quick preview line.';
-}
-
 function buildDefaultSampleText(speaker) {
     if (!speaker || speaker === 'default') {
         return 'This is a quick preview for the default narrator.';
@@ -4414,6 +4407,12 @@ function setupEventListeners() {
         projectModalOverlay.addEventListener('click', event => {
             if (event.target === projectModalOverlay) {
                 closeProjectModal();
+                return;
+            }
+            // The header "?" opens the Help Center (help.js document listener);
+            // close the modal first so it does not cover the article.
+            if (event.target instanceof Element && event.target.closest('#project-modal [data-help-id]')) {
+                closeProjectModal();
             }
         });
     }
@@ -4833,6 +4832,11 @@ function setupEventListeners() {
                     const loadedProject = await fetchSavedProject(projectId);
                     closeProjectModal();
                     await applyProjectState(loadedProject);
+                    // The switcher lives in the sidebar; show the loaded manuscript.
+                    const activeTab = document.querySelector('.tab-button.active')?.dataset?.tab;
+                    if (activeTab !== 'generate' && typeof window.studioGoToTab === 'function') {
+                        window.studioGoToTab('generate');
+                    }
                 } catch (error) {
                     showNotification(error.message || 'Unable to load project.', 'warning');
                 } finally {
@@ -7648,7 +7652,9 @@ async function updateQueueIndicator() {
         
         if (data.success) {
             const indicator = document.getElementById('queue-indicator');
-            const queueSize = data.queue_size;
+            // Count what the Queue screen shows: job_queue.qsize() (queue_size) also holds
+            // payloads of cancelled/deleted jobs and hidden voice-design tasks.
+            const queueSize = data.jobs.filter(j => j.status === 'queued').length;
             const processingJobs = data.jobs.filter(j => j.status === 'processing').length;
             if (typeof updateLatestAudioFromQueue === 'function') {
                 updateLatestAudioFromQueue(data.jobs);
@@ -8916,7 +8922,14 @@ function initAltWordRegistry() {
     document.getElementById('alt-word-registry-close')?.addEventListener('click', closeAltWordRegistryModal);
     document.getElementById('alt-word-registry-cancel')?.addEventListener('click', closeAltWordRegistryModal);
     document.getElementById('alt-word-registry-overlay')?.addEventListener('click', (e) => {
-        if (e.target === document.getElementById('alt-word-registry-overlay')) closeAltWordRegistryModal();
+        if (e.target === document.getElementById('alt-word-registry-overlay')) {
+            closeAltWordRegistryModal();
+            return;
+        }
+        // The header "?" opens the Help Center; close the modal so it does not cover the article.
+        if (e.target instanceof Element && e.target.closest('#alt-word-registry-modal [data-help-id]')) {
+            closeAltWordRegistryModal();
+        }
     });
 
     // Open add entry modal

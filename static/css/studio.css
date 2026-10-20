@@ -1760,25 +1760,29 @@ dialog::backdrop {
 }
 
 /* --------------------------------------------------------------------------
-   Toasts (showNotification) — bottom-right stack
+   Toasts (showNotification) — bottom-left stack inside the main area
+   (sidebar 224px + 20px). The bottom-right corner holds the Generate aside's
+   sticky footer (Generate audio, queue line) and the last Queue/Library rows'
+   actions, so toasts stay clear of it. Toasts never take clicks: they hold
+   text only, and anything underneath stays usable while they are shown.
    -------------------------------------------------------------------------- */
 .toast-stack {
     position: fixed;
-    right: 20px;
-    bottom: 20px;
+    left: 244px;
+    bottom: 52px;
     z-index: 10000;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: 8px;
-    max-width: min(400px, calc(100vw - 40px));
+    max-width: min(400px, calc(100vw - 264px));
     pointer-events: none;
 }
 
 .notification {
     position: fixed;
-    right: 20px;
-    bottom: 20px;
+    left: 244px;
+    bottom: 52px;
     z-index: 10000;
     max-width: 400px;
     padding: 10px 14px 10px 14px;
@@ -1793,13 +1797,13 @@ dialog::backdrop {
     opacity: 0;
     transform: translateY(8px);
     transition: opacity 0.2s ease, transform 0.2s ease;
-    pointer-events: auto;
+    pointer-events: none;
     overflow-wrap: anywhere;
 }
 
 .toast-stack > .notification {
     position: relative;
-    right: auto;
+    left: auto;
     bottom: auto;
     top: auto;
     max-width: 100%;
@@ -1837,6 +1841,67 @@ dialog::backdrop {
     background: var(--st-raised);
     color: var(--st-text);
     box-shadow: var(--st-shadow-pop);
+}
+
+/* --------------------------------------------------------------------------
+   Breeze production voices dialog (breeze-api.js, body-level <dialog>).
+   Opened from both the Library "more" menu and Settings: styled once here.
+   -------------------------------------------------------------------------- */
+#breeze-productions-dialog {
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#breeze-productions-dialog h2 {
+    margin: 0 0 8px;
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.2;
+}
+
+#breeze-productions-dialog h3 {
+    margin: 0 0 4px;
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#breeze-productions-dialog p {
+    margin: 0 0 10px;
+    color: var(--st-text-3);
+    line-height: 1.5;
+}
+
+#breeze-productions-dialog [data-status]:empty {
+    display: none;
+}
+
+#breeze-productions-dialog button {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    margin: 0 6px 10px 0;
+    padding: 0 10px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background: var(--st-control);
+    color: var(--st-text-strong);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+#breeze-productions-dialog button:hover:not(:disabled) {
+    background: var(--st-control-2);
+    border-color: var(--st-border-strong);
+    color: var(--st-text-strong);
+}
+
+#breeze-productions-dialog button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {

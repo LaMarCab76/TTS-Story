@@ -21,7 +21,7 @@ To generate samples for all speakers:
 
 For each speaker, TTS-Story uses the saved Voice Design Prompt with the selected engine, generates the requested number of candidates, and saves them into Voice Prompts. A single candidate is assigned automatically; multiple candidates remain available for approval in Speaker Properties. The completion message reports how many voices succeeded.
 
-This operation can be slow and can consume significant GPU resources. Test one voice through [Voice Creation](app:voices) before launching a large batch.
+This operation can be slow and can consume significant GPU resources. Test one voice through [Voice creation](app:voices/qwen) before launching a large batch.
 
 To build and design only one speaker, open that speaker's properties, click **Build Profile**, review the two generated fields, and then click **Generate Voice**. These buttons perform separate operations: Build Profile calls the configured LLM chain, while Generate Voice creates and saves the audio reference.
 

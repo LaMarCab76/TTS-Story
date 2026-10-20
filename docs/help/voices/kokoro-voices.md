@@ -1,6 +1,6 @@
 # Kokoro Voices and Previews
 
-Kokoro includes built-in voices grouped by language. Open [Voices](app:voices) and select the **Kokoro** sub-tab to browse them. Each language has its own card listing its voices with their gender and voice code.
+Kokoro includes built-in voices grouped by language. Open [Voices](app:voices/kokoro) and select the **Kokoro** sub-tab to browse them. Each language has its own card listing its voices with their gender and voice code.
 
 ![Kokoro voice browser showing language groups and preview actions](../../../static/help/screenshots/kokoro-voice-browser.png)
 

@@ -2159,57 +2159,7 @@
     margin: 12px 0;
 }
 
-/* ==========================================================================
-   Breeze production voices dialog (opened from the Library "more" menu)
-   ========================================================================== */
-#breeze-productions-dialog {
-    font-size: 13px;
-    line-height: 1.5;
-}
-
-#breeze-productions-dialog h2 {
-    margin: 0 0 8px;
-    font-family: var(--st-font-serif);
-    font-size: 24px;
-    font-weight: 400;
-    line-height: 1.1;
-}
-
-#breeze-productions-dialog h3 {
-    margin: 0 0 4px;
-    font-size: 14px;
-    font-weight: 600;
-}
-
-#breeze-productions-dialog p {
-    margin: 0 0 10px;
-    color: var(--st-text-3);
-}
-
-#breeze-productions-dialog button {
-    display: inline-flex;
-    align-items: center;
-    height: 28px;
-    margin: 0 6px 8px 0;
-    padding: 0 10px;
-    border: 1px solid var(--st-border-control);
-    border-radius: 6px;
-    background: var(--st-control);
-    color: var(--st-text-strong);
-    font: inherit;
-    font-size: 12.5px;
-    cursor: pointer;
-}
-
-#breeze-productions-dialog button:hover:not(:disabled) {
-    background: var(--st-control-2);
-    border-color: var(--st-border-strong);
-}
-
-#breeze-productions-dialog button:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-}
+/* The Breeze production voices dialog (Library "more" menu and Settings) is styled in studio.css. */
 
 @media (prefers-reduced-motion: reduce) {
     #refresh-library-btn.is-loading > .ms,
