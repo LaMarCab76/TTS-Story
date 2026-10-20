@@ -465,6 +465,16 @@ class TextProcessor:
         
         total_chunks = sum(len(seg["chunks"]) for seg in segments)
         word_count = len(text.split())
+
+        # Per-speaker chunk counts, summed exactly as the generator chunks the
+        # segments (pause-marker segments count toward the preceding speaker),
+        # so the values always add up to total_chunks.
+        speaker_chunks: Dict[str, int] = {}
+        for seg in segments:
+            speaker = seg.get("speaker")
+            if not speaker:
+                continue
+            speaker_chunks[speaker] = speaker_chunks.get(speaker, 0) + len(seg.get("chunks") or [])
         
         # Count segments with emotions
         segments_with_emotion = sum(1 for seg in segments if seg.get("emotion"))
@@ -483,6 +493,7 @@ class TextProcessor:
             "speaker_count": len(speakers),
             "speakers": speakers,
             "speaker_emotions": speaker_emotions,
+            "speaker_chunks": speaker_chunks,
             "total_segments": len(segments),
             "segments_with_emotion": segments_with_emotion,
             "total_chunks": total_chunks,

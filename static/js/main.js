@@ -77,7 +77,7 @@ function refreshQwenVoiceDesignControls() {
     const batchButton = document.getElementById('generate-voices-btn');
     if (batchButton) {
         batchButton.disabled = !anyAvailable || !hasDetectedSpeakers;
-        batchButton.title = anyAvailable ? '' : (anyKnown
+        batchButton.title = anyAvailable ? 'Generate voices for the whole cast' : (anyKnown
             ? 'Install Qwen3-TTS or Breeze TTS 2 under Settings → Engine Settings to generate voices.'
             : 'Checking voice-design engine availability…');
     }
@@ -497,7 +497,7 @@ async function generateAndSaveVoiceCandidates(speaker, displayName, statusEl, en
     const payload = buildSpeakerVoiceDesignPayload(speaker, displayName);
     const { profile } = findSpeakerProfile(speaker);
     const designEngine = normalizeVoiceDesignEngine(engineOverride || profile?.voice_design_engine);
-    if (designEngine === 'gemini') throw new Error('Use Generate Voice in Speaker Properties to audition and select hosted Gemini voices. Local sample batch creation does not support hosted IDs.');
+    if (designEngine === 'gemini') throw new Error('Open the speaker in the Cast list and use Generate voice to audition and select hosted Gemini voices. Local sample batch creation does not support hosted IDs.');
     await requireVoiceDesignBackend(designEngine);
     const engineConfig = getVoiceDesignEngineConfig(designEngine);
     const requestedCount = Number.parseInt(profile?.voice_candidate_count, 10);
@@ -589,7 +589,7 @@ async function generateSpeakerVoicePromptBatch(speaker, displayName, statusEl, d
         const candidates = await generateAndSaveVoiceCandidates(speaker, displayName, statusEl, designEngine);
         if (candidates.length > 1) {
             speakerVoiceDesignCandidates[speakerKey] = candidates;
-            if (statusEl) statusEl.textContent = `Created ${candidates.length} candidates for ${displayName || speaker}; select one in Speaker Properties.`;
+            if (statusEl) statusEl.textContent = `Created ${candidates.length} candidates for ${displayName || speaker}; open the speaker in the Cast list to select one.`;
         } else {
             delete speakerVoiceDesignCandidates[speakerKey];
             const promptValue = (candidates[0]?.prompt_path || candidates[0]?.file_name || '').trim();
@@ -796,7 +796,7 @@ async function runBatchVoiceGeneration(prefix, statusEl, progressEls = {}, compl
     }
     if (completeSummary) {
         completeSummary.textContent = bulkVoiceGenerationState.design_engine === 'gemini'
-            ? `New auditions created for ${successCount - reusedCount} speakers; ${reusedCount} pending auditions retained without new requests. Open Speaker Properties to review them; current voice assignments are unchanged.${failures.length ? ` Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}` : ''}`
+            ? `New auditions created for ${successCount - reusedCount} speakers; ${reusedCount} pending auditions retained without new requests. Open each speaker in the Cast list to review them; current voice assignments are unchanged.${failures.length ? ` Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}` : ''}`
             : failures.length
             ? `Generated ${getVoiceDesignEngineConfig(bulkVoiceGenerationState.design_engine).label} voices for ${successCount} of ${speakers.length} speakers. Failed: ${failures.map(item => `${item.speaker}: ${item.error}`).join(' | ')}`
             : `Voices ready for all ${speakers.length} speakers. ${bulkVoiceGenerationState.design_engine === 'gemini' ? 'Existing Gemini auditions were preserved. Open each speaker to preview and select a hosted voice, including single candidates.' : 'Speakers configured for multiple candidates still require a final selection.'}`;
@@ -1989,6 +1989,7 @@ function updateAssignmentModes(engineName, rows = getAssignmentRows()) {
             kokoroPanel.style.display = 'flex';
         }
     });
+    if (typeof castViewRender === 'function') castViewRender();
     // Populate Qwen3 language dropdowns if Qwen3 is selected
     if (isQwen && qwen3Metadata?.languages) {
         document.querySelectorAll('#inline-voice-assignment-list .qwen3-language-select, #speaker-edit-modal-body .qwen3-language-select').forEach(select => {
@@ -2258,6 +2259,7 @@ function syncSpeakerReferenceAssignment(speaker, promptValue = '') {
         }
         updateInlineSampleButtonState(select.closest('.voice-assignment-row'), { stopPlayback: false });
     });
+    if (typeof castViewRender === 'function') castViewRender();
     return matched;
 }
 
@@ -2745,6 +2747,40 @@ function buildDefaultSampleText(speaker) {
     return `This is a quick preview line for ${speaker}.`;
 }
 
+// Quick-test line for a speaker: the first passage it speaks in the manuscript
+// (inline tags and directions stripped), trimmed to a sentence or ~180 chars.
+function buildSpeakerSampleText(speaker) {
+    const text = document.getElementById('input-text')?.value || '';
+    const name = String(speaker || '').trim();
+    if (!text || !name || name === 'default') return buildDefaultSampleText(speaker);
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = new RegExp(`\\[${escapedName}\\]([\\s\\S]*?)\\[\\/${escapedName}\\]`, 'i').exec(text);
+    let line = (match ? match[1] : (name === 'Speaker 1' ? text : ''))
+        .replace(/\[[^\]\n]{1,60}\]/g, ' ')
+        .replace(/\*{3,}/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!line) return buildDefaultSampleText(speaker);
+    if (line.length > 180) {
+        const head = line.slice(0, 180);
+        const sentenceEnd = Math.max(head.lastIndexOf('. '), head.lastIndexOf('! '), head.lastIndexOf('? '));
+        line = sentenceEnd >= 40 ? head.slice(0, sentenceEnd + 1) : `${head.replace(/\s+\S*$/, '')}…`;
+    }
+    return line;
+}
+
+function formatFxPitch(value) {
+    const pitch = Number(value) || 0;
+    const rounded = Math.round(pitch * 10) / 10;
+    const sign = rounded > 0 ? '+' : rounded < 0 ? '−' : '';
+    return `${sign}${Math.abs(rounded).toFixed(1)} st`;
+}
+
+function formatFxSpeed(value) {
+    const speed = Number(value) || 1;
+    return `${speed.toFixed(2)}×`;
+}
+
 function renderFxPanel(container, speaker, options = {}) {
     if (!container) return;
     const state = getFxState(speaker);
@@ -2768,13 +2804,16 @@ function renderFxPanel(container, speaker, options = {}) {
             </div>
         `
         : '';
+    const isSpeakerPanel = !!speaker && speaker !== 'default';
+    const sampleText = state.sampleText || (isSpeakerPanel ? buildSpeakerSampleText(speaker) : buildDefaultSampleText(speaker));
     const previewMarkup = !useSharedPreview
         ? `
             <div class="fx-field fx-preview">
-                <textarea data-role="fx-sample-text" rows="2" placeholder="Preview text">${state.sampleText || buildDefaultSampleText(speaker)}</textarea>
+                <span class="fx-preview-label">Quick test</span>
+                <textarea data-role="fx-sample-text" rows="2" placeholder="Preview text" aria-label="Quick test line">${escapeHtml(sampleText)}</textarea>
                 <div class="fx-preview-actions">
-                    <button type="button" class="btn btn-sm" data-role="fx-preview-btn">Quick Test</button>
-                    <span class="fx-status" data-role="fx-status"></span>
+                    <button type="button" class="btn btn-sm" data-role="fx-preview-btn" data-label-play="Test" data-label-stop="Stop" title="Synthesize this line with the current voice, pitch and speed">Test</button>
+                    <span class="fx-status" data-role="fx-status" aria-live="polite"></span>
                 </div>
             </div>
         `
@@ -2786,15 +2825,15 @@ function renderFxPanel(container, speaker, options = {}) {
                 <div class="fx-field fx-inline fx-slider">
                     <label>Pitch</label>
                     <div class="slider-group">
-                        <input type="range" min="-6" max="6" step="0.1" value="${state.pitch}" data-role="fx-pitch">
-                        <span class="slider-value" data-role="fx-pitch-value">${state.pitch.toFixed(1)} st</span>
+                        <input type="range" min="-6" max="6" step="0.5" value="${state.pitch}" data-role="fx-pitch" aria-label="Pitch in semitones">
+                        <span class="slider-value" data-role="fx-pitch-value">${formatFxPitch(state.pitch)}</span>
                     </div>
                 </div>
                 <div class="fx-field fx-inline fx-slider">
                     <label>Speed</label>
                     <div class="slider-group">
-                        <input type="range" min="0.5" max="2.0" step="0.01" value="${state.speed}" data-role="fx-speed">
-                        <span class="slider-value" data-role="fx-speed-value">${state.speed.toFixed(2)}x</span>
+                        <input type="range" min="0.5" max="2.0" step="0.01" value="${state.speed}" data-role="fx-speed" aria-label="Speed multiplier">
+                        <span class="slider-value" data-role="fx-speed-value">${formatFxSpeed(state.speed)}</span>
                     </div>
                 </div>
                 ${sharedActionsMarkup}
@@ -2823,13 +2862,15 @@ function renderFxPanel(container, speaker, options = {}) {
     if (pitchInput && pitchValue) {
         pitchInput.addEventListener('input', event => {
             state.pitch = parseFloat(event.target.value) || 0;
-            pitchValue.textContent = `${state.pitch.toFixed(1)} st`;
+            pitchValue.textContent = formatFxPitch(state.pitch);
+            if (typeof castViewRender === 'function') castViewRender();
         });
     }
     if (speedInput && speedValue) {
         speedInput.addEventListener('input', event => {
             state.speed = parseFloat(event.target.value) || 1;
-            speedValue.textContent = `${state.speed.toFixed(2)}x`;
+            speedValue.textContent = formatFxSpeed(state.speed);
+            if (typeof castViewRender === 'function') castViewRender();
         });
     }
     if (!useSharedPreview && sampleInput) {
@@ -2936,7 +2977,8 @@ async function handleFxPreview(speaker, container) {
     const state = getFxState(speaker);
     const sampleText = speaker === 'default'
         ? (state.sampleText || '').trim() || buildDefaultSampleText(speaker)
-        : getSharedPreviewText();
+        : (container.querySelector('[data-role="fx-sample-text"]')?.value || state.sampleText || '').trim()
+            || buildSpeakerSampleText(speaker);
     const panelSpeed = Number(state.speed) || NaN;
     const globalSpeed = parseFloat(document.getElementById('speed')?.value) || 1.0;
     let previewSpeed = Number.isFinite(panelSpeed) ? panelSpeed : globalSpeed;
@@ -4278,6 +4320,8 @@ function setupEventListeners() {
     if (speakersList) {
         speakersList.addEventListener('click', event => {
             const target = event.target instanceof HTMLElement ? event.target : null;
+            // In-row controls (the Cast list play button) are handled by cast-view.js.
+            if (target?.closest('[data-cast-action]')) return;
             const chip = target?.closest('.speaker-tag');
             if (!chip) return;
             const speaker = chip.dataset.speaker;
@@ -4453,7 +4497,7 @@ function setupEventListeners() {
                     Math.min(Number.parseInt(resumeRequested ? bulkVoiceGenerationState.candidate_count : batchCandidateCountInput?.value, 10) || 1, batchDesignEngine === 'gemini' ? 4 : 10)
                 );
                 if (batchCandidateCountInput) batchCandidateCountInput.value = String(batchCandidateCount);
-                if (batchDesignEngine === 'gemini' && !window.confirm(`Generate Gemini hosted voice candidates for this cast? Up to ${batchCandidateCount} candidates per remaining speaker will be billed by Google. Pending auditions will be kept without new requests. Previously selected auditions will receive new candidates without changing the assigned voice.\n\nKeep this page open while generation runs. Pause stops after the current speaker. Select voices afterward in Speaker Properties.`)) return;
+                if (batchDesignEngine === 'gemini' && !window.confirm(`Generate Gemini hosted voice candidates for this cast? Up to ${batchCandidateCount} candidates per remaining speaker will be billed by Google. Pending auditions will be kept without new requests. Previously selected auditions will receive new candidates without changing the assigned voice.\n\nKeep this page open while generation runs. Pause stops after the current speaker. Select voices afterward by opening each speaker in the Cast list.`)) return;
                 await requireVoiceDesignBackend(batchDesignEngine);
                 (currentStats?.speakers || []).forEach(speaker => {
                     updateSpeakerProfileEntry(speaker, {
@@ -4665,6 +4709,7 @@ function setupEventListeners() {
         });
         showNotification('Voice samples assigned.', 'success');
         closeAutoAssignModal();
+        if (typeof castViewRender === 'function') castViewRender();
     }
 
     if (autoAssignThresholdSlider) {
@@ -5215,7 +5260,7 @@ async function buildSingleSpeakerProfile(speaker) {
         if (currentBuildBtn) {
             currentBuildBtn.disabled = false;
             currentBuildBtn.classList.remove('is-loading');
-            currentBuildBtn.textContent = 'Build Profile';
+            currentBuildBtn.textContent = 'Build profile';
         }
     }
 }
@@ -5511,7 +5556,7 @@ async function generateSpeakerVoiceCandidatesForSpeaker(speaker) {
             const { profile } = findSpeakerProfile(speaker);
             currentButton.disabled = !voiceDesignEngineAvailable(profile?.voice_design_engine);
             currentButton.classList.remove('is-loading');
-            currentButton.textContent = 'Generate Voice';
+            currentButton.textContent = 'Generate voice';
         }
     }
 }
@@ -5571,7 +5616,7 @@ async function assignGeminiSpeakerVoice(speaker, id, label, designEngine = 'gemi
     }
     const selects = Array.from(document.querySelectorAll('#inline-voice-assignment-list .voice-select, #speaker-edit-modal-body .voice-select'))
         .filter(select => (select.dataset.speaker || select.closest('.voice-assignment-row')?.dataset.speaker) === speaker);
-    if (!selects.length) throw new Error('Speaker voice dropdown is no longer available. Reopen Speaker Properties; your candidates remain saved.');
+    if (!selects.length) throw new Error('Speaker voice dropdown is no longer available. Reopen the speaker from the Cast list; your candidates remain saved.');
     for (const select of selects) {
         if (!Array.from(select.options).some(option => option.value === id)) select.add(new Option(label, id));
         select.value = id;
@@ -5605,58 +5650,65 @@ function renderSpeakerProfileSummary(speaker) {
     // Don't mix earlier local auditions with the current hosted audition.
     const candidates = voiceDesignEngine === 'gemini' ? [] : (speakerVoiceDesignCandidates[normalizeSpeakerKey(speaker)] || []);
     const emptyMessage = hasProfiles
-        ? 'No profile matched this speaker yet.'
-        : 'No speaker profile data yet. Build this profile or run Prep Text.';
+        ? 'No profile matched this speaker yet. Run Build profile, or describe the character here.'
+        : 'No profile yet. Run Prep text or Build profile to describe this character and suggest a voice type.';
+    const maxCandidates = voiceDesignEngine === 'gemini' ? 4 : 10;
+    // Two sections for the speaker drawer: "Character" (profile) and "Design a
+    // new voice". The drawer orders them around the row's Voice section.
     summary.innerHTML = `
-        <div class="speaker-profile-row speaker-profile-editor">
-            <div class="speaker-profile-fields">
-                <label>
-                    <strong>Profile:</strong>
-                    <textarea class="speaker-profile-input" data-role="speaker-profile-description" rows="3" placeholder="${escapeHtml(emptyMessage)}">${escapeHtml(description)}</textarea>
-                </label>
-                <label>
-                    <strong>Voice Type:</strong>
-                    <input class="speaker-profile-input" data-role="speaker-profile-voice" type="text" value="${escapeHtml(voice)}" placeholder="Not available yet." />
-                </label>
-                <label>
-                    <strong>Voice Design Prompt:</strong>
-                    <textarea class="speaker-profile-input" data-role="speaker-voice-design-prompt" rows="2" placeholder="ADULT FEMALE VOICE. Warm alto; measured, expressive delivery.">${escapeHtml(voiceDesignPrompt)}</textarea>
-                    <small>The selected design engine receives this voice-only instruction, or builds one from Voice Type. The narrative profile is kept separate.</small>
-                </label>
-                <label>
-                    <strong>Voice Design Engine:</strong>
-                    <select class="speaker-profile-input" data-role="speaker-voice-design-engine">
-                        <option value="qwen3" data-voice-design-option ${voiceDesignEngine === 'qwen3' ? 'selected' : ''}>Qwen3-TTS</option>
-                        <option value="breeze" data-voice-design-option ${voiceDesignEngine === 'breeze' ? 'selected' : ''}>Breeze TTS 2</option>
-                        <option value="gemini" data-voice-design-option ${voiceDesignEngine === 'gemini' ? 'selected' : ''}>Gemini TTS · Cloud Voice Design</option>
-                    </select>
-                </label>
-                ${voiceDesignEngine === 'gemini' ? `<label><strong>Gemini model:</strong>
-                    <select class="speaker-profile-input" data-role="speaker-gemini-model">
-                        <option value="gemini_tts" ${profile?.gemini_voice_audition?.engine !== 'gemini_tts_lite' ? 'selected' : ''}>Gemini Flash TTS</option>
-                        <option value="gemini_tts_lite" ${profile?.gemini_voice_audition?.engine === 'gemini_tts_lite' ? 'selected' : ''}>Gemini Flash-Lite TTS</option>
-                    </select></label>` : ''}
-                <label>
-                    <strong>Preview Text:</strong>
-                    <textarea class="speaker-profile-input" data-role="speaker-voice-preview-text" rows="2" readonly>${escapeHtml(previewText)}</textarea>
-                    <small>${voiceDesignEngine === 'gemini' ? 'Google chooses the preview passage for hosted voices; this text is not sent to voice design.' : 'The same standardized inflection passage is used for every candidate.'}</small>
-                </label>
-                <label>
-                    <strong>Voice Candidates:</strong>
-                    <input class="speaker-profile-input speaker-candidate-count" data-role="speaker-voice-candidate-count" type="number" min="1" max="${voiceDesignEngine === 'gemini' ? 4 : 10}" step="1" value="${Math.min(candidateCount, voiceDesignEngine === 'gemini' ? 4 : 10)}" />
-                    <small>Generate one voice by default, or increase this to audition multiple alternatives.</small>
+        <div class="speaker-profile-character">
+            <div class="speaker-section-head">
+                <h4 class="speaker-section-title">Character</h4>
+                <button type="button" class="btn btn-link" data-role="speaker-build-profile" title="Ask the text-prep LLM to describe this character and suggest a voice type">Build profile</button>
+            </div>
+            <textarea class="speaker-profile-input speaker-profile-card" data-role="speaker-profile-description" rows="3" aria-label="Character profile" placeholder="${escapeHtml(emptyMessage)}">${escapeHtml(description)}</textarea>
+            <label class="speaker-profile-voice-type">
+                <span>Voice type</span>
+                <input class="speaker-profile-input" data-role="speaker-profile-voice" type="text" value="${escapeHtml(voice)}" placeholder="Not available yet." />
+            </label>
+        </div>
+        <div class="speaker-profile-row speaker-profile-editor speaker-voice-design">
+            <h4 class="speaker-section-title">Design a new voice</h4>
+            <p class="speaker-section-copy">Creates candidates from the character profile. Cloud designers are billable.</p>
+            <div class="speaker-design-controls">
+                <select class="speaker-profile-input" data-role="speaker-voice-design-engine" aria-label="Voice design engine">
+                    <option value="qwen3" data-voice-design-option ${voiceDesignEngine === 'qwen3' ? 'selected' : ''}>Qwen3-TTS · VoiceDesign</option>
+                    <option value="breeze" data-voice-design-option ${voiceDesignEngine === 'breeze' ? 'selected' : ''}>Breeze TTS 2 · Design</option>
+                    <option value="gemini" data-voice-design-option ${voiceDesignEngine === 'gemini' ? 'selected' : ''}>Gemini TTS · Cloud Voice Design</option>
+                </select>
+                <label class="input-unit speaker-design-count" title="Voice candidates to generate (1–${maxCandidates})">
+                    <input class="speaker-profile-input speaker-candidate-count" data-role="speaker-voice-candidate-count" type="number" min="1" max="${maxCandidates}" step="1" value="${Math.min(candidateCount, maxCandidates)}" aria-label="Voice candidates" />
+                    <span>${candidateCount === 1 ? 'voice' : 'voices'}</span>
                 </label>
             </div>
+            ${voiceDesignEngine === 'gemini' ? `<label class="speaker-design-field"><span>Gemini model</span>
+                <select class="speaker-profile-input" data-role="speaker-gemini-model">
+                    <option value="gemini_tts" ${profile?.gemini_voice_audition?.engine !== 'gemini_tts_lite' ? 'selected' : ''}>Gemini Flash TTS</option>
+                    <option value="gemini_tts_lite" ${profile?.gemini_voice_audition?.engine === 'gemini_tts_lite' ? 'selected' : ''}>Gemini Flash-Lite TTS</option>
+                </select></label>` : ''}
             <div class="speaker-profile-actions">
-                <button type="button" class="btn btn-secondary btn-sm" data-role="speaker-build-profile">Build Profile</button>
-                <button type="button" class="btn btn-secondary btn-sm" data-role="speaker-generate-voice" disabled title="Checking voice-design engine availability…">${voiceDesignEngine === 'gemini' ? 'Generate Voice (billable)' : 'Generate Voice'}</button>
+                <button type="button" class="btn btn-ghost" data-role="speaker-generate-voice" disabled title="Checking voice-design engine availability…">${voiceDesignEngine === 'gemini' ? 'Generate voice (billable)' : 'Generate voice'}</button>
             </div>
             <div class="engine-action-notice hidden" data-role="voice-design-unavailable">
                 <span data-role="voice-design-unavailable-message">Install the selected voice-design engine before generating.</span>
-                <button type="button" class="btn btn-secondary btn-sm" data-role="open-voice-design-settings">Open Engine Settings</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-role="open-voice-design-settings">Open engine settings</button>
             </div>
-        </div>
-        ${candidates.length ? `
+            <details class="speaker-design-advanced" ${summary.dataset.advancedOpen === 'true' ? 'open' : ''}>
+                <summary>Advanced</summary>
+                <div class="speaker-profile-fields">
+                    <label class="speaker-design-field">
+                        <span>Voice design prompt</span>
+                        <textarea class="speaker-profile-input" data-role="speaker-voice-design-prompt" rows="2" placeholder="ADULT FEMALE VOICE. Warm alto; measured, expressive delivery.">${escapeHtml(voiceDesignPrompt)}</textarea>
+                        <small>The selected design engine receives this voice-only instruction, or builds one from Voice type. The narrative profile is kept separate.</small>
+                    </label>
+                    <label class="speaker-design-field">
+                        <span>Preview text</span>
+                        <textarea class="speaker-profile-input" data-role="speaker-voice-preview-text" rows="2" readonly>${escapeHtml(previewText)}</textarea>
+                        <small>${voiceDesignEngine === 'gemini' ? 'Google chooses the preview passage for hosted voices; this text is not sent to voice design.' : 'The same standardized inflection passage is used for every candidate.'}</small>
+                    </label>
+                </div>
+            </details>
+            ${candidates.length ? `
             <div class="voice-design-candidates">
                 <strong>Select a VoiceDesign candidate:</strong>
                 <div class="voice-design-candidate-grid">
@@ -5671,12 +5723,17 @@ function renderSpeakerProfileSummary(speaker) {
                     `).join('')}
                 </div>
             </div>` : ''}
-        ${selectedVoiceName || selectedVoicePath ? `
+            ${selectedVoiceName || selectedVoicePath ? `
             <div class="voice-design-selected">
+                <span class="ms ms-fill" aria-hidden="true">check_circle</span>
                 <strong>Selected Voice:</strong>
                 <span>${escapeHtml(selectedVoiceName || selectedVoicePath)}</span>
             </div>` : ''}
+        </div>
     `;
+    summary.querySelector('.speaker-design-advanced')?.addEventListener('toggle', event => {
+        summary.dataset.advancedOpen = event.currentTarget.open ? 'true' : 'false';
+    });
     const descriptionInput = summary.querySelector('[data-role="speaker-profile-description"]');
     const voiceInput = summary.querySelector('[data-role="speaker-profile-voice"]');
     const voiceDesignInput = summary.querySelector('[data-role="speaker-voice-design-prompt"]');
@@ -5735,8 +5792,10 @@ function renderSpeakerProfileSummary(speaker) {
     }
     if (candidateCountInput) {
         candidateCountInput.addEventListener('change', event => {
-            const value = Math.max(1, Math.min(Number.parseInt(event.currentTarget.value, 10) || 1, 10));
+            const value = Math.max(1, Math.min(Number.parseInt(event.currentTarget.value, 10) || 1, maxCandidates));
             event.currentTarget.value = String(value);
+            const unit = event.currentTarget.parentElement?.querySelector('span');
+            if (unit) unit.textContent = value === 1 ? 'voice' : 'voices';
             updateSpeakerProfileEntry(speaker, { voice_candidate_count: value });
         });
     }
@@ -5845,6 +5904,26 @@ function renderSpeakerDuplicates(speakers) {
     });
 }
 
+// Cast list in the Generate aside. cast-view.js renders the rows (List/Details
+// views); this fallback keeps the speaker buttons usable without it. Every row is
+// a `.speaker-tag[data-speaker]`, which the delegated click handler opens.
+function renderSpeakerCastList(container, speakers, stats) {
+    if (typeof renderCastList === 'function') {
+        renderCastList(speakers, stats);
+        return;
+    }
+    if (!container) return;
+    container.innerHTML = '';
+    speakers.forEach(speaker => {
+        const tag = document.createElement('button');
+        tag.type = 'button';
+        tag.className = `speaker-tag${speakerReadyState[speaker] ? ' ready' : ''}`;
+        tag.dataset.speaker = speaker;
+        tag.textContent = speaker;
+        container.appendChild(tag);
+    });
+}
+
 function applySpeakerRename(stats, oldName, newName) {
     if (!stats || !Array.isArray(stats.speakers)) return;
     const updated = stats.speakers.map(name => (name === oldName ? newName : name));
@@ -5939,10 +6018,12 @@ function handleInlineRename(originalName, inputEl) {
 function setSpeakerReadyState(speaker, ready) {
     if (!speaker) return;
     speakerReadyState[speaker] = !!ready;
-    const chip = document.querySelector(`#speakers-list .speaker-tag[data-speaker="${speaker}"]`);
+    const chip = Array.from(document.querySelectorAll('#speakers-list .speaker-tag'))
+        .find(item => item.dataset.speaker === speaker);
     if (chip) {
         chip.classList.toggle('ready', !!ready);
     }
+    if (typeof castViewRender === 'function') castViewRender();
 }
 
 function selectedVoicePreviewUrl(select) {
@@ -5958,6 +6039,10 @@ function selectedVoicePreviewUrl(select) {
         && (window.geminiTtsVoices || []).some(v => v.short_name === value && v.designed)) {
         return `/api/gemini-tts/voices/${encodeURIComponent(value)}/preview`;
     }
+    // Kokoro built-ins with a generated preview sample (Voices → Kokoro).
+    const kokoroSample = Object.values(window.availableVoices || {})
+        .map(group => group?.samples?.[value]).find(Boolean) || '';
+    if (/^\/(?!\/)/.test(kokoroSample)) return kokoroSample;
     return '';
 }
 
@@ -5967,7 +6052,7 @@ function updateGeminiSelectedVoicePreview(row) {
     if (!button || !select) return;
     button.hidden = false;
     button.disabled = !selectedVoicePreviewUrl(select);
-    button.title = button.disabled ? 'No saved audio preview is available for this voice. Use Quick Test to synthesize a sample.' : 'Play the selected voice sample (no new synthesis).';
+    button.title = button.disabled ? 'No saved audio preview is available for this voice. Use Test below to synthesize a sample.' : 'Play the selected voice sample (no new synthesis).';
     button.onclick = async () => {
         if (currentFxPreviewButton === button) { stopSpeakerPreviewAudio(); return; }
         const url = selectedVoicePreviewUrl(select);
@@ -5977,6 +6062,7 @@ function updateGeminiSelectedVoicePreview(row) {
         currentFxPreviewAudio = audio;
         currentFxPreviewButton = button;
         button.textContent = 'Stop';
+        button.classList?.add('is-playing');
         const finish = () => { if (currentFxPreviewAudio === audio) stopSpeakerPreviewAudio(); };
         const failed = () => {
             if (currentFxPreviewAudio !== audio) return;
@@ -6019,7 +6105,7 @@ function openSpeakerEditModal(speaker) {
     }
 
     if (title) {
-        title.textContent = `Edit Speaker: ${speaker}`;
+        title.textContent = speaker;
     }
     if (readyCheckbox) {
         readyCheckbox.checked = !!speakerReadyState[speaker];
@@ -6031,12 +6117,14 @@ function openSpeakerEditModal(speaker) {
 
     overlay.classList.remove('hidden');
     modal.classList.remove('hidden');
+    // Drawer header (kicker, color dot), engine label and quick-test line.
+    if (typeof castDrawerOpened === 'function') castDrawerOpened(speaker, row);
 }
 
 function closeSpeakerEditModal() {
     const geminiDesigner = document.querySelector('#speaker-profile-summary [data-gemini-inline-designer]');
     if (geminiDesigner?.dataset.busy === 'true') {
-        showNotification('Please wait for Gemini voice creation or cleanup to finish before closing Speaker Properties.', 'info');
+        showNotification('Please wait for Gemini voice creation or cleanup to finish before closing this speaker.', 'info');
         return;
     }
     geminiDesigner?.geminiDispose?.();
@@ -6046,8 +6134,14 @@ function closeSpeakerEditModal() {
     const modalBody = document.querySelector('#speaker-edit-modal .modal-body');
     const profileSummary = document.getElementById('speaker-profile-summary');
     const modalAnchor = document.getElementById('speaker-edit-modal-body');
+    const closingSpeaker = activeSpeakerModal;
     if (activeSpeakerRow && activeSpeakerRowOrigin) {
-        activeSpeakerRowOrigin.appendChild(activeSpeakerRow);
+        // A re-analysis while the drawer was open rebuilds the hidden list, so a
+        // newer row for this speaker may exist: keep the edited row in its place.
+        const staleCopy = Array.from(activeSpeakerRowOrigin.querySelectorAll('.voice-assignment-row'))
+            .find(item => item !== activeSpeakerRow && item.dataset.speaker === activeSpeakerRow.dataset.speaker);
+        if (staleCopy) staleCopy.replaceWith(activeSpeakerRow);
+        else activeSpeakerRowOrigin.appendChild(activeSpeakerRow);
         populateReferenceDropdown(activeSpeakerRow.querySelector('.reference-select'), 'Select Voice Sample...');
     }
     if (profileSummary && modalBody && modalAnchor) {
@@ -6063,6 +6157,7 @@ function closeSpeakerEditModal() {
     activeSpeakerModal = null;
     if (overlay) overlay.classList.add('hidden');
     if (modal) modal.classList.add('hidden');
+    if (typeof castDrawerClosed === 'function') castDrawerClosed(closingSpeaker);
 }
 
 function serializeVoiceDesignCandidateGroups() {
@@ -6369,7 +6464,9 @@ function applyProjectAssignments(project) {
             qwenInstruct.value = qwenInstructs[speaker];
         }
         updateInlineSampleButtonState(row, { stopPlayback: true });
+        updateGeminiSelectedVoicePreview(row);
     });
+    if (typeof castViewRender === 'function') castViewRender();
 }
 
 // Manuscript footer stats: "3 speakers · 7 chunks · 132 words · ≈ 0:54"
@@ -6479,54 +6576,18 @@ function displayStatistics(stats) {
         autoAssignVoicesBtn.disabled = !hasDetectedSpeakers;
     }
 
+    // The per-speaker rows are built first: the Cast list reads each row's
+    // assigned voice to describe it (cast-view.js).
     if (hasDetectedSpeakers) {
-        speakersList.innerHTML = '<p><strong>Detected Speakers:</strong></p>';
-        const tagsWrap = document.createElement('div');
-        tagsWrap.className = 'speaker-tags-wrap';
-        detectedSpeakers.forEach(speaker => {
-            const tag = document.createElement('button');
-            tag.type = 'button';
-            tag.className = `speaker-tag${speakerReadyState[speaker] ? ' ready' : ''}`;
-            tag.dataset.speaker = speaker;
-            tag.textContent = speaker;
-            tagsWrap.appendChild(tag);
-        });
-        speakersList.appendChild(tagsWrap);
-        const hint = document.createElement('p');
-        hint.className = 'speaker-modal-hint';
-        hint.textContent = 'Click any speaker chip to open assignments.';
-        speakersList.appendChild(hint);
         renderSpeakerDuplicates(detectedSpeakers);
-        
-        // Show emotion tag detection info
-        if (stats.has_emotion_tags) {
-            const emotionInfo = document.createElement('p');
-            emotionInfo.className = 'emotion-detection-info';
-            emotionInfo.innerHTML = `🎭 <strong>Emotion tags detected:</strong> ${stats.segments_with_emotion} segment(s) with emotions (will be used as Qwen3 instructions)`;
-            speakersList.appendChild(emotionInfo);
-        }
-        
         // Show inline voice assignments with emotion data
         displayInlineVoiceAssignments(detectedSpeakers, stats.speaker_emotions || {});
     } else {
-        speakersList.innerHTML = '<p><strong>Detected Speakers:</strong></p>';
-        const tagsWrap = document.createElement('div');
-        tagsWrap.className = 'speaker-tags-wrap';
-        const tag = document.createElement('button');
-        tag.type = 'button';
-        tag.className = `speaker-tag${speakerReadyState['Speaker 1'] ? ' ready' : ''}`;
-        tag.dataset.speaker = 'Speaker 1';
-        tag.textContent = 'Speaker 1';
-        tagsWrap.appendChild(tag);
-        speakersList.appendChild(tagsWrap);
-        const hint = document.createElement('p');
-        hint.className = 'speaker-modal-hint';
-        hint.textContent = 'Click the speaker chip to open assignments.';
-        speakersList.appendChild(hint);
         displayInlineVoiceAssignments(activeSpeakers, {});
         renderSpeakerDuplicates([]);
     }
-    
+    renderSpeakerCastList(speakersList, activeSpeakers, stats);
+
     document.getElementById('stats-section').style.display = 'block';
 }
 
@@ -6565,19 +6626,25 @@ function displayInlineVoiceAssignments(speakers, speakerEmotions = {}) {
         row.innerHTML = `
             <div class="assignment-header">
                 <span class="speaker-label">${speaker}</span>
+                <span class="speaker-field-label">Name</span>
                 <div class="speaker-rename">
-                    <input type="text" class="speaker-rename-input" data-role="speaker-rename-input" />
-                    <button type="button" class="btn btn-sm speaker-rename-btn" data-role="speaker-rename-btn">Apply</button>
+                    <input type="text" class="speaker-rename-input" data-role="speaker-rename-input" aria-label="Speaker name" />
+                    <button type="button" class="btn btn-ghost speaker-rename-btn" data-role="speaker-rename-btn">Rename</button>
                 </div>
+                <span class="speaker-rename-hint">Renaming updates every <code>[${escapeHtml(speaker)}]</code> tag in the manuscript.</span>
             </div>
             <div class="assignment-body compact-assignment">
+                <div class="speaker-section-head speaker-voice-head">
+                    <h4 class="speaker-section-title">Voice</h4>
+                    <span class="speaker-voice-engine" data-role="speaker-engine-label"></span>
+                </div>
                 <div class="assignment-selection-group">
                     <div class="assignment-select voice-select-inline" data-role="kokoro-control">
                         <label>${speaker}</label>
                         <input type="search" class="localai-sample-filter" placeholder="Filter LocalAI voices and TTS-Story samples…" hidden />
                         <div class="voice-sample-row">
                         <select class="voice-select" data-speaker="${speaker}">
-                            <option value="">Select Voice...</option>
+                            <option value="">Select a voice…</option>
                         </select>
                         <button type="button" class="btn btn-sm" data-role="gemini-selected-preview" data-label-play="Play" hidden disabled>Play</button>
                         </div>
@@ -6664,10 +6731,11 @@ function displayInlineVoiceAssignments(speakers, speakerEmotions = {}) {
             renderFxPanel(fxContainer, speaker, {
                 title: `${speaker} FX`,
                 showHeader: false,
-                useSharedPreview: true
+                useSharedPreview: false
             });
         }
         row.querySelector('.voice-select')?.addEventListener('change', event => {
+            if (typeof castViewRender === 'function') castViewRender();
             if (currentFxPreviewButton === row.querySelector('[data-role="gemini-selected-preview"]')) stopSpeakerPreviewAudio();
             updateGeminiSelectedVoicePreview(row);
             const selectedVoice = event.currentTarget?.value?.trim() || '';
@@ -6688,6 +6756,7 @@ function displayInlineVoiceAssignments(speakers, speakerEmotions = {}) {
             const value = event.target.value.trim();
             if (select) select.value = Array.from(select.options).some(option => option.value === value && !option.disabled) ? value : '';
             if (value.startsWith(TTS_STORY_VOICE_REFERENCE_PREFIX)) rememberCompatibleVoiceSample(speaker, value);
+            if (typeof castViewRender === 'function') castViewRender();
         });
         row.querySelectorAll('.azure-style-select, .azure-role-select, .azure-style-degree, .azure-volume').forEach(control => {
             control.addEventListener('change', () => rememberAzureVoiceOptions(row));
@@ -6714,6 +6783,7 @@ function displayInlineVoiceAssignments(speakers, speakerEmotions = {}) {
                 updateAzureVoiceControls(row, azureVoiceOptionState[spk] || {});
             }
         });
+        if (typeof castViewRender === 'function') castViewRender();
     };
     if (window.availableVoices) {
         populateVoiceSelects();
@@ -6779,6 +6849,7 @@ function initInlineSampleHandlers() {
                 }
             }
             updateInlineSampleButtonState(row, { stopPlayback: true });
+            if (typeof castViewRender === 'function') castViewRender();
         });
         container.addEventListener('click', event => {
             const target = event.target instanceof HTMLElement ? event.target : null;
@@ -6880,7 +6951,7 @@ function populateVoiceSelects() {
             return;
         }
         select.disabled = false;
-        select.innerHTML = '<option value="">Select Voice...</option>';
+        select.innerHTML = '<option value="">Select a voice…</option>';
         if (window.isGeminiTtsEngine?.(engineName)) {
             appendProviderVoiceOptions(select, window.geminiTtsVoices || [], 'Google voices');
             window.ensureGeminiVoiceOption?.(select, previousValue);
@@ -6920,6 +6991,7 @@ function populateVoiceSelects() {
         if (isAzureSpeech) updateAzureVoiceControls(select.closest('.voice-assignment-row'));
         updateGeminiSelectedVoicePreview(select.closest('.voice-assignment-row'));
     });
+    if (typeof castViewRender === 'function') castViewRender();
     if (isLocalAITts) {
         const sharedDatalist = document.getElementById('localai-tts-voice-options');
         if (sharedDatalist) {
@@ -7786,11 +7858,16 @@ function appendVoiceOptions(selectElement) {
         if (!voiceConfig) return;
         const baseOptgroup = document.createElement('optgroup');
         baseOptgroup.label = voiceConfig.language || 'Voices';
-        
+        const regionCodes = { a: 'US', b: 'GB', e: 'ES', f: 'FR', h: 'IN', i: 'IT', j: 'JP', p: 'BR', z: 'CN' };
+
         voiceConfig.voices.forEach(voiceName => {
             const option = document.createElement('option');
             option.value = voiceName;
-            option.textContent = voiceName;
+            // "af_bella" → "af_bella · Bella (US F)"
+            const parts = /^([a-z])([fm])_([a-z0-9]+)$/i.exec(String(voiceName || ''));
+            option.textContent = parts
+                ? `${voiceName} · ${parts[3].charAt(0).toUpperCase()}${parts[3].slice(1)} (${regionCodes[parts[1].toLowerCase()] || parts[1].toUpperCase()} ${parts[2].toUpperCase()})`
+                : voiceName;
             baseOptgroup.appendChild(option);
         });
         
@@ -8080,8 +8157,9 @@ function getVoiceAssignments() {
                 const speakerInstruct = instructInput?.value?.trim() || '';
                 
                 assignments[speaker] = {
-                    voice: selectedVoice,
-                    extra: { 
+                    // Keeps the speaker's Pitch/Speed (fx, speed) like every other engine.
+                    ...createPresetAssignment(selectedVoice, speaker),
+                    extra: {
                         language: speakerLang,
                         ...(speakerInstruct && { instruct: speakerInstruct })
                     }
