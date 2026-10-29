@@ -4,10 +4,14 @@ IndexTTS runs locally in its own environment. Version 2.5 supports English, Chin
 
 ## Install and select
 
-1. Open [Settings → IndexTTS](app:settings/index-tts) and install the engine. Existing installations need reinstalling to obtain the 2.5 runtime.
+1. Open [Settings → Engines → IndexTTS](app:settings/index-tts) and click **Install engine**. Existing installations need reinstalling to obtain the 2.5 runtime.
 2. Select **IndexTTS-2.5**, choose the manuscript language, and save.
-3. Assign a clean reference from the shared Voice Prompts library to each speaker.
+3. Assign a clean reference from Voices → Voice prompts to each speaker.
 4. Generate a short test before a full production.
+
+![Settings → Engines with IndexTTS selected, its status pill, Install engine, and the model, language, and emotion controls](../../../static/help/screenshots/index-tts-settings.png)
+
+*Select IndexTTS in Settings → Engines, install it, then choose the model version and manuscript language before saving.*
 
 The installer uses Python 3.11, the official dependency lock and a pinned upstream source revision in an isolated environment. Model files download on first use into separate version folders. Existing version-2 checkpoints are not overwritten by 2.5. No models or environments used by Breeze are changed.
 
@@ -24,7 +28,7 @@ The direction is not spoken. IndexTTS translates it into its eight emotion dimen
 
 Zero strength or disabling the option bypasses text-emotion guidance. Without a direction, normal reference-based cloning is used. Repeated directions are cached within a batch and on disk for retries/resumes. The cache stores hashed instruction keys and emotion vectors under the model's checkpoint directory, automatically invalidates when the classifier files change, and applies the current emotion strength at synthesis time. The model stays loaded for the batch.
 
-In **Library → Review Chunks**, edit **Voice Direction** and regenerate. The saved direction is also retained for bulk speaker regeneration and resumed jobs.
+In Library, click **Review chunks** on the chapter row, click **Edit** on the chunk, change **Voice Direction**, and click **Regenerate**. The saved direction is also retained for bulk speaker regeneration and resumed jobs.
 
 For IndexTTS chunks, **IndexTTS emotion strength** appears beneath Voice Direction. Set a value from 0 to 1 and click Regenerate. The value overrides the saved job strength for that chunk only, is saved after successful regeneration, and is reused for later chunk regenerations. Changing global engine settings does not replace this value. Existing chunks start with their saved job strength when available (older items without that information use 0.6). Zero disables guidance; a positive override enables it for the chunk. The control hides when another engine is selected; Breeze does not use this IndexTTS-specific setting. Recompile the chapter/full story afterward to include the updated chunk.
 

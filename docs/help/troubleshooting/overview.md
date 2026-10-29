@@ -8,7 +8,7 @@ Start by identifying the smallest stage that fails. Avoid deleting the job, Libr
 
 **Text analysis:** Speakers, chunks, or chapters are wrong before generation begins.
 
-**Voice setup:** A catalog does not load, a prompt is missing, or Quick Test fails.
+**Voice setup:** A catalog does not load, a prompt is missing, or **Quick test** fails.
 
 **Generation:** The job is queued, paused, interrupted, failed, or stuck processing.
 
@@ -22,21 +22,21 @@ Use the matching section below instead of changing unrelated settings.
 
 Before removing a failed job:
 
-1. Open [Job Queue](app:queue) and record its full Job ID, engine, status, progress, and error from **Details**.
+1. Open [Job Queue](app:queue), click **Details** on the job, then **Full details**, and record the full Job ID, engine, status, progress, and error.
 2. Preserve the terminal traceback or provider error.
 3. Copy the per-job `job.log` from `static/audio/<job-id>/` if it exists.
 4. Note exactly which action failed and whether it ever worked on this computer.
 5. Remove credentials, private manuscript text, personal paths, and reference audio before sharing anything.
 
-![Job Details dialog showing status, progress, engine information, and diagnostic fields](../../../static/help/screenshots/job-details.png)
+![Job details window for a failed job showing status, the full job ID, error, timing, and engine information](../../../static/help/screenshots/job-details.png)
 
-*Capture the non-sensitive status and error information from Job Details before deleting or retrying a failed job.*
+*Capture the non-sensitive status and error information from Job details before deleting or retrying a failed job.*
 
 Deleting a Library item removes its generated directory and job log.
 
 ## 3. Run a minimal test
 
-Open [Generate](app:generate) and use one short paragraph with one speaker, the same engine, default engine parameters, no chapter splitting, and MP3 output. Assign one known-good built-in voice or prompt and run Quick Test before submitting.
+Open [Generate](app:generate) and use one short paragraph with one speaker, the same engine, default engine parameters, no chapter splitting, and MP3 output. Assign one known-good built-in voice or prompt and run **Quick test** before submitting.
 
 - If the small test fails, investigate engine installation, credentials, model availability, or hardware.
 - If it succeeds, add the original options back one at a time: speaker tags, reference prompt, effects, chapters, then the full manuscript.

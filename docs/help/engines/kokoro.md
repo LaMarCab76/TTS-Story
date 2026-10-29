@@ -8,31 +8,31 @@ Kokoro is a strong default for lightweight, repeatable narration. TTS-Story prov
 - Built-in voices that remain consistent across a long project
 - Multiple supported languages when each voice and language code are matched correctly
 - Local, private generation after the model has downloaded
-- Custom Kokoro blends made in [Available Voices](help:custom-kokoro-blends)
+- Custom Kokoro blends made in [Voices → Kokoro blends](help:custom-kokoro-blends)
 
 Kokoro does **not** clone a person from reference audio in TTS-Story. A custom blend combines existing compatible Kokoro voice embeddings.
 
 ## Local requirements and setup
 
-![Kokoro voice browser showing available voices and preview controls](../../../static/help/screenshots/kokoro-voice-browser.png)
+![Voices screen with the Kokoro sub-tab showing the built-in voices by language and preview controls](../../../static/help/screenshots/kokoro-voice-browser.png)
 
-*Use the voice browser to audition a Kokoro voice before assigning it to a long project.*
+*Use the Kokoro sub-tab of Voices to audition a voice before assigning it to a long project.*
 
 The normal TTS-Story setup installs the Kokoro package and required speech components. The model and voice files may download on first use. An NVIDIA GPU speeds generation, but the adapter automatically falls back to CPU and Kokoro is one of the more practical local CPU engines.
 
-Open [Settings → Engine Settings](app:settings/kokoro), select **Kokoro**, and leave the 500-character chunk target in place for the first test. On Generate, assign a language and compatible built-in or custom voice to every speaker.
+Open [Settings → Engines](app:settings/kokoro), select **Kokoro**, and leave the 500-character chunk target in place for the first test. On Generate, assign a compatible built-in or custom voice to every speaker in its Edit speaker drawer; the voice code prefix sets the language (for example `bf_` = British English female).
 
 The adapter produces 24 kHz speech before TTS-Story performs any requested final conversion or merge processing.
 
 ## Replicate requirements and setup
 
-Create a Replicate API token, enter it under **Engine Settings → Kokoro Cloud**, and select **Kokoro Replicate** for the job. The token and Replicate parallel-request limit are shared with Chatterbox Cloud. TTS-Story calls a pinned `jaaari/kokoro-82m` model version and submits text, voice, and speed.
+Create a Replicate API token, enter it under **Settings → Engines → Kokoro Cloud**, click **Save provider**, and select **Kokoro · Replicate** as the job engine. The token and Replicate parallel-request limit are shared with Chatterbox Cloud. TTS-Story calls a pinned `jaaari/kokoro-82m` model version and submits text, voice, and speed.
 
 Replicate uses its own supported voice names. A local `custom_...` blend is not uploaded to the hosted model and should be used with local Kokoro instead.
 
 ## Controls TTS-Story exposes
 
-- **Chunk Size:** sentence-aware character target; 300–600 is a useful working range and 500 is the default.
+- **Chunk size (chars):** sentence-aware character target; 300–600 is a useful working range and 500 is the default.
 - **Voice and language:** selected per speaker on Generate.
 - **Speed and FX:** normal TTS-Story speaker/output controls; extreme changes can sound synthetic.
 - **Parallel chunks:** useful for Replicate, within provider capacity. It does not make the local model generate several chunks at once.

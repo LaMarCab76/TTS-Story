@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     document.getElementById('breeze-api-catalog').addEventListener('click', event => busy(event.currentTarget, async () => {
         const result = await window.loadBreezeApiCatalog(true);
-        status.textContent = result ? `Loaded ${result.voices.length} voices. Save Settings to use this account.` : 'Catalog unavailable. Check your API key.';
+        status.textContent = result ? `Loaded ${result.voices.length} voices. Save settings to use this account.` : 'Catalog unavailable. Check your API key.';
     }));
     document.getElementById('breeze-api-load-samples').addEventListener('click', event => busy(event.currentTarget, async () => {
         const data = await breezeFetch('/api/voice-prompts');
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = await breezeFetch('/api/breeze-api/save-voice', preview);
         preview = null;
         await window.loadBreezeApiCatalog();
-        status.textContent = `Saved ${data.voice_id}. Select this voice in Speaker Properties with Breeze API selected on the main page. Save your project to retain assignments.`;
+        status.textContent = `Saved ${data.voice_id}. Select it in the speaker's voice drawer (Generate → Cast) with Breeze API as the engine. Save your project to retain assignments.`;
     }));
 });
 
@@ -109,7 +109,7 @@ window.openBreezeProductions = async (jobId = null) => {
     document.getElementById('breeze-productions-dialog')?.remove();
     const dialog = document.createElement('dialog');
     dialog.id = 'breeze-productions-dialog';
-    dialog.style.cssText = 'background:#111827;color:#e5e7eb;border:1px solid #64748b;border-radius:12px;padding:24px;width:min(850px,90vw);max-height:85vh;overflow:auto';
+    dialog.style.cssText = 'background:var(--st-panel);color:var(--st-text);border:1px solid var(--st-border-control);border-radius:10px;padding:24px;width:min(850px,90vw);max-height:85vh;overflow:auto';
     dialog.innerHTML = '<h2>Breeze Production Voices</h2><p>Remote voices belong to one production. Local samples and finished audio are preserved. Release only after delivery, approval and payment, or when deliberately abandoning a production. Releasing closes the production: further generation requires a new job.</p><button type="button" data-refresh>Refresh status</button> <button type="button" data-close>Close</button><p data-status role="status"></p><div data-productions></div>';
     document.body.appendChild(dialog);
     dialog.showModal();
@@ -127,7 +127,7 @@ window.openBreezeProductions = async (jobId = null) => {
             if (!items.length) status.textContent = 'No managed sample uploads for this production. Catalog voices are shared and are never deleted here.';
             for (const production of items) {
                 const card = document.createElement('section');
-                card.style.cssText = 'border-top:1px solid #475569;padding:16px 0';
+                card.style.cssText = 'border-top:1px solid var(--st-border);padding:16px 0';
                 const heading = document.createElement('h3');
                 heading.textContent = production.title || production.production_id;
                 const info = document.createElement('p');

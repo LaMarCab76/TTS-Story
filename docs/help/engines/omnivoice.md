@@ -8,32 +8,32 @@ OmniVoice provides local multilingual voice cloning and instruction-based voice 
 - Local synthesis when multilingual coverage matters
 - Creating an English- or Chinese-directed voice preview from attributes such as age, pitch, accent, dialect, or whisper style
 
-**OmniVoice Clone** appears in the Generate engine list. **OmniVoice Design** is registered for [Voice Creation](help:voice-creation) and Library workflows rather than normal full-job selection.
+**OmniVoice Clone** appears in the Generate engine list. **OmniVoice Design** is registered for [Voices → Voice creation](help:voice-creation) and Library workflows rather than normal full-job selection.
 
 ## Requirements and setup
 
-![Voice Creation workspace with the Qwen3 and OmniVoice design modes](../../../static/help/screenshots/voice-creation.png)
+![Voice creation sub-tab with the Design engine switch (Qwen3-TTS, Breeze TTS 2, OmniVoice) and preview controls](../../../static/help/screenshots/voice-creation.png)
 
-*Switch Voice Creation to OmniVoice to combine concrete voice attributes and audition a designed prompt.*
+*Switch the Voice creation design engine to OmniVoice to combine concrete voice attributes and audition a designed prompt.*
 
-Install OmniVoice from its tab under [Settings → Engine Settings](app:settings/omnivoice). TTS-Story creates `engines/omnivoice/.venv`, installs the compatible runtime, and normally attempts to prefetch `k2-fsa/OmniVoice`. If prefetch was skipped or failed, first generation retries the several-gigabyte download.
+Select OmniVoice under [Settings → Engines](app:settings/omnivoice) and click **Install engine**. TTS-Story creates `engines/omnivoice/.venv`, installs the compatible runtime, and normally attempts to prefetch `k2-fsa/OmniVoice`. If prefetch was skipped or failed, first generation retries the several-gigabyte download.
 
 CUDA is the practical choice for long jobs. The adapter also accepts `cpu`, `mps`, and explicit CUDA device names, subject to the installed runtime and hardware. Leave Device at `auto` initially. The default float16 dtype minimizes memory on compatible accelerators; use float32 only when necessary because it increases memory and time.
 
-Do not install OmniVoice into TTS-Story's main `venv`; the isolated environment is intentional. If its setup failed, use **Install Engine** or uninstall and reinstall it from the OmniVoice settings tab rather than mixing dependencies manually.
+Do not install OmniVoice into TTS-Story's main `venv`; the isolated environment is intentional. If its setup failed, use **Repair**, or **Remove engine** and then **Install engine**, in the OmniVoice panel rather than mixing dependencies manually.
 
 ## Controls TTS-Story exposes
 
-Open [Settings → Engine Settings](app:settings/omnivoice) and select **OmniVoice**.
+Open [Settings → Engines](app:settings/omnivoice) and select **OmniVoice**.
 
 - **Model ID:** `k2-fsa/OmniVoice` by default
-- **Chunk Size:** 500 characters for both clone and design workflows
+- **Chunk size (chars):** 500 characters for both clone and design workflows
 - **Device** and **DType**
-- **Performance Preset:** Fast, Balanced, or High Quality selects 16, 32, or 48 diffusion steps; Custom preserves another step value
-- **Inference Batch Size:** 1 uses the least VRAM; 2 can improve long-job throughput on GPUs with enough free memory
-- **Post-Process Output:** trims/manages sentence-boundary silence; disable it if short sentences run together unnaturally
-- **Clone Default Prompt** and **Prompt Transcript:** Whisper transcribes locally when the transcript is blank
-- **Design Default Instruction:** a comma-separated description such as “female, middle aged, low pitch, British accent”
+- **Performance preset:** Fast, Balanced, or High Quality selects 16, 32, or 48 diffusion steps; Custom preserves another step value
+- **Inference batch size:** 1 uses the least VRAM; 2 can improve long-job throughput on GPUs with enough free memory
+- **Post-process output:** trims/manages sentence-boundary silence; disable it if short sentences run together unnaturally
+- **Default prompt** and **Prompt transcript** (Voice clone defaults): Whisper transcribes locally when the transcript is blank
+- **Default instruction** (Voice design defaults): a comma-separated description such as “female, middle aged, low pitch, British accent”
 
 Per-speaker reference prompts and transcripts override clone defaults.
 

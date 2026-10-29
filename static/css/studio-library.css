@@ -1,0 +1,2169 @@
+/* studio-library.css — Library screen + chunk/chapter review and timecodes modals.
+   Owned by the library screen agent of the "Estudio" redesign. Loaded after studio.css.
+   Legacy rules for the same classes live in style.css; everything here is scoped under
+   #library-tab / #chunk-review-modal / .library-* so it wins without touching them. */
+
+/* ==========================================================================
+   Header
+   ========================================================================== */
+#library-tab .screen-title-group {
+    align-items: baseline;
+}
+
+#library-tab .screen-title-group .help-icon {
+    position: relative;
+    top: -3px;
+    margin-left: -4px;
+}
+
+#library-tab .library-search {
+    width: 240px;
+}
+
+#library-tab .library-search > input {
+    font-size: 13px;
+}
+
+#refresh-library-btn > .ms {
+    font-size: 17px;
+}
+
+#refresh-library-btn.is-loading > .ms {
+    animation: library-spin 0.8s linear infinite;
+}
+
+@keyframes library-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ==========================================================================
+   List, empty state, pagination
+   ========================================================================== */
+#library-tab .library-list {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+}
+
+#library-tab #library-items {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#library-tab .library-empty {
+    margin: 0;
+    padding: 56px 24px;
+    border: 1px dashed var(--st-border-strong);
+    border-radius: 10px;
+    color: var(--st-text-3);
+    text-align: center;
+}
+
+#library-tab .library-empty > span {
+    display: block;
+}
+
+#library-tab .library-empty-icon {
+    width: auto;
+    height: auto;
+    margin: 0 auto 10px;
+    color: var(--st-text-faint);
+    font-size: 28px;
+}
+
+#library-tab .library-empty-title {
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#library-tab .library-empty-text {
+    margin-top: 4px;
+    color: var(--st-text-muted);
+}
+
+#library-tab .library-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+#library-tab .library-pagination [role="status"] {
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#library-tab .library-pagination .btn > .ms {
+    font-size: 16px;
+}
+
+/* ==========================================================================
+   Production card
+   ========================================================================== */
+#library-tab .library-item {
+    padding: 0;
+    border: 1px solid var(--st-border);
+    border-radius: 10px;
+    background: var(--st-panel);
+    box-shadow: none;
+    transform: none;
+    transition: border-color 0.15s ease;
+}
+
+#library-tab .library-item:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: #35312b;
+}
+
+#library-tab .library-item-summary.library-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 14px;
+    min-width: 0;
+    margin: 0;
+    padding: 14px 16px;
+    cursor: pointer;
+}
+
+#library-tab .library-item-controls {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 36px amber play / pause button; the icon follows data-state (set by library.js). */
+#library-tab .library-item-play.library-item-control-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: var(--st-accent);
+    color: var(--st-accent-ink);
+    font-size: 0;
+    cursor: pointer;
+    transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+#library-tab .library-item-play.library-item-control-btn:hover {
+    background: var(--st-accent-hover);
+}
+
+#library-tab .library-item-play.library-item-control-btn:active {
+    transform: scale(0.96);
+}
+
+#library-tab .library-item-play::before,
+#library-tab .library-chapter-play::before,
+#chunk-review-modal .library-chunk-play::before,
+#chunk-review-modal .library-review-playall::before,
+#library-tab .library-item-toggle::before,
+#chunk-review-modal .chapter-toggle::before,
+#chunk-review-modal .book-toggle::before,
+#chunk-review-modal .bulk-expand-toggle::before {
+    content: 'play_arrow';
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    overflow: hidden;
+    font-family: var(--st-font-icon);
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    -webkit-font-smoothing: antialiased;
+}
+
+#library-tab .library-item-play::before {
+    font-size: 22px;
+}
+
+#library-tab .library-item-play[data-state="playing"]::before {
+    content: 'pause';
+}
+
+#library-tab .library-item-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+#library-tab .library-item-title {
+    overflow: hidden;
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 21px;
+    font-weight: 400;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#library-tab .library-item-subline {
+    overflow: hidden;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#library-tab .library-item-duration {
+    flex: none;
+    margin-right: 6px;
+    color: var(--st-text-2);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+#library-tab .library-item-summary .library-item-meta-action.btn {
+    flex: none;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12.5px;
+    line-height: 1.2;
+}
+
+#library-tab .library-item-summary .library-download-btn.btn {
+    gap: 4px;
+    padding: 0 8px 0 12px;
+}
+
+#library-tab .library-download-btn > .ms {
+    font-size: 16px;
+}
+
+#library-tab .library-download-btn > .library-download-caret {
+    color: var(--st-text-muted);
+}
+
+#library-tab .library-item-summary .library-more-btn.btn {
+    width: 30px;
+    padding: 0;
+}
+
+#library-tab .library-more-btn > .ms {
+    font-size: 17px;
+}
+
+#library-tab .library-item-meta-action.is-open {
+    border-color: var(--st-border-strong);
+    background: var(--st-raised);
+}
+
+#library-tab .library-rebuild-btn.is-busy {
+    gap: 6px;
+}
+
+#library-tab .library-item-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin-left: -4px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--st-text-3);
+    font-size: 0;
+    cursor: pointer;
+}
+
+#library-tab .library-item-toggle:hover {
+    background: var(--st-raised);
+    color: var(--st-text);
+}
+
+#library-tab .library-item-toggle:focus {
+    outline: none;
+}
+
+#library-tab .library-item-toggle:focus-visible {
+    outline: 2px solid rgba(226, 160, 79, 0.7);
+    outline-offset: 1px;
+}
+
+#library-tab .library-item-toggle::before {
+    content: 'expand_more';
+    font-size: 22px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+}
+
+#library-tab .library-item-toggle[aria-expanded="true"]::before {
+    content: 'expand_less';
+}
+
+/* ==========================================================================
+   Expanded card: scrubber + chapter rows
+   ========================================================================== */
+#library-tab .library-item-details {
+    margin: 0;
+}
+
+/* The native control stays in the DOM (library.js drives it); the scrubber replaces its UI. */
+#library-tab .library-item-player {
+    display: none;
+}
+
+#library-tab .library-item-scrubber {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px 14px 66px;
+    color: var(--st-text-muted);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+#library-tab .library-scrub-time {
+    flex: none;
+    min-width: 34px;
+}
+
+#library-tab .library-scrub-total {
+    text-align: right;
+}
+
+#library-tab .library-scrub-track {
+    position: relative;
+    flex: 1;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--st-border);
+    cursor: pointer;
+}
+
+#library-tab .library-scrub-track::after {
+    /* Larger hit area than the 4px track */
+    content: '';
+    position: absolute;
+    inset: -8px 0;
+}
+
+#library-tab .library-scrub-track:focus-visible {
+    outline: 2px solid rgba(226, 160, 79, 0.7);
+    outline-offset: 4px;
+}
+
+#library-tab .library-scrub-fill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    border-radius: 999px;
+    background: var(--st-accent);
+}
+
+#library-tab .library-scrub-stop {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-left: -4px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--st-text-3);
+    cursor: pointer;
+}
+
+#library-tab .library-scrub-stop > .ms {
+    --ms-fill: 1;
+    font-size: 18px;
+}
+
+#library-tab .library-scrub-stop:hover:not(:disabled) {
+    background: var(--st-raised);
+    color: var(--st-text);
+}
+
+#library-tab .library-scrub-stop:disabled {
+    color: var(--st-text-ghost);
+    cursor: default;
+}
+
+#library-tab .library-chapters {
+    border-top: 1px solid var(--st-border);
+}
+
+#library-tab .library-chapters-head {
+    padding: 10px 16px 6px 66px;
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+#library-tab .library-chapter {
+    border-bottom: 1px solid var(--st-border-soft);
+}
+
+#library-tab .library-chapter:last-child {
+    border-bottom: none;
+}
+
+#library-tab .library-chapter-row {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr) 64px auto;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+}
+
+#library-tab .library-chapter-num {
+    color: var(--st-text-faint);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    text-align: center;
+}
+
+#library-tab .library-chapter-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+#library-tab .library-chapter-title {
+    overflow: hidden;
+    color: var(--st-text);
+    font-size: 13.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#library-tab .library-combined-pill {
+    flex: none;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--st-control);
+    color: var(--st-text-2);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+#library-tab .library-chapter-name .pill {
+    flex: none;
+    font-size: 11px;
+}
+
+#library-tab .library-chapter-dur {
+    color: var(--st-text-3);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+#library-tab .library-chapter-row.is-current .library-chapter-num,
+#library-tab .library-chapter-row.is-current .library-chapter-dur {
+    color: var(--st-accent);
+}
+
+#library-tab .library-chapter-row.is-current .library-chapter-title {
+    color: var(--st-text-strong);
+}
+
+#library-tab .library-chapter.is-missing .library-chapter-title {
+    color: var(--st-text-3);
+}
+
+#library-tab .library-chapter-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+#library-tab .library-chapter-review.btn {
+    min-width: 98px;
+}
+
+#library-tab .library-chapter.is-reviewing .library-chapter-review.btn {
+    border-color: var(--st-border-strong);
+    background: var(--st-raised);
+    color: var(--st-text-strong);
+}
+
+#library-tab .library-chapter-play {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px solid var(--st-border-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--st-text);
+    font-size: 0;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+#library-tab .library-chapter-play::before {
+    font-size: 16px;
+}
+
+#library-tab .library-chapter-play:hover {
+    border-color: var(--st-border-dashed);
+    background: var(--st-raised);
+}
+
+#library-tab .library-chapter-play[data-state="playing"] {
+    border-color: var(--st-accent);
+    color: var(--st-accent);
+}
+
+#library-tab .library-chapter-play[data-state="playing"]::before {
+    content: 'pause';
+}
+
+#library-tab .library-chapter-icon {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--st-text-3);
+    cursor: pointer;
+}
+
+#library-tab .library-chapter-icon > .ms {
+    font-size: 17px;
+}
+
+#library-tab button.library-chapter-icon:hover,
+#library-tab button.library-chapter-icon.is-open {
+    background: var(--st-raised);
+    color: var(--st-text);
+}
+
+#library-tab .library-chapter-more-spacer {
+    cursor: default;
+}
+
+/* ==========================================================================
+   Popover menus (rendered on <body>, position fixed)
+   ========================================================================== */
+.library-menu {
+    position: fixed;
+    z-index: 9500;
+    min-width: 196px;
+    max-width: 300px;
+}
+
+.library-menu .library-menu-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.library-menu .library-menu-hint {
+    flex: none;
+    padding-left: 16px;
+    color: var(--st-text-muted);
+    font-family: var(--st-font-mono);
+    font-size: 11px;
+}
+
+.library-menu .st-menu-item.is-danger > .ms {
+    color: var(--st-red);
+}
+
+/* ==========================================================================
+   Inline chunk review panel (#chunk-review-modal)
+   ========================================================================== */
+.library-review-dock {
+    display: none !important;
+}
+
+#chunk-review-modal.library-review {
+    margin: 0 16px 16px 66px;
+    overflow: hidden;
+    border: 1px solid var(--st-border);
+    border-radius: 10px;
+    background: var(--st-bg);
+    cursor: default;
+}
+
+#chunk-review-modal.library-review.hidden {
+    display: none;
+}
+
+#chunk-review-modal .library-review-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--st-border);
+}
+
+/* Header buttons keep their 26-28px hit area without making the row taller than the
+   design's 12px + text + 12px. */
+#chunk-review-modal .library-review-head > button {
+    margin-top: -5px;
+    margin-bottom: -5px;
+}
+
+#chunk-review-modal .library-review-title {
+    flex: none;
+    margin: 0;
+    color: var(--st-text);
+    font-family: var(--st-font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+#chunk-review-modal .library-review-meta {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--st-text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#chunk-review-modal .library-review-spacer {
+    flex: 1;
+}
+
+#chunk-review-modal .library-review-playall {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 6px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--st-text-btn);
+    font: inherit;
+    cursor: pointer;
+}
+
+#chunk-review-modal .library-review-playall::before {
+    content: 'play_circle';
+    color: var(--st-accent);
+    font-size: 18px;
+}
+
+#chunk-review-modal .library-review-playall.playing::before {
+    content: 'stop_circle';
+}
+
+#chunk-review-modal .library-review-playall:hover:not(:disabled) {
+    background: var(--st-raised);
+    color: var(--st-text-strong);
+}
+
+#chunk-review-modal .library-review-playall:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+#chunk-review-modal .library-review-close {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin-right: -6px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--st-text-3);
+    cursor: pointer;
+}
+
+#chunk-review-modal .library-review-close:hover {
+    background: var(--st-raised);
+    color: var(--st-text);
+}
+
+#chunk-review-modal .library-review-close > .ms {
+    font-size: 18px;
+}
+
+#chunk-review-modal .library-review-body {
+    padding: 0;
+}
+
+#chunk-review-modal .chunk-review-loading,
+#chunk-review-modal .chunk-review-error,
+#chunk-review-modal .chunk-review-empty {
+    padding: 28px 16px;
+    color: var(--st-text-muted);
+    text-align: center;
+}
+
+#chunk-review-modal .chunk-review-error {
+    color: var(--st-red);
+}
+
+#chunk-review-modal .library-review-foot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+}
+
+#chunk-review-modal .library-review-note {
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#chunk-review-modal .library-review-foot .btn {
+    font-size: 13px;
+}
+
+#chunk-review-modal .library-review-recompile.btn {
+    padding: 0 14px;
+    font-weight: 500;
+}
+
+#chunk-review-modal .library-review-recompile.btn:disabled {
+    opacity: 1;
+    color: var(--st-text-muted);
+}
+
+/* Custom checkboxes (speaker selection, select all): the design's 19px Material
+   check_box / check_box_outline_blank glyph, #6f685e idle and amber when ticked. */
+#chunk-review-modal .bulk-speaker-checkbox,
+#chunk-review-modal #chunk-review-select-all {
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--st-text-faint);
+    vertical-align: middle;
+    cursor: pointer;
+    transition: color 0.12s ease;
+}
+
+#chunk-review-modal .bulk-speaker-checkbox::before,
+#chunk-review-modal #chunk-review-select-all::before {
+    content: 'check_box_outline_blank';
+    display: block;
+    width: 1em;
+    height: 1em;
+    overflow: hidden;
+    font-family: var(--st-font-icon);
+    font-size: 19px;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    -webkit-font-smoothing: antialiased;
+}
+
+#chunk-review-modal .bulk-speaker-checkbox:hover,
+#chunk-review-modal #chunk-review-select-all:hover {
+    color: var(--st-text-3);
+}
+
+#chunk-review-modal .bulk-speaker-checkbox:checked,
+#chunk-review-modal #chunk-review-select-all:checked,
+#chunk-review-modal #chunk-review-select-all:indeterminate {
+    color: var(--st-accent);
+}
+
+#chunk-review-modal .bulk-speaker-checkbox:checked::before,
+#chunk-review-modal #chunk-review-select-all:checked::before {
+    content: 'check_box';
+}
+
+#chunk-review-modal #chunk-review-select-all:indeterminate::before {
+    content: 'indeterminate_check_box';
+}
+
+#chunk-review-modal .bulk-speaker-checkbox:disabled,
+#chunk-review-modal #chunk-review-select-all:disabled {
+    color: var(--st-text-ghost);
+    cursor: not-allowed;
+}
+
+#chunk-review-modal .bulk-speaker-checkbox:focus-visible,
+#chunk-review-modal #chunk-review-select-all:focus-visible {
+    outline: 2px solid rgba(226, 160, 79, 0.7);
+    outline-offset: 0;
+}
+
+/* ---- Regeneration progress strip -------------------------------------- */
+#chunk-review-modal .library-regen-progress {
+    margin: 0;
+    padding: 12px 16px;
+    border: none;
+    border-bottom: 1px solid var(--st-border);
+    border-radius: 0;
+    background: var(--st-panel);
+}
+
+#chunk-review-modal .library-regen-progress.is-complete {
+    background: linear-gradient(90deg, rgba(148, 184, 158, 0.08), transparent 60%), var(--st-panel);
+}
+
+#chunk-review-modal .library-regen-progress.has-errors {
+    box-shadow: inset 3px 0 0 var(--st-red);
+}
+
+#chunk-review-modal .library-regen-progress-heading {
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+#chunk-review-modal .library-regen-progress-heading strong {
+    font-weight: 600;
+}
+
+#chunk-review-modal #library-regen-progress-percent {
+    color: var(--st-accent);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+#chunk-review-modal .library-regen-progress-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--st-border);
+    box-shadow: none;
+}
+
+#chunk-review-modal .library-regen-progress-fill {
+    background: var(--st-accent);
+}
+
+#chunk-review-modal .library-regen-progress.is-complete .library-regen-progress-fill {
+    background: var(--st-green);
+}
+
+#chunk-review-modal .library-regen-progress-details {
+    margin-top: 8px;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#chunk-review-modal .library-regen-progress-current {
+    margin-top: 6px;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+}
+
+#chunk-review-modal .library-regen-progress-statuses {
+    margin-top: 8px;
+    gap: 6px;
+}
+
+#chunk-review-modal .library-regen-stat {
+    padding: 2px 8px;
+    font-size: 11.5px;
+    font-weight: 400;
+}
+
+/* ---- Bulk speaker block ------------------------------------------------- */
+#chunk-review-modal .bulk-speaker-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 0;
+    padding: 12px 16px;
+    border: none;
+    border-bottom: 1px solid var(--st-border);
+    border-radius: 0;
+    background: var(--st-panel);
+}
+
+#chunk-review-modal .bulk-speaker-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 0 6px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+}
+
+#chunk-review-modal .bulk-speaker-hint {
+    flex: 1;
+    min-width: 0;
+    color: var(--st-text-3);
+    font-size: 13px;
+}
+
+#chunk-review-modal .chunk-review-select-all {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    color: var(--st-text-3);
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+#chunk-review-modal #chunk-review-rebuild-selected {
+    flex: none;
+    padding: 0 12px;
+}
+
+#chunk-review-modal .bulk-speaker-card {
+    border: none;
+}
+
+#chunk-review-modal .bulk-speaker-summary {
+    display: grid;
+    grid-template-columns: 20px 10px minmax(0, 1fr) auto 18px;
+    align-items: center;
+    gap: 10px;
+    height: 34px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+#chunk-review-modal .bulk-speaker-summary:hover .bulk-speaker-name {
+    color: var(--st-text-strong);
+}
+
+#chunk-review-modal .bulk-speaker-summary .bulk-speaker-checkbox {
+    margin-left: 0;
+}
+
+#chunk-review-modal .bulk-speaker-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--spk-color, var(--st-text-muted));
+}
+
+#chunk-review-modal .bulk-speaker-who {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#chunk-review-modal .bulk-speaker-name {
+    color: var(--st-text);
+    font-weight: 500;
+}
+
+#chunk-review-modal .bulk-speaker-count {
+    color: var(--st-text-muted);
+    font-size: 13px;
+}
+
+#chunk-review-modal .bulk-speaker-voice {
+    max-width: 260px;
+    margin: 0;
+    padding: 2px 8px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--st-control);
+    color: var(--st-text-2);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    font-style: normal;
+    line-height: 1.5;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#chunk-review-modal .bulk-speaker-voice.is-changed {
+    background: var(--st-accent-soft);
+    color: var(--st-accent);
+}
+
+#chunk-review-modal .bulk-expand-toggle,
+#chunk-review-modal .chapter-toggle,
+#chunk-review-modal .book-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+}
+
+#chunk-review-modal .bulk-expand-toggle:hover,
+#chunk-review-modal .chapter-toggle:hover,
+#chunk-review-modal .book-toggle:hover {
+    color: var(--st-text);
+}
+
+#chunk-review-modal .bulk-expand-toggle {
+    width: 18px;
+    color: var(--st-text-muted);
+    font-size: 0;
+    text-align: center;
+}
+
+#chunk-review-modal .bulk-expand-toggle::before {
+    content: 'expand_more';
+    font-size: 18px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+}
+
+#chunk-review-modal .bulk-speaker-summary[aria-expanded="true"] .bulk-expand-toggle::before {
+    content: 'expand_less';
+}
+
+#chunk-review-modal .bulk-speaker-details {
+    padding: 6px 0 14px 50px;
+    border: none;
+    background: transparent;
+}
+
+#chunk-review-modal .bulk-speaker-details:not(.collapsed) {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#chunk-review-modal .bulk-speaker-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 12px;
+}
+
+#chunk-review-modal .bulk-regen-section,
+#chunk-review-modal .bulk-fx-section,
+#chunk-review-modal .library-speaker-profile,
+#chunk-review-modal .chunk-regen-section,
+#chunk-review-modal .chunk-fx-section,
+#chunk-review-modal .chunk-silence-section {
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-bg);
+}
+
+#chunk-review-modal .bulk-regen-title,
+#chunk-review-modal .bulk-fx-title,
+#chunk-review-modal .chunk-regen-title,
+#chunk-review-modal .chunk-fx-title,
+#chunk-review-modal .library-speaker-profile h4 {
+    margin: 0 0 10px;
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+#chunk-review-modal .bulk-regen-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+#chunk-review-modal .bulk-regen-field {
+    display: flex;
+    flex: 1 1 150px;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+#chunk-review-modal .bulk-regen-field-wide {
+    flex-basis: 220px;
+}
+
+#chunk-review-modal .bulk-regen-field label,
+#chunk-review-modal .chunk-prompt-filters label > span {
+    color: var(--st-text-2);
+    font-size: 12px;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+#chunk-review-modal .bulk-voice-pick {
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+}
+
+#chunk-review-modal .bulk-voice-pick > select {
+    flex: 1;
+    min-width: 0;
+}
+
+#chunk-review-modal .bulk-prompt-filters,
+#chunk-review-modal .bulk-qwen3-options,
+#chunk-review-modal .chunk-prompt-filters,
+#chunk-review-modal .chunk-qwen3-options {
+    margin-top: 10px;
+    padding-top: 0;
+    border-top: none;
+}
+
+#chunk-review-modal .bulk-regen-actions,
+#chunk-review-modal .bulk-fx-actions,
+#chunk-review-modal .chunk-fx-actions,
+#chunk-review-modal .library-speaker-profile-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+#chunk-review-modal .bulk-regen-hint {
+    flex: 1;
+    color: var(--st-text-faint);
+    font-size: 12px;
+}
+
+#chunk-review-modal .bulk-regen-actions:has(.bulk-speaker-regen:not(:disabled)) .bulk-regen-hint {
+    visibility: hidden;
+}
+
+#chunk-review-modal .bulk-speaker-regen,
+#chunk-review-modal .bulk-speaker-apply-fx {
+    width: auto;
+    margin: 0;
+}
+
+#chunk-review-modal select,
+#chunk-review-modal input[type="text"],
+#chunk-review-modal input[type="number"] {
+    height: 30px;
+    padding-left: 8px;
+    border-color: var(--st-border-control);
+    background-color: var(--st-bg);
+    color: var(--st-text);
+    font-size: 12.5px;
+}
+
+#chunk-review-modal select:not([multiple]):not([size]) {
+    padding-right: 28px;
+}
+
+#chunk-review-modal .bulk-speaker-engine-select,
+#chunk-review-modal .bulk-speaker-voice-select,
+#chunk-review-modal .library-chunk-engine-select,
+#chunk-review-modal .library-chunk-voice-select,
+#chunk-review-modal .chunk-qwen3-language {
+    width: 100%;
+    min-width: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+}
+
+#chunk-review-modal .bulk-fx-row,
+#chunk-review-modal .chunk-fx-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+}
+
+#chunk-review-modal .bulk-fx-control,
+#chunk-review-modal .chunk-fx-control {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 46px;
+    align-items: center;
+    gap: 10px;
+}
+
+#chunk-review-modal .bulk-fx-control label,
+#chunk-review-modal .chunk-fx-control label {
+    min-width: 0;
+    color: var(--st-text-2);
+    font-size: 12px;
+}
+
+#chunk-review-modal .bulk-speed-slider,
+#chunk-review-modal .bulk-pitch-slider,
+#chunk-review-modal .chunk-speed-slider,
+#chunk-review-modal .chunk-pitch-slider {
+    width: 100%;
+    height: 4px;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--st-border-control);
+}
+
+#chunk-review-modal .bulk-speed-slider::-webkit-slider-thumb,
+#chunk-review-modal .bulk-pitch-slider::-webkit-slider-thumb,
+#chunk-review-modal .chunk-speed-slider::-webkit-slider-thumb,
+#chunk-review-modal .chunk-pitch-slider::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--st-accent);
+}
+
+#chunk-review-modal .bulk-speed-slider::-moz-range-thumb,
+#chunk-review-modal .bulk-pitch-slider::-moz-range-thumb,
+#chunk-review-modal .chunk-speed-slider::-moz-range-thumb,
+#chunk-review-modal .chunk-pitch-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--st-accent);
+}
+
+#chunk-review-modal .bulk-speed-value,
+#chunk-review-modal .bulk-pitch-value,
+#chunk-review-modal .chunk-speed-value,
+#chunk-review-modal .chunk-pitch-value {
+    min-width: 0;
+    color: var(--st-text-soft);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    text-align: right;
+}
+
+#chunk-review-modal .bulk-silence-section {
+    margin-top: 10px;
+    padding: 0;
+    border: none;
+    background: none;
+}
+
+#chunk-review-modal .bulk-silence-row,
+#chunk-review-modal .chunk-silence-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    color: var(--st-text-2);
+    font-size: 12px;
+}
+
+#chunk-review-modal .bulk-silence-label,
+#chunk-review-modal .chunk-silence-label {
+    flex-basis: 100%;
+    margin: 0 0 2px;
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+#chunk-review-modal .bulk-silence-row input[type="number"],
+#chunk-review-modal .chunk-silence-row input[type="number"] {
+    width: 72px;
+    margin-right: 10px;
+    font-family: var(--st-font-mono);
+}
+
+/* The number inputs already show the value; library.js keeps these echo spans updated. */
+#chunk-review-modal .bulk-leading-silence-value,
+#chunk-review-modal .bulk-trailing-silence-value,
+#chunk-review-modal .chunk-leading-silence-value,
+#chunk-review-modal .chunk-trailing-silence-value {
+    display: none;
+}
+
+#chunk-review-modal .library-speaker-profile {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+#chunk-review-modal .library-speaker-profile h4 {
+    margin-bottom: 0;
+}
+
+#chunk-review-modal .library-speaker-profile label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0;
+    color: var(--st-text-2);
+    font-size: 12px;
+}
+
+#chunk-review-modal .library-speaker-profile textarea,
+#chunk-review-modal .library-chunk-details textarea {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background: var(--st-bg);
+    color: var(--st-text);
+    font-family: var(--st-font-ui);
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+#chunk-review-modal .library-speaker-profile p {
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+    opacity: 1;
+}
+
+#chunk-review-modal .library-speaker-profile-actions {
+    justify-content: flex-start;
+    margin-top: 2px;
+}
+
+#chunk-review-modal .speaker-profile-save-status {
+    color: var(--st-text-muted);
+    font-size: 12px;
+    opacity: 1;
+}
+
+#chunk-review-modal .library-regen-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid var(--st-border-soft);
+}
+
+#chunk-review-modal .library-regen-control-status {
+    flex: 1;
+    min-width: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* ---- Chapter / book groups (full-production review) ---------------------- */
+#chunk-review-modal .chunk-review-table {
+    display: block;
+    gap: 0;
+}
+
+#chunk-review-modal .book-section,
+#chunk-review-modal .chapter-section {
+    margin: 0;
+    overflow: visible;
+    border: none;
+    border-bottom: 1px solid var(--st-border);
+    border-radius: 0;
+    background: none;
+}
+
+#chunk-review-modal .book-header,
+#chunk-review-modal .chapter-header {
+    position: static;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    padding: 6px 16px;
+    border: none;
+    background: var(--st-raised);
+    box-shadow: none;
+    cursor: pointer;
+}
+
+#chunk-review-modal .chapter-header {
+    background: transparent;
+}
+
+#chunk-review-modal .book-header:hover,
+#chunk-review-modal .chapter-header:hover {
+    background: rgba(236, 230, 220, 0.035);
+}
+
+#chunk-review-modal .chapter-toggle,
+#chunk-review-modal .book-toggle {
+    width: 18px;
+    color: var(--st-text-muted);
+    font-size: 0;
+    text-align: center;
+}
+
+#chunk-review-modal .chapter-toggle::before,
+#chunk-review-modal .book-toggle::before {
+    content: 'chevron_right';
+    font-size: 18px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+}
+
+#chunk-review-modal .chapter-header[aria-expanded="true"] .chapter-toggle::before,
+#chunk-review-modal .book-header[aria-expanded="true"] .book-toggle::before {
+    content: 'expand_more';
+}
+
+#chunk-review-modal .book-title,
+#chunk-review-modal .chapter-title {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--st-text);
+    font-size: 13.5px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#chunk-review-modal .book-title {
+    font-weight: 600;
+}
+
+#chunk-review-modal .book-chapter-count,
+#chunk-review-modal .chapter-chunk-count {
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#chunk-review-modal .book-chapters:not(.collapsed) .chapter-header {
+    padding-left: 32px;
+}
+
+#chunk-review-modal .chapter-chunks:not(.collapsed) {
+    padding: 0;
+    border-top: 1px solid var(--st-border-soft);
+}
+
+#chunk-review-modal .chapter-chunks .library-chunk-card:last-child {
+    border-bottom: none;
+}
+
+/* ---- Chunk rows ----------------------------------------------------------- */
+#chunk-review-modal .library-chunk-card {
+    border: none;
+    border-bottom: 1px solid var(--st-border-soft);
+}
+
+#chunk-review-modal .library-chunk-summary {
+    position: static;
+    display: grid;
+    grid-template-columns: 32px 90px minmax(0, 1fr) 44px auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border: none;
+    border-left: none;
+    background: transparent;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+}
+
+#chunk-review-modal .library-chunk-summary:hover {
+    background: rgba(236, 230, 220, 0.025);
+}
+
+#chunk-review-modal .library-chunk-card.is-playing-sequence .library-chunk-summary {
+    background: var(--st-accent-wash);
+    box-shadow: inset 2px 0 0 var(--st-accent);
+}
+
+#chunk-review-modal .library-chunk-card.is-playing-sequence-stopped .library-chunk-summary {
+    background: rgba(236, 230, 220, 0.035);
+    box-shadow: inset 2px 0 0 var(--st-border-dashed);
+}
+
+#chunk-review-modal .library-chunk-play {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid var(--st-border-strong);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--st-text);
+    font-size: 0;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+#chunk-review-modal .library-chunk-play::before {
+    font-size: 17px;
+}
+
+#chunk-review-modal .library-chunk-play:hover:not(:disabled) {
+    border-color: var(--st-border-dashed);
+    background: var(--st-raised);
+}
+
+#chunk-review-modal .library-chunk-play.playing {
+    border-color: var(--st-accent);
+    background: transparent;
+    color: var(--st-accent);
+}
+
+#chunk-review-modal .library-chunk-play.playing::before {
+    content: 'stop';
+}
+
+#chunk-review-modal .library-chunk-play:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+#chunk-review-modal .library-chunk-speaker {
+    display: block;
+    overflow: hidden;
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--spk-color, var(--st-text-2));
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+#chunk-review-modal .library-chunk-main {
+    min-width: 0;
+}
+
+/* Status chips (Queued / Rendering / Failed / Updated / Refresh needed) live under the
+   text, so the duration and action columns keep the same x on every row. */
+#chunk-review-modal .library-chunk-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+#chunk-review-modal .library-chunk-status:empty {
+    display: none;
+}
+
+#chunk-review-modal .library-chunk-status .review-chip.warning {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+#chunk-review-modal .library-chunk-status .review-chip.warning::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border: 1.5px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: library-spin 0.8s linear infinite;
+}
+
+#chunk-review-modal .library-chunk-preview {
+    display: -webkit-box;
+    flex: initial;
+    overflow: hidden;
+    color: var(--st-text-prose);
+    font-family: var(--st-font-prose);
+    font-size: 15.5px;
+    line-height: 1.45;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+}
+
+#chunk-review-modal .library-chunk-card.is-open .library-chunk-preview {
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+}
+
+#chunk-review-modal .library-chunk-duration {
+    color: var(--st-text-muted);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+#chunk-review-modal .library-chunk-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+#chunk-review-modal .chunk-expand-toggle {
+    display: none;
+}
+
+#chunk-review-modal .library-chunk-edit.btn {
+    min-width: 50px;
+}
+
+#chunk-review-modal .library-chunk-card.is-open .library-chunk-edit.btn {
+    border-color: var(--st-border-strong);
+    background: var(--st-raised);
+    color: var(--st-text-strong);
+}
+
+/* Same width idle and busy ("Queued…", "Rendering…") so rows stay aligned: the busy
+   label fits the idle width, and the activity spinner moves to the row's status chip. */
+#chunk-review-modal .library-chunk-regen.btn {
+    min-width: 88px;
+}
+
+#chunk-review-modal .library-chunk-regen.is-loading::after {
+    display: none;
+}
+
+#chunk-review-modal .library-chunk-regen.is-loading {
+    color: var(--st-accent);
+}
+
+#chunk-review-modal .review-chip {
+    flex: none;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--st-control);
+    color: var(--st-text-2);
+    font-size: 11px;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+#chunk-review-modal .review-chip.warning {
+    background: var(--st-accent-soft);
+    color: var(--st-accent);
+}
+
+#chunk-review-modal .review-chip.error {
+    background: rgba(229, 138, 122, 0.14);
+    color: var(--st-red);
+}
+
+#chunk-review-modal .review-chip.success {
+    background: var(--st-green-soft);
+    color: var(--st-green);
+}
+
+/* Chunk details ("Edit") */
+#chunk-review-modal .library-chunk-details {
+    padding: 2px 16px 16px 60px;
+    border: none;
+    background: transparent;
+}
+
+#chunk-review-modal .library-chunk-details:not(.collapsed) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(250px, 1fr);
+    align-items: start;
+    gap: 12px 16px;
+}
+
+#chunk-review-modal .chunk-detail-section {
+    margin: 0;
+}
+
+#chunk-review-modal .chunk-text-col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    grid-row: span 3;
+}
+
+#chunk-review-modal .chunk-detail-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#chunk-review-modal .chunk-detail-label .library-chunk-voice-label {
+    display: inline-block;
+    width: auto;
+    margin: 0;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--st-control);
+    color: var(--st-text-2);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+}
+
+#chunk-review-modal .chunk-text-section {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+#chunk-review-modal .chunk-text-section label {
+    display: block;
+    margin: 0;
+    color: var(--st-text-2);
+    font-size: 12px;
+}
+
+#chunk-review-modal .chunk-text-section small {
+    color: var(--st-text-muted);
+    font-size: 11.5px;
+    line-height: 1.45;
+}
+
+#chunk-review-modal .library-chunk-details .library-chunk-textarea {
+    font-family: var(--st-font-prose);
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--st-text-prose);
+}
+
+#chunk-review-modal .chunk-index-emotion-control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin-top: 6px;
+}
+
+#chunk-review-modal .chunk-index-emotion-control input {
+    width: 80px;
+}
+
+#chunk-review-modal .chunk-regen-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+}
+
+#chunk-review-modal .chunk-qwen3-options .chunk-regen-row {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+#chunk-review-modal .chunk-prompt-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+#chunk-review-modal .chunk-prompt-filters-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+#chunk-review-modal .chunk-regen-note {
+    margin: 8px 0 0;
+    color: var(--st-text-faint);
+    font-size: 11.5px;
+    line-height: 1.45;
+}
+
+#chunk-review-modal .library-localai-fields {
+    margin-top: 8px;
+}
+
+#chunk-review-modal .chunk-review-chapter-tools {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--st-border);
+    background: var(--st-panel);
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#chunk-review-modal .chunk-review-chapter-tools > span {
+    flex: 1;
+}
+
+/* ==========================================================================
+   JS-built dialogs (M4B, metadata, chapter rename, metrics)
+   ========================================================================== */
+.library-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--st-overlay);
+}
+
+.library-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-height: calc(100vh - 48px);
+    overflow: hidden;
+    border: 1px solid var(--st-border-control);
+    border-radius: 10px;
+    background: var(--st-panel);
+    color: var(--st-text);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.45);
+}
+
+.library-dialog-header {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--st-border);
+}
+
+.library-dialog-header h2 {
+    margin: 0;
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1.1;
+}
+
+.library-dialog-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    padding: 18px 24px;
+    overflow-y: auto;
+}
+
+.library-dialog-footer {
+    display: flex;
+    flex: none;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--st-border);
+}
+
+.library-dialog-lead {
+    margin: 0;
+    color: var(--st-text-2);
+    line-height: 1.5;
+}
+
+.library-dialog .field > input:not([type="checkbox"]):not([type="file"]),
+.library-dialog .field > select,
+.library-dialog .field > textarea {
+    width: 100%;
+}
+
+.library-dialog .field > textarea {
+    resize: vertical;
+}
+
+.library-dialog-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.library-dialog-year > input {
+    max-width: 140px;
+}
+
+.library-dialog-toggle {
+    color: var(--st-text);
+}
+
+.library-cover-preview {
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    padding: 10px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+}
+
+.library-cover-preview img {
+    width: 84px;
+    height: 84px;
+    border-radius: 4px;
+    background: var(--st-bg);
+    object-fit: contain;
+}
+
+.library-cover-dimensions {
+    color: var(--st-text);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+}
+
+.library-cover-warning {
+    margin-top: 4px;
+    color: var(--st-accent-text-soft);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.library-dialog-progress {
+    padding: 12px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-bg);
+}
+
+.library-dialog-progress-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+}
+
+.library-dialog-progress-percent {
+    color: var(--st-accent);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+}
+
+.library-dialog-progress-track {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--st-border);
+}
+
+.library-dialog-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--st-accent);
+    transition: width 0.3s ease;
+}
+
+.library-dialog-progress-status {
+    margin-top: 6px;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+.library-metrics-dialog .job-detail-timing-grid {
+    gap: 8px;
+}
+
+.library-metrics-dialog .timing-row {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--st-raised);
+}
+
+.library-metrics-dialog .timing-label {
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    line-height: 1.4;
+}
+
+/* Same card + chart language as Queue's job details (studio-queue.css). */
+.library-metrics-dialog .timing-value {
+    color: var(--st-text);
+    font-family: var(--st-font-ui);
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.library-metrics-dialog .chunk-chart {
+    margin-top: 8px;
+    padding: 10px 12px 8px;
+    border: none;
+    border-radius: 8px;
+    background: var(--st-raised);
+}
+
+.library-metrics-dialog .chunk-chart-title {
+    margin-bottom: 6px;
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.library-metrics-dialog .chunk-chart-estimated {
+    margin-top: 2px;
+    color: var(--st-text-faint);
+    font-size: 11.5px;
+    font-style: normal;
+}
+
+/* ==========================================================================
+   Time codes modal (static markup) and Library copies of the AWR modals
+   ========================================================================== */
+#timecodes-modal .hidden {
+    display: none !important;
+}
+
+#timecodes-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+#timecodes-modal .timecodes-intro-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin: 0;
+}
+
+#timecodes-modal .timecodes-intro-row .field {
+    font-size: 13px;
+}
+
+#timecodes-modal .timecodes-intro-row .input-unit {
+    width: 150px;
+}
+
+#timecodes-modal .timecodes-intro-row label {
+    white-space: nowrap;
+}
+
+#timecodes-modal .timecodes-help-text {
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#timecodes-modal .timecodes-result {
+    margin: 0;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-bg);
+}
+
+#timecodes-modal .timecodes-result-header {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--st-border);
+    background: transparent;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+#timecodes-modal .timecodes-output {
+    padding: 12px 14px;
+    color: var(--st-text-soft);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+}
+
+#timecodes-modal .timecodes-loading,
+#timecodes-modal .timecodes-error {
+    padding: 6px 0;
+    font-size: 12.5px;
+    text-align: left;
+}
+
+#timecodes-modal .timecodes-loading {
+    color: var(--st-text-muted);
+}
+
+#timecodes-modal .timecodes-error {
+    color: var(--st-red);
+}
+
+#lib-awr-registry-overlay .awr-edit-btn,
+#lib-awr-registry-overlay .awr-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 6px;
+}
+
+#lib-awr-registry-overlay .awr-edit-btn > .ms,
+#lib-awr-registry-overlay .awr-delete-btn > .ms {
+    font-size: 17px;
+}
+
+/* Generate's AWR rows draw their icon with ::before; these buttons carry a real .ms span. */
+#lib-awr-registry-overlay .awr-edit-btn::before,
+#lib-awr-registry-overlay .awr-delete-btn::before {
+    content: none;
+}
+
+#lib-awr-registry-overlay .awr-edit-btn {
+    color: var(--st-text-3);
+}
+
+#lib-awr-registry-overlay .awr-delete-btn {
+    color: var(--st-red);
+}
+
+#lib-awr-registry-overlay .awr-toolbar {
+    margin: 12px 0;
+}
+
+/* The Breeze production voices dialog (Library "more" menu and Settings) is styled in studio.css. */
+
+@media (prefers-reduced-motion: reduce) {
+    #refresh-library-btn.is-loading > .ms,
+    #chunk-review-modal .library-chunk-status .review-chip.warning::before {
+        animation: none;
+    }
+}

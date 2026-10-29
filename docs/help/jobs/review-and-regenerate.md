@@ -1,23 +1,22 @@
 # Review and Regenerate Chunks
 
-Chunk review lets you repair a small part of a completed audiobook without synthesizing the entire manuscript again. Review opens as a modal inside the Audio Library page; it does not open a separate window and it is not a Job Queue feature.
+Chunk review lets you repair a small part of a completed audiobook without synthesizing the entire manuscript again. Review opens as a panel inside the Library page, directly under the chapter you are reviewing; it does not open a separate window and it is not a Job Queue feature.
 
 ## Open review
 
 1. Open [Audio Library](app:library).
-2. Expand the desired Library item.
-3. Select a chapter pill, or select **Full Story**.
-4. Choose **Review Chunks**.
+2. Click the chevron at the right of the production row to show its chapters.
+3. Click **Review chunks** on a chapter row or on the **Full story** row (or use **… → Review all chunks**).
 
-![Chunk Review modal with playback, text editing, and regeneration controls](../../../static/help/screenshots/chunk-review.png)
+![Inline chunk review panel with speaker regeneration, chunk rows, and Recompile audio](../../../static/help/screenshots/chunk-review.png)
 
 *Review one chunk at a time, listen before and after changes, and regenerate only the audio that needs repair.*
 
-TTS-Story loads the saved chunk text, speaker, engine, voice, and audio references. Full Story review groups chunks by chapter or book when that information is available.
+TTS-Story loads the saved chunk text, speaker, engine, voice, and audio references. Full story review groups chunks by chapter or book when that information is available.
 
 ## Repair one chunk
 
-On a chunk card you can:
+On a chunk row, click **Edit** to:
 
 - play the current audio;
 - edit its text;
@@ -29,7 +28,7 @@ On a chunk card you can:
 - preview or apply FX; and
 - click **Regenerate**.
 
-Regeneration queues new synthesis for that chunk. Keep the review modal open long enough to see whether the chunk completes or fails, then listen to the replacement.
+Regeneration queues new synthesis for that chunk. Keep the review panel open long enough to see whether the chunk completes or fails, then listen to the replacement.
 
 **Voice Direction** shows the saved passage cue from the manuscript's `[direction]...[/direction]` block. Enter only the instruction, without tags. Click **Regenerate** to apply it; the edited cue is saved with the chunk after successful synthesis and remains available when you reopen review. Clearing the field removes that chunk's cue (engine/voice defaults may still apply). Existing jobs with no saved direction show an empty field; TTS-Story does not invent missing cues. Speaker-wide regeneration keeps each chunk's saved direction; use the individual chunk's Regenerate button to apply edits in its direction field.
 
@@ -41,13 +40,13 @@ Expand a speaker to edit **Character Profile**, **Voice Type**, and **Voice Desi
 
 For local Breeze and Breeze API, the saved **Voice Type** is prepended to each chunk's **Voice Direction** during synthesis. For example, `High-pitched, squeaky, comically pompous.` plus `Delivered with theatrical mystery and importance.` becomes one instruction. Keep the stable identity in Voice Type and the changing delivery in the chunk field. Clearing Voice Type removes the prefix. Character Profile and Voice Design Prompt are not prepended.
 
-The speaker-level controls can apply a selected engine, voice, speed, pitch, and leading/trailing silence across that speaker's chunks. **Regenerate All** queues each affected chunk; it can consume substantial local processing time or cloud quota.
+The speaker-level controls can apply a selected engine, voice, speed, pitch, and leading/trailing silence across that speaker's chunks. **Regenerate all** queues each affected chunk; it can consume substantial local processing time or cloud quota.
 
 Test one representative chunk first. Once it sounds right, apply the same settings to the speaker.
 
 ## Fix recurring pronunciation
 
-For a word that fails in many chunks, edit the Library item's **Alt Words** registry instead of changing each chunk manually. Library replacements are saved with that item and are applied during regeneration. Replacements are case-insensitive literal substrings, not whole-word rules, so choose the source text carefully.
+For a word that fails in many chunks, edit the production's **… → Alt words** registry instead of changing each chunk manually. Library replacements are saved with that item and are applied during regeneration. Replacements are case-insensitive literal substrings, not whole-word rules, so choose the source text carefully.
 
 See [Alternate Word Registry](help:alt-word-registry).
 
@@ -55,11 +54,10 @@ See [Alternate Word Registry](help:alt-word-registry).
 
 > **Regenerate changes chunk audio. Rebuild changes the compiled outputs.**
 
-After replacing chunks, use the review modal's chapter rebuild controls or the Library item's **Rebuild** action. Otherwise a previously compiled chapter, Full Story, ZIP, or M4B can still contain the old audio.
+After replacing chunks, use **Rebuild chapter audio file** at the bottom of a chapter review (or **Rebuild chapter** on each chapter of a Full story review), **Recompile audio** in the panel footer, or the production row's **Rebuild** action. Otherwise a previously compiled chapter, Full story, ZIP, or M4B can still contain the old audio.
 
-- Rebuild Chapter recompiles that chapter from its current chunks.
-- Rebuild selected chapters recompiles checked chapters.
-- The Library card's Rebuild action recompiles all chapter outputs and the combined audiobook.
+- Rebuild chapter recompiles that chapter from its current chunks.
+- The production row's Rebuild action recompiles all chapter outputs and the combined audiobook.
 
 Rebuild does not call the TTS engine and cannot recreate a missing source chunk. It merges the chunk files already stored for the item. See [Edit, Rebuild, and Repair Library Items](help:library-editing-repair).
 

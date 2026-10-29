@@ -13,19 +13,19 @@ TTS-Story stores configuration, generated audio, jobs, projects, prompts, and mo
 | `data/voice_prompts/` | Uploaded, downloaded, and designed reference clips plus cached transcripts |
 | `data/chatterbox_voices.json` | Friendly voice registry and prompt metadata |
 | `data/custom_voices.json` | Custom Kokoro blend definitions |
-| `data/prep/` | Saved Prep Text progress |
+| `data/prep/` | Saved Prep text progress |
 | `data/llm_profile_usage.json` | Local per-profile daily LLM request counters; contains profile IDs and counts, not API keys |
 | `data/external_voices/` and related cache files | Downloaded/cataloged external voices |
 | `static/samples/` | Generated catalog preview audio |
 | `models/` and engine-specific model/cache directories | Downloaded local model data |
 
-Optional local engines maintain their own virtual environments and model/cache data below their engine-owned folders. Engine Settings can rebuild those dependencies, but model downloads can be large.
+Optional local engines maintain their own virtual environments and model/cache data below their engine-owned folders. **Settings → Engines** (**Repair**, **Remove engine**, **Install engine**) can rebuild those dependencies, but model downloads can be large.
 
 ## Saved Projects are separate
 
 Generate-page Projects are stored in `data/projects.json`. They preserve editor text, assignments, chapter/output choices, alternate words, speaker profiles, and related per-project state.
 
-![Project Manager showing locally saved browser projects and project actions](../../../static/help/screenshots/project-manager.png)
+![Projects dialog listing the saved project snapshots with Load and Delete](../../../static/help/screenshots/project-manager.png)
 
 *Projects are shared working snapshots for one TTS-Story installation; they are separate from generated Library audio, global Settings, and external backups.*
 

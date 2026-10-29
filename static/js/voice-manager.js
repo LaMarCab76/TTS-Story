@@ -43,26 +43,212 @@ document.addEventListener('DOMContentLoaded', () => {
     setupChatterboxVoiceSection();
     setupVoiceListControls();
     initEditVoiceModal();
-    setupVoicesAccordion();
+    setupVoicesSubtabs();
+    setupVoicePromptsChrome();
     setupQwenVoiceCreation();
     setupOmniVoiceCreation();
     setupVoiceCreationEngineToggle();
 });
 
-function setupVoicesAccordion() {
-    const sections = document.querySelectorAll('.voices-section');
-    sections.forEach(section => {
-        const header = section.querySelector('.voices-section-header');
-        const toggle = section.querySelector('.voices-section-toggle');
-        if (!header || !toggle) return;
-        header.addEventListener('click', event => {
-            if (event.target.closest('button')) {
-                return;
-            }
-            section.classList.toggle('collapsed');
-            toggle.textContent = section.classList.contains('collapsed') ? '▶' : '▼';
+// ---------------------------------------------------------------------------
+// Voices screen chrome: underline sub-tabs, tab counts, row menus, modals.
+
+const VOICES_SUBTAB_STORAGE_KEY = 'ttsStory.voicesSubtab.v1';
+
+function setupVoicesSubtabs() {
+    const tabs = Array.from(document.querySelectorAll('#voices-tab .voices-subtab[data-voices-target]'));
+    const panels = Array.from(document.querySelectorAll('#voices-tab .voices-panel[data-voices-section]'));
+    if (!tabs.length || !panels.length) return;
+
+    const activate = (target, { focus = false, persist = true } = {}) => {
+        const known = tabs.some(tab => tab.dataset.voicesTarget === target);
+        const section = known ? target : 'prompts';
+        tabs.forEach(tab => {
+            const active = tab.dataset.voicesTarget === section;
+            tab.classList.toggle('is-active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            tab.tabIndex = active ? 0 : -1;
+            if (active && focus) tab.focus();
+        });
+        panels.forEach(panel => {
+            panel.hidden = panel.dataset.voicesSection !== section;
+        });
+        closeVoiceRowMenu();
+        if (section === 'kokoro') refreshKokoroInUse();
+        if (persist) {
+            try { sessionStorage.setItem(VOICES_SUBTAB_STORAGE_KEY, section); } catch { /* Session memory is optional. */ }
+        }
+        const body = document.getElementById('voices-body');
+        if (body) body.scrollTop = 0;
+        return section;
+    };
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => activate(tab.dataset.voicesTarget));
+        tab.addEventListener('keydown', event => {
+            const index = tabs.indexOf(tab);
+            let next = -1;
+            if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+            else if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+            else if (event.key === 'Home') next = 0;
+            else if (event.key === 'End') next = tabs.length - 1;
+            if (next < 0) return;
+            event.preventDefault();
+            activate(tabs[next].dataset.voicesTarget, { focus: true });
         });
     });
+
+    let initial = 'prompts';
+    try { initial = sessionStorage.getItem(VOICES_SUBTAB_STORAGE_KEY) || 'prompts'; } catch { /* Default to prompts. */ }
+    activate(initial, { persist: false });
+    window.studioVoicesShowSection = section => activate(section);
+}
+
+/** Writes a sub-tab (or archived card) count. null/'' clears it. */
+function setVoicesTabCount(section, count) {
+    const text = count === null || count === undefined || count === '' ? '' : String(count);
+    document.querySelectorAll(`#voices-tab [data-voices-count="${section}"]`).forEach(node => {
+        node.textContent = text;
+    });
+}
+window.studioVoicesCount = setVoicesTabCount;
+
+function setupVoicePromptsChrome() {
+    // "Add voice" opens the single-voice upload form in a modal.
+    document.getElementById('voice-add-btn')?.addEventListener('click', openAddVoiceModal);
+    document.getElementById('add-voice-modal-close')?.addEventListener('click', closeAddVoiceModal);
+    document.getElementById('add-voice-cancel')?.addEventListener('click', closeAddVoiceModal);
+    document.getElementById('add-voice-modal-overlay')?.addEventListener('click', closeAddVoiceModal);
+
+    // Archived voices card.
+    const archiveToggle = document.getElementById('voice-archive-toggle');
+    archiveToggle?.addEventListener('click', () => {
+        const body = document.getElementById('voice-archive-body');
+        if (!body) return;
+        const open = body.hidden;
+        body.hidden = !open;
+        archiveToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        const chevron = archiveToggle.querySelector('.voices-archive-chevron');
+        if (chevron) chevron.textContent = open ? 'expand_less' : 'expand_more';
+    });
+
+    // Keyboard sorting on the column headers.
+    document.querySelectorAll('#voices-tab th.sortable').forEach(th => {
+        th.addEventListener('keydown', event => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            th.click();
+        });
+    });
+
+    // Row overflow menus (rendered inside each row's actions cell).
+    ['chatterbox-voice-list', 'chatterbox-voice-archive-list'].forEach(id => {
+        const tbody = document.getElementById(id);
+        if (!tbody) return;
+        tbody.addEventListener('click', event => {
+            const toggle = event.target.closest('.voices-row-more');
+            if (toggle) {
+                event.preventDefault();
+                toggleVoiceRowMenu(toggle);
+                return;
+            }
+            if (event.target.closest('.voices-row-menu [data-action]')) {
+                closeVoiceRowMenu();
+            }
+        });
+    });
+    document.addEventListener('mousedown', event => {
+        if (!voicesOpenRowMenu) return;
+        if (event.target.closest('.voices-row-menu') || event.target.closest('.voices-row-more')) return;
+        closeVoiceRowMenu();
+    });
+    document.addEventListener('keydown', event => {
+        if (voicesOpenRowMenu && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            const items = Array.from(voicesOpenRowMenu.menu.querySelectorAll('.st-menu-item:not([disabled])'));
+            if (!items.length) return;
+            event.preventDefault();
+            const index = items.indexOf(document.activeElement);
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            items[(index + step + items.length) % items.length].focus();
+            return;
+        }
+        if (event.key !== 'Escape') return;
+        if (voicesOpenRowMenu) {
+            const trigger = voicesOpenRowMenu.trigger;
+            closeVoiceRowMenu();
+            trigger?.focus();
+            return;
+        }
+        if (!document.getElementById('add-voice-modal')?.classList.contains('hidden')) closeAddVoiceModal();
+        else if (!document.getElementById('edit-voice-modal')?.classList.contains('hidden')) closeEditVoiceModal();
+        else if (!document.getElementById('custom-voice-modal')?.classList.contains('hidden')) {
+            document.getElementById('custom-voice-cancel')?.click();
+        }
+    });
+    document.getElementById('voices-body')?.addEventListener('scroll', closeVoiceRowMenu, { passive: true });
+    window.addEventListener('resize', closeVoiceRowMenu);
+
+    // "In use" pills on Kokoro cards follow the Generate screen's assignments.
+    document.querySelector('.tab-button[data-tab="voices"]')?.addEventListener('click', refreshKokoroInUse);
+}
+
+function openAddVoiceModal() {
+    const overlay = document.getElementById('add-voice-modal-overlay');
+    const modal = document.getElementById('add-voice-modal');
+    if (!overlay || !modal) return;
+    overlay.classList.remove('hidden');
+    modal.classList.remove('hidden');
+    document.getElementById('chatterbox-voice-name')?.focus();
+}
+
+function closeAddVoiceModal() {
+    document.getElementById('add-voice-modal-overlay')?.classList.add('hidden');
+    document.getElementById('add-voice-modal')?.classList.add('hidden');
+}
+
+let voicesOpenRowMenu = null;
+
+function closeVoiceRowMenu() {
+    if (!voicesOpenRowMenu) return;
+    const { menu, trigger } = voicesOpenRowMenu;
+    menu.hidden = true;
+    menu.style.top = '';
+    menu.style.left = '';
+    trigger?.setAttribute('aria-expanded', 'false');
+    trigger?.classList.remove('is-open');
+    voicesOpenRowMenu = null;
+}
+
+function toggleVoiceRowMenu(trigger) {
+    const menu = trigger.parentElement?.querySelector('.voices-row-menu');
+    if (!menu) return;
+    const wasOpen = voicesOpenRowMenu?.menu === menu;
+    closeVoiceRowMenu();
+    if (wasOpen) return;
+    menu.hidden = false;
+    trigger.setAttribute('aria-expanded', 'true');
+    trigger.classList.add('is-open');
+    // position: fixed escapes the table's rounded overflow clip; flip above near the bottom edge.
+    const rect = trigger.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    const margin = 8;
+    let top = rect.bottom + 4;
+    if (top + menuRect.height > window.innerHeight - margin) {
+        top = Math.max(margin, rect.top - 4 - menuRect.height);
+    }
+    const left = Math.max(margin, Math.min(rect.right - menuRect.width, window.innerWidth - menuRect.width - margin));
+    menu.style.top = `${Math.round(top)}px`;
+    menu.style.left = `${Math.round(left)}px`;
+    voicesOpenRowMenu = { menu, trigger };
+    menu.querySelector('.st-menu-item:not([disabled])')?.focus({ preventScroll: true });
+}
+
+function voicesAttr(value) {
+    return typeof window.studioEscapeAttr === 'function'
+        ? window.studioEscapeAttr(value)
+        : String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 async function loadPocketTtsVoices() {
@@ -93,6 +279,11 @@ function getSelectedCount(scope) {
 function updateBatchToolbar(scope) {
     const isArchive = scope === 'archived';
     const count = getSelectedCount(scope);
+    const toolbar = document.getElementById(isArchive ? 'voice-archive-toolbar' : 'voice-batch-toolbar');
+    if (toolbar) {
+        // The selection bar only appears while something is selected.
+        toolbar.hidden = count === 0;
+    }
     const countLabel = document.getElementById(isArchive ? 'voice-archive-selected-count' : 'voice-selected-count');
     if (countLabel) {
         countLabel.textContent = `${count} selected`;
@@ -111,8 +302,8 @@ function updateBatchToolbar(scope) {
         }).length;
         transcribeBtn.disabled = missingCount === 0;
         transcribeBtn.textContent = missingCount
-            ? `Generate Transcripts (${missingCount})`
-            : 'Generate Transcripts';
+            ? `Generate transcripts (${missingCount})`
+            : 'Generate transcripts';
     }
     const selectAll = document.getElementById(isArchive ? 'voice-archive-select-all' : 'voice-select-all');
     if (selectAll) {
@@ -230,11 +421,14 @@ function setupQwenVoiceCreation() {
         const available = window.voiceDesignEngineAvailable?.(engine) === true;
         const known = window.voiceDesignEngineAvailabilityKnown?.(engine) === true;
         const status = document.getElementById('qwen-voice-status');
+        const installMessage = config.installMessage || 'Install the selected voice-design engine under Settings → Engines.';
+        // The install hint lives in the unavailable notice (shown by refreshQwenVoiceDesignControls
+        // once availability is known); the status line only reports the pending check.
+        const noticeMessage = document.getElementById('voice-creation-unavailable-message');
+        if (noticeMessage) noticeMessage.textContent = installMessage;
         if (!available && status) {
-            status.textContent = known
-                ? (config.installMessage || 'Install the selected voice-design engine under Settings → Engine Settings.')
-                : `Checking ${config.label || 'voice-design engine'} availability…`;
-        } else if (available && status?.textContent?.startsWith('Install ')) {
+            status.textContent = known ? '' : `Checking ${config.label || 'voice-design engine'} availability…`;
+        } else if (available && (status?.textContent?.startsWith('Install ') || status?.textContent?.startsWith('Checking '))) {
             status.textContent = '';
         }
         window.refreshQwenVoiceDesignControls?.();
@@ -539,6 +733,8 @@ function setupChatterboxVoiceSection() {
             formData.append('name', name);
             formData.append('file', file);
             formData.append('transcript', transcriptInput?.value?.trim() || '');
+            const submitBtn = document.getElementById('add-voice-save');
+            if (submitBtn) submitBtn.disabled = true;
             try {
                 const response = await fetch('/api/chatterbox-voices', {
                     method: 'POST',
@@ -551,10 +747,13 @@ function setupChatterboxVoiceSection() {
                 showToast('Chatterbox voice saved.', 'success');
                 form.reset();
                 fileInput.value = '';
+                closeAddVoiceModal();
                 await loadChatterboxVoices();
             } catch (error) {
                 console.error('Failed to save Chatterbox voice', error);
                 showToast(error.message || 'Failed to save voice', 'error');
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
             }
         });
     }
@@ -1027,80 +1226,107 @@ function renderChatterboxVoiceList() {
     
     // Update language filter options
     updateLanguageFilterOptions(allVoices);
-    
-    renderVoiceRows(container, sortedVoices, { archived: false });
+
+    closeVoiceRowMenu();
+    renderVoiceRows(container, sortedVoices, { archived: false, total: activeVoices.length });
     if (archiveContainer) {
-        renderVoiceRows(archiveContainer, sortedArchived, { archived: true });
+        renderVoiceRows(archiveContainer, sortedArchived, { archived: true, total: archivedVoices.length });
     }
+    setVoicesTabCount('prompts', activeVoices.length);
+    setVoicesTabCount('archived', archivedVoices.length);
+    const archiveEmpty = document.getElementById('voice-archive-empty');
+    const archiveContent = document.getElementById('voice-archive-content');
+    if (archiveEmpty) archiveEmpty.hidden = archivedVoices.length > 0;
+    if (archiveContent) archiveContent.hidden = archivedVoices.length === 0;
     syncSelectionSets();
     updateBatchToolbar('active');
     updateBatchToolbar('archived');
 }
 
-function renderVoiceRows(container, rows, { archived }) {
+function renderVoiceRows(container, rows, { archived, total = rows.length }) {
     if (!container) return;
     if (!rows.length) {
-        container.innerHTML = `<tr><td colspan="7" class="help-text">${archived ? 'No archived voices.' : 'No voices match your filters.'}</td></tr>`;
+        let message;
+        if (archived) message = total ? 'No archived voices match your filters.' : 'No archived voices.';
+        else message = total ? 'No voices match your filters.' : 'No voice prompts yet. Add a voice or drop clips above to get started.';
+        container.innerHTML = `<tr class="voices-empty-row"><td colspan="8" class="voices-empty">${message}</td></tr>`;
         return;
     }
     container.innerHTML = '';
     rows.forEach(entry => {
         const row = document.createElement('tr');
+        row.className = 'voices-row';
         row.dataset.voiceId = entry.id;
         row.dataset.source = entry.source;
         row.dataset.archived = archived ? 'true' : 'false';
 
         const isExternal = entry.source === 'external';
-        const isDownloaded = isExternal ? entry.is_downloaded : true;
-        const genderBadge = entry.gender
-            ? `<span class="badge badge-${entry.gender.toLowerCase()}">${entry.gender}</span>`
-            : '<span class="badge">—</span>';
-        const sourceBadge = isExternal
-            ? (isDownloaded ? '<span class="badge badge-downloaded">Downloaded</span>' : '<span class="badge badge-external">External</span>')
-            : '<span class="badge badge-local">Local</span>';
-        const transcriptBadge = isExternal ? '' : (entry.transcript_available
-            ? '<span class="badge badge-downloaded">Transcript ready</span>'
-            : '<span class="badge badge-danger">Transcript required for LocalAI</span>');
-        const durationText = entry.duration_seconds ? `${entry.duration_seconds.toFixed(1)}s` : '—';
-        const languageText = getLanguageDisplayName(entry.language);
+        // `is_downloaded` only means the GitHub sample is cached (previewing caches it too).
+        // Voices actually added to voice prompts are filtered out of the external list, so
+        // every external row still needs its Download action and reads as "External".
+        const hasLocalFile = isExternal ? !!entry.is_downloaded : true;
+        const name = entry.name || 'Untitled Voice';
+        const genderText = entry.gender ? escapeHtml(entry.gender) : '<span class="voices-dash">—</span>';
+        const sourcePill = isExternal
+            ? `<span class="pill"${hasLocalFile ? ' title="Sample cached locally. Download it to use it as a voice prompt."' : ''}>External</span>`
+            : '<span class="pill pill-green">Local</span>';
+        let transcriptCell = '<span class="voices-dash">—</span>';
+        if (!isExternal) {
+            transcriptCell = entry.transcript_available
+                ? '<span class="voices-transcript is-added" data-role="transcript-status" title="Transcript added"><span class="ms" aria-hidden="true">check</span>Added</span>'
+                : '<span class="voices-transcript is-missing" data-role="transcript-status" title="Add an exact transcript for engines that need one (LocalAI, Audio8…)">Missing</span>';
+        }
+        const durationText = entry.duration_seconds ? `${entry.duration_seconds.toFixed(1)} s` : '—';
+        const languageText = entry.language ? escapeHtml(getLanguageDisplayName(entry.language)) : '<span class="voices-dash">—</span>';
         const selectionSet = archived ? selectedArchivedVoiceIds : selectedVoiceIds;
         const isSelected = selectionSet.has(entry.id);
         const archiveAction = archived ? 'unarchive' : 'archive';
         const archiveLabel = archived ? 'Unarchive' : 'Archive';
+        const nameAttr = voicesAttr(name);
+        const canPreview = !entry.missing_file;
+        const canTranscribe = !isExternal && !entry.transcript_available && !entry.missing_file;
+
+        // Icon-only buttons keep their text label (JS rewrites it: Play/Stop/Loading…,
+        // Download/Downloading...); CSS hides the text and draws the icon.
+        const secondaryAction = isExternal
+            ? `
+                <button type="button" class="voices-row-icon voices-row-download" data-action="download" data-voice-id="${voicesAttr(entry.short_name)}" title="Download to voice prompts" aria-label="Download ${nameAttr}">Download</button>`
+            : `<button type="button" class="voices-row-icon voices-row-edit" data-action="edit-meta" title="Edit details" aria-label="Edit ${nameAttr}">Edit</button>`;
 
         row.innerHTML = `
             <td class="select-col">
-                <input type="checkbox" class="voice-select-checkbox" data-role="voice-select" ${isSelected ? 'checked' : ''}>
+                <input type="checkbox" class="voice-select-checkbox voices-check" data-role="voice-select" aria-label="Select ${nameAttr}" ${isSelected ? 'checked' : ''}>
             </td>
             <td class="voice-name-cell">
-                ${escapeHtml(entry.name || 'Untitled Voice')}
-                ${entry.missing_file ? '<span class="badge badge-danger">Missing</span>' : ''}
-                ${transcriptBadge}
+                <div class="voices-name-wrap">
+                    <span class="voices-name" title="${nameAttr}">${escapeHtml(name)}</span>
+                    ${entry.missing_file ? '<span class="pill pill-red voices-missing-file" title="The audio file for this voice was not found on disk.">File missing</span>' : ''}
+                </div>
             </td>
-            <td>${genderBadge}</td>
-            <td>${escapeHtml(languageText)}</td>
-            <td>${durationText}</td>
-            <td>${sourceBadge}</td>
+            <td class="voices-cell-soft">${genderText}</td>
+            <td class="voices-cell-soft voices-ellipsis">${languageText}</td>
+            <td class="voices-cell-mono">${durationText}</td>
+            <td>${sourcePill}</td>
+            <td>${transcriptCell}</td>
             <td class="voice-actions">
-                ${isExternal && !isDownloaded ? `
-                    <button type="button" class="btn-ghost btn-download" data-action="download" data-voice-id="${entry.short_name}">Download</button>
-                ` : `
-                    <button type="button" class="btn-ghost chatterbox-preview-btn"
+                <div class="voices-row-actions">
+                    <button type="button" class="voices-row-play chatterbox-preview-btn"
                         data-action="preview"
                         data-label-play="Play"
-                        data-label-stop="Stop">
-                        Play
-                    </button>
-                `}
-                <button type="button" class="btn-ghost" data-action="export" ${!isDownloaded ? 'disabled' : ''}>Export</button>
-                <button type="button" class="btn-ghost" data-action="${archiveAction}">${archiveLabel}</button>
-                ${!isExternal ? `
-                    ${!entry.transcript_available && !entry.missing_file ? `
-                        <button type="button" class="btn-ghost" data-action="transcribe">Generate Transcript</button>
-                    ` : ''}
-                    <button type="button" class="btn-ghost" data-action="edit-meta">Edit</button>
-                ` : ''}
-                <button type="button" class="btn-danger" data-action="delete">Delete</button>
+                        data-label-stop="Stop"
+                        title="${isExternal ? 'Preview sample' : 'Play'}"
+                        ${canPreview ? '' : 'disabled data-disabled="true"'}>Play</button>
+                    ${secondaryAction}
+                    <button type="button" class="voices-row-icon voices-row-more" aria-haspopup="menu" aria-expanded="false" title="More actions" aria-label="More actions for ${nameAttr}">More</button>
+                    <div class="st-menu voices-row-menu" role="menu" hidden>
+                        <button type="button" class="st-menu-item" role="menuitem" data-icon="ios_share" data-action="export" ${!hasLocalFile ? 'disabled title="Download the voice first"' : ''}>Export</button>
+                        <button type="button" class="st-menu-item" role="menuitem" data-icon="${archived ? 'unarchive' : 'archive'}" data-action="${archiveAction}">${archiveLabel}</button>
+                        ${canTranscribe ? '<button type="button" class="st-menu-item" role="menuitem" data-icon="subtitles" data-action="transcribe">Generate transcript</button>' : ''}
+                        ${isExternal ? `<button type="button" class="st-menu-item" role="menuitem" data-icon="download" data-action="download" data-voice-id="${voicesAttr(entry.short_name)}">Download</button>` : ''}
+                        <div class="st-menu-sep" role="separator"></div>
+                        <button type="button" class="st-menu-item is-danger" role="menuitem" data-icon="delete" data-action="delete">Delete</button>
+                    </div>
+                </div>
             </td>
         `;
         container.appendChild(row);
@@ -1186,7 +1412,7 @@ function updateLanguageFilterOptions(voices) {
     const sortedLangs = [...languages].sort((a, b) => 
         getLanguageDisplayName(a).localeCompare(getLanguageDisplayName(b))
     );
-    select.innerHTML = '<option value="all">All Languages</option>';
+    select.innerHTML = '<option value="all">All languages</option>';
     sortedLangs.forEach(lang => {
         const opt = document.createElement('option');
         opt.value = lang;
@@ -1219,10 +1445,24 @@ function setupVoiceListControls() {
         }
     });
     
-    // Sort headers
-    const table = document.getElementById('chatterbox-voice-table');
-    if (table) {
-        table.querySelectorAll('th.sortable').forEach(th => {
+    // Sort headers (sort state is shared by the active and archived tables,
+    // so both tables show the same indicator).
+    const sortTables = ['chatterbox-voice-table', 'chatterbox-voice-archive-table']
+        .map(id => document.getElementById(id))
+        .filter(Boolean);
+    const syncSortIndicators = () => {
+        sortTables.forEach(sortTable => {
+            sortTable.querySelectorAll('th.sortable').forEach(h => {
+                const active = h.dataset.sort === voiceListSortKey;
+                h.classList.toggle('sort-asc', active && voiceListSortDir === 'asc');
+                h.classList.toggle('sort-desc', active && voiceListSortDir === 'desc');
+                if (active) h.setAttribute('aria-sort', voiceListSortDir === 'asc' ? 'ascending' : 'descending');
+                else h.removeAttribute('aria-sort');
+            });
+        });
+    };
+    sortTables.forEach(sortTable => {
+        sortTable.querySelectorAll('th.sortable').forEach(th => {
             th.addEventListener('click', () => {
                 const sortKey = th.dataset.sort;
                 if (voiceListSortKey === sortKey) {
@@ -1231,36 +1471,12 @@ function setupVoiceListControls() {
                     voiceListSortKey = sortKey;
                     voiceListSortDir = 'asc';
                 }
-                
-                // Update sort indicators
-                table.querySelectorAll('th.sortable').forEach(h => {
-                    h.classList.remove('sort-asc', 'sort-desc');
-                });
-                th.classList.add(voiceListSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
-                
+                syncSortIndicators();
                 renderChatterboxVoiceList();
             });
         });
-    }
-    const archiveTable = document.getElementById('chatterbox-voice-archive-table');
-    if (archiveTable) {
-        archiveTable.querySelectorAll('th.sortable').forEach(th => {
-            th.addEventListener('click', () => {
-                const sortKey = th.dataset.sort;
-                if (voiceListSortKey === sortKey) {
-                    voiceListSortDir = voiceListSortDir === 'asc' ? 'desc' : 'asc';
-                } else {
-                    voiceListSortKey = sortKey;
-                    voiceListSortDir = 'asc';
-                }
-                archiveTable.querySelectorAll('th.sortable').forEach(h => {
-                    h.classList.remove('sort-asc', 'sort-desc');
-                });
-                th.classList.add(voiceListSortDir === 'asc' ? 'sort-asc' : 'sort-desc');
-                renderChatterboxVoiceList();
-            });
-        });
-    }
+    });
+    syncSortIndicators();
     
     // Load external voices button
     const loadExternalBtn = document.getElementById('load-external-voices-btn');
@@ -1347,7 +1563,7 @@ async function loadExternalVoices() {
     const btn = document.getElementById('load-external-voices-btn');
     if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Loading...';
+        btn.textContent = 'Loading…';
     }
     
     try {
@@ -1366,7 +1582,7 @@ async function loadExternalVoices() {
     } finally {
         if (btn) {
             btn.disabled = false;
-            btn.textContent = 'Load External Voices';
+            btn.textContent = 'Load external voices';
         }
     }
 }
@@ -1401,7 +1617,11 @@ async function handleVoiceTableAction(event) {
     } else if (action === 'edit-meta') {
         await editVoiceMetadata(voiceId);
     } else if (action === 'transcribe') {
-        await generateVoiceTranscript(voiceId, btn);
+        // The menu closes on click, so progress shows in the row's Transcript cell.
+        const statusTarget = row?.querySelector('[data-role="transcript-status"]') || btn;
+        statusTarget.classList?.add('is-busy');
+        await generateVoiceTranscript(voiceId, statusTarget);
+        statusTarget.classList?.remove('is-busy');
     }
 }
 
@@ -1613,38 +1833,58 @@ async function downloadExternalVoice(shortName, btn) {
     }
 }
 
+let externalPreviewAudio = null;
+let externalPreviewButton = null;
+
+function stopExternalVoicePreview() {
+    if (externalPreviewAudio) {
+        externalPreviewAudio.pause();
+        externalPreviewAudio = null;
+    }
+    if (externalPreviewButton) {
+        externalPreviewButton.disabled = false;
+        externalPreviewButton.classList.remove('is-playing', 'is-loading');
+        externalPreviewButton.textContent = 'Play';
+        externalPreviewButton = null;
+    }
+}
+
 async function previewExternalVoice(shortName, btn) {
+    // Clicking the playing voice again stops it; another voice replaces it.
+    const wasPlaying = btn && btn === externalPreviewButton;
+    stopExternalVoicePreview();
+    if (wasPlaying) return;
+    window.chatterboxPreviewController?.stop?.();
     if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Loading...';
+        btn.classList.add('is-loading');
+        btn.textContent = 'Loading…';
     }
-    
+
+    const audio = new Audio(`/api/external-voices/${encodeURIComponent(shortName)}/preview`);
+    externalPreviewAudio = audio;
+    externalPreviewButton = btn || null;
     try {
-        const audio = new Audio(`/api/external-voices/${shortName}/preview`);
         audio.addEventListener('ended', () => {
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Play';
-            }
+            if (externalPreviewAudio === audio) stopExternalVoicePreview();
         });
         audio.addEventListener('error', () => {
+            if (externalPreviewAudio !== audio) return;
             showToast('Failed to play preview', 'error');
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Play';
-            }
+            stopExternalVoicePreview();
         });
         await audio.play();
-        if (btn) {
+        if (btn && externalPreviewAudio === audio) {
             btn.disabled = false;
+            btn.classList.remove('is-loading');
+            btn.classList.add('is-playing');
             btn.textContent = 'Stop';
         }
     } catch (error) {
         console.error('Preview failed:', error);
-        showToast('Failed to play preview', 'error');
-        if (btn) {
-            btn.disabled = false;
-            btn.textContent = 'Play';
+        if (externalPreviewAudio === audio) {
+            showToast('Failed to play preview', 'error');
+            stopExternalVoicePreview();
         }
     }
 }
@@ -1668,7 +1908,7 @@ function openEditVoiceModal(entry) {
     if (!overlay || !modal) return;
     
     // Populate language dropdown with all available locales
-    languageSelect.innerHTML = '<option value="">— Not specified —</option>';
+    languageSelect.innerHTML = '<option value="">Not specified</option>';
     Object.entries(VM_LOCALE_NAMES).sort((a, b) => a[1].localeCompare(b[1])).forEach(([code, name]) => {
         const opt = document.createElement('option');
         opt.value = code;
@@ -1769,10 +2009,15 @@ function summarizeFileSize(bytes) {
     return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
+// This script loads after main/queue/library, so this copy is the runtime global.
+// It must stay quote-safe: callers interpolate it into attribute values.
 function escapeHtml(value = '') {
-    const div = document.createElement('div');
-    div.textContent = value;
-    return div.innerHTML;
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 async function renameChatterboxVoice(voiceId) {
@@ -1846,6 +2091,7 @@ async function copyChatterboxVoicePath(voiceId) {
 
 function toggleChatterboxVoicePreview(voiceId, triggerButton) {
     if (!voiceId) return;
+    stopExternalVoicePreview();
     if (!window.chatterboxPreviewController) {
         showToast('Preview controls are still loading. Try again shortly.', 'warning');
         return;
@@ -1904,37 +2150,59 @@ async function loadCustomVoices() {
     }
 }
 
+// Kokoro lang_code → [region chip, language label] (lang codes from src/voice_manager.py).
+const KOKORO_LANGUAGE_META = {
+    a: ['US', 'American English'],
+    b: ['GB', 'British English'],
+    e: ['ES', 'Spanish'],
+    f: ['FR', 'French'],
+    h: ['IN', 'Hindi'],
+    j: ['JP', 'Japanese'],
+    z: ['CN', 'Mandarin Chinese'],
+    p: ['BR', 'Brazilian Portuguese'],
+};
+
 function renderCustomVoices() {
     const container = document.getElementById('custom-voices-list');
     if (!container) return;
+    setVoicesTabCount('custom', customVoices.length);
 
     if (!customVoices.length) {
-        container.innerHTML = '<p class="help-text">You haven’t created any blends yet. Click “New Custom Voice” to get started.</p>';
+        container.innerHTML = `
+            <div class="voices-blend-empty">
+                <span class="ms" aria-hidden="true">tune</span>
+                <span>No blends yet. Use <strong>New blend</strong> to mix two or more built-in Kokoro voices into one.</span>
+            </div>`;
         return;
     }
 
-    container.innerHTML = '';
+    container.innerHTML = `
+        <div class="blend-head" aria-hidden="true">
+            <span>Name</span><span>Language</span><span>Components</span><span>Code</span><span>Updated</span><span></span>
+        </div>`;
     customVoices.forEach(entry => {
         const card = document.createElement('div');
-        card.className = 'custom-voice-card';
+        card.className = 'blend-row';
         card.dataset.voiceCode = entry.code;
+        const [region, language] = KOKORO_LANGUAGE_META[entry.lang_code] || [String(entry.lang_code || '').toUpperCase(), 'Kokoro'];
+        const updatedAt = entry.updated_at || entry.created_at;
+        const updatedLabel = updatedAt
+            ? (typeof window.studioRelativeTime === 'function' ? window.studioRelativeTime(updatedAt) : new Date(updatedAt).toLocaleDateString())
+            : '—';
+        const updatedTitle = updatedAt ? new Date(updatedAt).toLocaleString() : '';
+        const name = entry.name || entry.code || 'Untitled blend';
         card.innerHTML = `
-            <div class="custom-voice-title">
-                <div>
-                    <strong>${entry.name}</strong>
-                </div>
-                <span class="voice-badge">Lang ${entry.lang_code?.toUpperCase() ?? ''}</span>
+            <div class="blend-name">
+                <span class="blend-title" title="${voicesAttr(name)}">${escapeHtml(name)}</span>
+                ${entry.notes ? `<span class="blend-notes" title="${voicesAttr(entry.notes)}">${escapeHtml(entry.notes)}</span>` : ''}
             </div>
-            <div class="custom-voice-components">
-                ${renderComponentList(entry.components)}
-            </div>
-            <div class="custom-voice-meta">
-                <span class="badge-muted">${entry.code}</span>
-                ${entry.updated_at ? `<span>Updated ${new Date(entry.updated_at).toLocaleString()}</span>` : ''}
-            </div>
-            <div class="custom-voice-actions">
-                <button class="btn-ghost" data-action="edit">Edit</button>
-                <button class="btn-danger" data-action="delete">Delete</button>
+            <div class="blend-lang"><span class="blend-region">${escapeHtml(region)}</span>${escapeHtml(language)}</div>
+            <div class="blend-components">${renderComponentList(entry.components)}</div>
+            <div class="blend-code" title="${voicesAttr(entry.code || '')}">${escapeHtml(entry.code || '')}</div>
+            <div class="blend-updated" title="${voicesAttr(updatedTitle)}">${escapeHtml(updatedLabel || '—')}</div>
+            <div class="blend-actions">
+                <button type="button" class="voices-row-icon voices-row-edit" data-action="edit" title="Edit blend" aria-label="Edit ${voicesAttr(name)}">Edit</button>
+                <button type="button" class="voices-row-icon voices-row-delete" data-action="delete" title="Delete blend" aria-label="Delete ${voicesAttr(name)}">Delete</button>
             </div>
         `;
 
@@ -1946,11 +2214,11 @@ function renderCustomVoices() {
 
 function renderComponentList(components = []) {
     if (!components.length) {
-        return '<em>No components defined.</em>';
+        return '<em class="voices-dash">No components defined.</em>';
     }
     return components.map(comp => {
-        const weight = Number(comp.weight ?? 1).toFixed(2).replace(/\.00$/, '');
-        return `<div>${comp.voice} <span class="badge-muted">x${weight}</span></div>`;
+        const weight = Number(comp.weight ?? 1).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+        return `<span class="blend-chip"><span class="blend-chip-voice">${escapeHtml(comp.voice || '')}</span><span class="blend-chip-weight">×${escapeHtml(weight)}</span></span>`;
     }).join('');
 }
 
@@ -1986,19 +2254,20 @@ function setupCustomVoiceModal() {
         rows.innerHTML = '';
         if (entry) {
             modal.dataset.editCode = entry.code;
-            title.textContent = 'Edit Custom Voice';
+            title.textContent = 'Edit blend';
             nameInput.value = entry.name || '';
             langSelect.value = entry.lang_code || 'a';
             notesInput.value = entry.notes || '';
             (entry.components || []).forEach(component => addComponentRow(component));
         } else {
             modal.dataset.editCode = '';
-            title.textContent = 'Create Custom Voice';
+            title.textContent = 'New blend';
             nameInput.value = '';
             langSelect.value = 'a';
             notesInput.value = '';
             addComponentRow();
         }
+        nameInput.focus();
     }
 
     function addComponentRow(component = null) {
@@ -2013,10 +2282,14 @@ function setupCustomVoiceModal() {
         weightInput.step = '0.1';
         weightInput.value = component?.weight ?? 1;
         weightInput.classList.add('component-weight-input');
+        weightInput.setAttribute('aria-label', 'Weight');
+        voiceSelect.setAttribute('aria-label', 'Kokoro voice');
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'remove-component';
-        removeBtn.innerHTML = '&times;';
+        removeBtn.title = 'Remove component';
+        removeBtn.setAttribute('aria-label', 'Remove component');
+        removeBtn.innerHTML = '<span class="ms" aria-hidden="true">close</span>';
         removeBtn.addEventListener('click', () => {
             if (rows.children.length > 1) {
                 row.remove();
@@ -2065,6 +2338,7 @@ function setupCustomVoiceModal() {
             const value = select.value;
             const newSelect = buildVoiceSelect(value, event.target.value);
             newSelect.className = select.className;
+            newSelect.setAttribute('aria-label', 'Kokoro voice');
             select.replaceWith(newSelect);
         });
     });
@@ -2177,44 +2451,41 @@ function updateSampleStatus(data) {
     const failedCount = failedList.length;
     const totalVoices = data.total_unique_voices || 0;
     const generatedCount = data.sample_count || 0;
+    const allReady = missingCount === 0 && failedCount === 0 && generatedCount > 0;
 
-    let summaryMessage = '';
-    let statusClass = 'info';
+    const voicesLabel = `${totalVoices} voice${totalVoices === 1 ? '' : 's'}`;
+    let summaryMessage;
+    let statusClass;
     const detailMessages = [];
 
-    if (missingCount === 0 && failedCount === 0 && generatedCount > 0) {
-        summaryMessage = `All ${generatedCount} voice previews are ready.`;
+    if (allReady) {
+        summaryMessage = `${voicesLabel} · all previews ready. Click a voice to listen.`;
         statusClass = 'success';
-        buttonContainer.style.display = 'none';
     } else {
-        const missingSummary = missingCount > 0
-            ? `${missingCount} of ${totalVoices} voices still need previews`
-            : 'Some voices are ready to preview';
-        summaryMessage = missingSummary;
-
-        if (missingCount > 0) {
-            detailMessages.push(`Missing previews: ${summarizeVoiceList(missingList)}`);
-        }
-
+        summaryMessage = missingCount > 0
+            ? `${voicesLabel} · ${missingCount} without a preview sample. Click a voice with a preview to listen.`
+            : `${voicesLabel}. Click a voice with a preview to listen.`;
+        statusClass = missingCount > 0 ? 'warning' : 'info';
         if (failedCount > 0) {
             const failedNames = failedList
                 .map(item => (typeof item === 'string' ? item : item.voice))
                 .filter(Boolean);
             detailMessages.push(`Failed to generate: ${summarizeVoiceList(failedNames)}`);
             statusClass = 'warning';
-        } else if (missingCount > 0) {
-            statusClass = 'warning';
-        } else {
-            statusClass = 'info';
         }
-
-        buttonContainer.style.display = 'flex';
     }
 
+    // Controls stay visible ("Regenerate all" is always available); only the
+    // "Generate missing previews" action hides once every preview exists.
+    buttonContainer.style.display = '';
+    const generateBtn = document.getElementById(generateSamplesBtnId);
+    if (generateBtn) generateBtn.hidden = allReady;
+
     statusContainer.className = `sample-status ${statusClass}`.trim();
+    statusContainer.title = missingCount > 0 ? `Missing previews: ${summarizeVoiceList(missingList, 12)}` : '';
     statusContainer.innerHTML = `
-        <div>${summaryMessage}</div>
-        ${detailMessages.length ? `<div class="sample-status-details">${detailMessages.join('<br>')}</div>` : ''}
+        <div class="sample-status-summary">${escapeHtml(summaryMessage)}</div>
+        ${detailMessages.length ? `<div class="sample-status-details">${detailMessages.map(escapeHtml).join('<br>')}</div>` : ''}
     `;
 }
 
@@ -2224,79 +2495,128 @@ function displaySampleError(message) {
     if (statusContainer) {
         statusContainer.textContent = message;
         statusContainer.className = 'sample-status error';
+        statusContainer.title = '';
     }
     if (buttonContainer) {
-        buttonContainer.style.display = 'flex';
+        buttonContainer.style.display = '';
     }
+    const generateBtn = document.getElementById(generateSamplesBtnId);
+    if (generateBtn) generateBtn.hidden = false;
 }
 
-// Display voice library
+// Kokoro card geometry, mirrored from studio-voices.css (border 2 + head 43 + gap 12; rows 48).
+const KOKORO_CARD_CHROME_PX = 57;
+const KOKORO_ROW_PX = 48;
+
+// Display voice library (Kokoro built-in voices as one card per language)
 function displayVoiceLibrary(voices) {
     const container = document.getElementById('voice-library');
+    if (!container) return;
     container.innerHTML = '';
-    
-    const languageNames = {
-        'american_english': '🇺🇸 American English',
-        'british_english': '🇬🇧 British English',
-        'spanish': '🇪🇸 Spanish',
-        'french': '🇫🇷 French',
-        'hindi': '🇮🇳 Hindi',
-        'japanese': '🇯🇵 Japanese',
-        'chinese': '🇨🇳 Chinese',
-        'brazilian_portuguese': '🇧🇷 Brazilian Portuguese',
-    };
-    
-    for (const [key, config] of Object.entries(voices)) {
+    if (currentPreviewItem) {
+        currentPreviewAudio?.pause();
+        currentPreviewAudio = null;
+        currentPreviewItem = null;
+    }
+
+    let totalVoices = 0;
+    for (const [key, config] of Object.entries(voices || {})) {
+        const voiceList = Array.isArray(config?.voices) ? config.voices : [];
+        if (!voiceList.length) continue;
+        totalVoices += voiceList.length;
+        const [region, fallbackLanguage] = KOKORO_LANGUAGE_META[config.lang_code] || [String(config.lang_code || '').toUpperCase(), ''];
+        const languageLabel = config.language || fallbackLanguage || key.replace(/_/g, ' ');
+
         const category = document.createElement('div');
         category.className = 'voice-category';
-        
-        const title = document.createElement('h3');
-        title.textContent = languageNames[key] || key;
-        category.appendChild(title);
-        
+        category.dataset.langCode = config.lang_code || '';
+        // Masonry packing on a 1px-row grid (see studio-voices.css .voices-kokoro-grid).
+        category.style.gridRowEnd = `span ${KOKORO_CARD_CHROME_PX + KOKORO_ROW_PX * voiceList.length}`;
+
+        const head = document.createElement('div');
+        head.className = 'voice-category-head';
+        head.innerHTML = `
+            <span class="voice-category-code">${escapeHtml(region)}</span>
+            <h3 class="voice-category-title">${escapeHtml(languageLabel)}</h3>
+            <span class="voice-category-count">${voiceList.length}</span>
+        `;
+        category.appendChild(head);
+
         const list = document.createElement('ul');
         list.className = 'voice-list';
-        
-        config.voices.forEach(voice => {
+
+        voiceList.forEach(voice => {
             const item = document.createElement('li');
             item.className = 'voice-item';
             item.dataset.voice = voice;
             item.dataset.langCode = config.lang_code;
-            
+
             const samplePath = (config.samples && config.samples[voice]) || null;
+            const stem = String(voice).replace(/^[a-z]{2}_/i, '');
+            const friendlyName = stem.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const genderCode = String(voice).charAt(1).toLowerCase();
+            const gender = genderCode === 'f' ? 'Female' : (genderCode === 'm' ? 'Male' : '');
+
+            item.innerHTML = `
+                <span class="voice-item-icon" aria-hidden="true"></span>
+                <span class="voice-info">
+                    <span class="voice-name">${escapeHtml(friendlyName)}${gender ? ` <span class="voice-gender">· ${gender}</span>` : ''}</span>
+                    <span class="voice-code">${escapeHtml(voice)}</span>
+                </span>
+                <span class="pill pill-amber voice-in-use" hidden>In use</span>
+            `;
+
             if (samplePath) {
                 item.classList.add('has-preview');
                 item.dataset.samplePath = samplePath;
+                item.tabIndex = 0;
+                item.setAttribute('role', 'button');
+                item.setAttribute('aria-label', `Play ${friendlyName} preview (${voice})`);
+                item.addEventListener('click', () => {
+                    playVoicePreview(voice, config.lang_code, samplePath, item);
+                });
+                item.addEventListener('keydown', event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    playVoicePreview(voice, config.lang_code, samplePath, item);
+                });
+            } else {
+                item.title = 'No preview sample yet. Use "Generate missing previews".';
             }
-            
-            const friendlyName = voice.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            
-            const info = document.createElement('div');
-            info.className = 'voice-info';
-            info.innerHTML = `
-                <span class="voice-name">${friendlyName}</span>
-                <span class="voice-code">${voice}</span>
-            `;
-            item.appendChild(info);
-            
-            const status = document.createElement('div');
-            status.className = 'voice-status';
-            status.textContent = samplePath ? 'Preview ready' : 'Preview unavailable';
-            if (!samplePath) {
-                status.classList.add('muted');
-            }
-            item.appendChild(status);
-            
-            item.addEventListener('click', () => {
-                playVoicePreview(voice, config.lang_code, samplePath, item);
-            });
-            
+
             list.appendChild(item);
         });
-        
+
         category.appendChild(list);
         container.appendChild(category);
     }
+    setVoicesTabCount('kokoro', totalVoices || '');
+    refreshKokoroInUse();
+}
+
+/** Marks Kokoro voices assigned to speakers on the Generate screen (Kokoro engines only). */
+function refreshKokoroInUse() {
+    const items = document.querySelectorAll('#voice-library .voice-item');
+    if (!items.length) return;
+    const used = new Set();
+    try {
+        const engine = typeof getSelectedJobEngine === 'function' ? getSelectedJobEngine() : '';
+        const kokoroEngine = typeof isKokoroEngine === 'function' ? isKokoroEngine(engine || 'kokoro') : true;
+        if (kokoroEngine) {
+            document.querySelectorAll('.voice-assignment-row .voice-select').forEach(select => {
+                const value = (select.value || '').trim();
+                if (value) used.add(value);
+            });
+        }
+    } catch (error) {
+        console.warn('Unable to read Kokoro voice assignments', error);
+    }
+    items.forEach(item => {
+        const inUse = used.has(item.dataset.voice);
+        item.classList.toggle('is-in-use', inUse);
+        const pill = item.querySelector('.voice-in-use');
+        if (pill) pill.hidden = !inUse;
+    });
 }
 
 async function generateSamples(overwrite = false) {
@@ -2309,12 +2629,16 @@ async function generateSamples(overwrite = false) {
     }
 
     button.disabled = true;
-    button.textContent = overwrite ? 'Regenerating samples…' : 'Generating samples…';
+    if (overwrite && regenButton) {
+        regenButton.textContent = 'Regenerating…';
+    } else {
+        button.textContent = 'Generating previews…';
+    }
     if (regenButton) {
         regenButton.disabled = true;
     }
     statusContainer.textContent = 'Generating preview samples, please wait…';
-    statusContainer.className = 'sample-status info';
+    statusContainer.className = 'sample-status info is-busy';
 
     try {
         const response = await fetch('/api/voices/samples', {
@@ -2359,10 +2683,11 @@ async function generateSamples(overwrite = false) {
         const refreshedRegenButton = document.getElementById(regenerateSamplesBtnId);
         if (refreshedButton) {
             refreshedButton.disabled = false;
-            refreshedButton.textContent = 'Generate Voice Previews';
+            refreshedButton.textContent = 'Generate missing previews';
         }
         if (refreshedRegenButton) {
             refreshedRegenButton.disabled = false;
+            refreshedRegenButton.textContent = 'Regenerate all';
         }
     }
 }
@@ -2378,17 +2703,22 @@ function showToast(message, type) {
 // Play voice preview using generated samples
 function playVoicePreview(voice, langCode, samplePath, listItem) {
     if (!samplePath) {
-        alert(`Preview not available for ${voice}. Click "Generate Voice Previews" to create samples.`);
+        showToast(`No preview sample for ${voice} yet. Use "Generate missing previews" to create it.`, 'info');
         return;
     }
 
+    // Clicking the voice that is playing stops it.
+    const wasPlaying = currentPreviewItem === listItem && currentPreviewAudio && !currentPreviewAudio.paused;
     if (currentPreviewAudio) {
         currentPreviewAudio.pause();
         currentPreviewAudio.currentTime = 0;
         if (currentPreviewItem) {
             currentPreviewItem.classList.remove('playing');
         }
+        currentPreviewAudio = null;
+        currentPreviewItem = null;
     }
+    if (wasPlaying) return;
 
     if (!audioPreviewCache[voice]) {
         audioPreviewCache[voice] = new Audio(samplePath);
@@ -2400,16 +2730,23 @@ function playVoicePreview(voice, langCode, samplePath, listItem) {
 
     audio.currentTime = 0;
     audio.play().then(() => {
-        listItem.classList.add('playing');
+        if (currentPreviewAudio === audio) listItem.classList.add('playing');
     }).catch(err => {
         console.error('Error playing preview:', err);
-        alert('Unable to play preview. See console for details.');
+        listItem.classList.remove('playing');
+        if (currentPreviewAudio === audio) {
+            currentPreviewAudio = null;
+            currentPreviewItem = null;
+        }
+        showToast('Unable to play this preview sample.', 'error');
     });
 
     audio.onended = () => {
         listItem.classList.remove('playing');
-        currentPreviewAudio = null;
-        currentPreviewItem = null;
+        if (currentPreviewAudio === audio) {
+            currentPreviewAudio = null;
+            currentPreviewItem = null;
+        }
     };
 }
 
@@ -2445,6 +2782,9 @@ function setupVoiceCreationEngineToggle() {
         qwen3Btn.classList.toggle('active', engine === 'qwen3');
         breezeBtn.classList.toggle('active', engine === 'breeze');
         omniBtn.classList.toggle('active', engine === 'omnivoice');
+        [qwen3Btn, breezeBtn, omniBtn].forEach(btn => {
+            btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false');
+        });
         if (qwen3Fields) qwen3Fields.style.display = engine === 'omnivoice' ? 'none' : '';
         if (omniFields) omniFields.style.display = engine === 'omnivoice' ? '' : 'none';
         if (engine !== 'omnivoice') {
@@ -2469,7 +2809,7 @@ function setupVoiceCreationEngineToggle() {
     document.getElementById('voice-creation-open-engine-settings')?.addEventListener('click', () => {
         const engine = getActiveVoiceCreationDesignEngine();
         if (engine === 'breeze') window.openBreezeEngineSettings?.();
-        else window.openQwenEngineSettings?.();
+        else (window.openQwen3EngineSettings || window.openQwenEngineSettings)?.();
     });
 }
 

@@ -1,0 +1,1646 @@
+/* studio-cast.css — Cast list + Edit-speaker drawer (Generate screen).
+   Owned by the cast screen agent of the "Estudio" redesign. Loaded after studio.css. */
+
+/* --------------------------------------------------------------------------
+   #cast-section markup (templates/index.html, inside #generate-tab >
+   aside.generate-aside > .generate-aside-scroll, first child):
+
+     section#cast-section.cast-section[.has-cast]   .has-cast set by cast-view.js
+       .cast-header                     "Cast" · count · help · List/Details .seg
+       div#stats-section.cast-body      display toggled inline by main.js
+         .speakers-header-row
+           #speakers-list.cast-list     rendered by cast-view.js (.speaker-tag.cast-row[data-speaker])
+           #speakers-duplicates         amber callout (display toggled by main.js)
+           .speakers-actions            #auto-assign-voices-btn, #build-speaker-profiles-btn, #generate-voices-btn
+           #generate-voices-unavailable muted footnote (.hidden toggled by main.js)
+         #inline-voice-assignments      always display:none; holds the hidden
+           #inline-voice-assignment-list per-speaker rows (moved into the drawer when edited)
+       .cast-empty                      shown while there is no cast
+
+   Shared icon glyph for ::before icons on buttons whose text JS rewrites. */
+#generate-voices-btn::before,
+#speaker-edit-modal-body .voice-sample-row > .btn::before,
+#speaker-edit-modal-body [data-role="fx-preview-btn"]::before,
+#speaker-edit-modal-body .speaker-design-advanced > summary::before,
+#speaker-edit-modal-body .gemini-voice-row > .btn-secondary::before {
+    display: inline-block;
+    flex: none;
+    width: 1em;
+    height: 1em;
+    overflow: hidden;
+    font-family: var(--st-font-icon);
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    white-space: nowrap;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+    -webkit-font-smoothing: antialiased;
+}
+
+@keyframes cast-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* --------------------------------------------------------------------------
+   Cast section shell
+   -------------------------------------------------------------------------- */
+#cast-section {
+    padding: 0;
+}
+
+#cast-section .cast-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 18px 20px 10px;
+}
+
+#cast-section .cast-header .panel-title {
+    margin: 0;
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+#cast-section .cast-count {
+    color: var(--st-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+#cast-section .cast-header .help-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+}
+
+#cast-section .cast-header-spacer {
+    flex: 1;
+}
+
+#cast-section .cast-view-toggle {
+    font-size: 12px;
+}
+
+#cast-section:not(.has-cast) .cast-view-toggle,
+#cast-section:not(.has-cast) .cast-count {
+    display: none;
+}
+
+#cast-section .cast-empty {
+    display: none;
+    margin: 0 20px 18px;
+    padding: 12px 14px;
+    border: 1px dashed var(--st-border-strong);
+    border-radius: 8px;
+    color: var(--st-text-3);
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+#cast-section:not(.has-cast) .cast-empty {
+    display: block;
+}
+
+/* main.js shows the cast body for a placeholder "Speaker 1" even when the
+   manuscript is empty; cast-view.js clears .has-cast in that case. */
+#cast-section:not(.has-cast) #stats-section {
+    display: none !important;
+}
+
+#cast-section .cast-empty code {
+    color: var(--st-text-2);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+}
+
+#cast-section .speakers-header-row {
+    display: block;
+    margin: 0;
+}
+
+#speakers-list.cast-list {
+    margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Cast rows (List view) — .speaker-tag keeps the delegated open-on-click.
+   Scoped under #speakers-list so queue.js .speaker-tag chips are untouched.
+   -------------------------------------------------------------------------- */
+#speakers-list .speaker-tag.cast-row {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto 28px;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--st-text);
+    font-size: 13px;
+    line-height: 1.35;
+    letter-spacing: normal;
+    text-align: left;
+    box-shadow: none;
+    transform: none;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+}
+
+#speakers-list .speaker-tag.cast-row:hover,
+#speakers-list .speaker-tag.cast-row:has(.cast-row-text:focus-visible) {
+    background: var(--st-raised);
+    box-shadow: none;
+    transform: none;
+}
+
+#speakers-list .speaker-tag.cast-row:has(.cast-row-text:focus-visible) {
+    outline: 2px solid rgba(226, 160, 79, 0.7);
+    outline-offset: -2px;
+}
+
+#speakers-list .speaker-tag.cast-row.ready {
+    background: transparent;
+    box-shadow: none;
+}
+
+#speakers-list .speaker-tag.cast-row.ready:hover,
+#speakers-list .speaker-tag.cast-row.ready:has(.cast-row-text:focus-visible) {
+    background: var(--st-raised);
+}
+
+#speakers-list .cast-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cast-color, var(--st-spk-1));
+}
+
+/* The name cell is the row's keyboard/AT button; it looks like plain text. */
+#speakers-list .cast-row-text {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+#speakers-list .cast-row-text:focus-visible {
+    outline: none;
+}
+
+#speakers-list .cast-row-name {
+    overflow: hidden;
+    color: var(--st-text);
+    font-size: 13.5px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#speakers-list .cast-row-voice {
+    overflow: hidden;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#speakers-list .cast-row-voice.is-missing {
+    color: var(--st-accent);
+}
+
+#speakers-list .cast-row-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#speakers-list .cast-row-status.is-ready {
+    color: var(--st-green);
+}
+
+#speakers-list .cast-row-status.is-ready > .ms,
+#speakers-list .cast-status-icon {
+    --ms-wght: 400;
+    font-size: 15px;
+}
+
+#speakers-list .cast-row-status.is-review {
+    color: var(--st-accent);
+}
+
+#speakers-list .cast-play {
+    width: 28px;
+    height: 28px;
+    color: var(--st-text);
+}
+
+#speakers-list .cast-play > .ms {
+    font-size: 17px;
+}
+
+#speakers-list .cast-play.is-playing {
+    border-color: var(--st-accent);
+    color: var(--st-accent);
+}
+
+#speakers-list .cast-play.is-loading > .ms {
+    --ms-fill: 0;
+    animation: cast-spin 1s linear infinite;
+}
+
+/* --------------------------------------------------------------------------
+   Details view
+   -------------------------------------------------------------------------- */
+#speakers-list .cast-details-head,
+#speakers-list .speaker-tag.cast-detail-row {
+    grid-template-columns: 10px minmax(0, 1fr) 54px 46px 34px 16px;
+    gap: 10px;
+}
+
+#speakers-list .cast-details-head.no-chunks,
+#speakers-list .speaker-tag.cast-detail-row.no-chunks {
+    grid-template-columns: 10px minmax(0, 1fr) 54px 46px 16px;
+}
+
+#speakers-list .cast-details-head {
+    display: grid;
+    align-items: center;
+    padding: 6px 20px;
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+#speakers-list .cast-details-head > span:nth-child(n + 3) {
+    text-align: right;
+}
+
+#speakers-list .speaker-tag.cast-detail-row {
+    padding: 9px 20px;
+    border-top: 1px solid #29261f;
+}
+
+#speakers-list .cast-detail-row .cast-row-text {
+    gap: 1px;
+}
+
+#speakers-list .cast-detail-row .cast-row-name {
+    font-size: 13px;
+}
+
+#speakers-list .cast-detail-row .cast-row-voice {
+    font-size: 11.5px;
+}
+
+#speakers-list .cast-num {
+    overflow: hidden;
+    color: var(--st-text-soft);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+#speakers-list .cast-num-dim {
+    color: var(--st-text-3);
+}
+
+#speakers-list .cast-status-icon {
+    font-size: 15px;
+}
+
+#speakers-list .cast-status-icon.is-ready {
+    color: var(--st-green);
+}
+
+#speakers-list .cast-status-icon.is-review {
+    color: var(--st-accent);
+}
+
+#speakers-list .cast-details-total {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 20px 0;
+    border-top: 1px solid #29261f;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   Footnotes, duplicate warning, actions
+   -------------------------------------------------------------------------- */
+#cast-section .cast-footnote {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin: 0;
+    padding: 10px 20px 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+#cast-section .cast-footnote > .ms {
+    font-size: 15px;
+    line-height: 1.2;
+    height: 1.2em;
+}
+
+#cast-section #generate-voices-unavailable {
+    padding: 0 20px 14px;
+    margin-top: -6px;
+}
+
+#cast-section #generate-voices-unavailable.hidden {
+    display: none;
+}
+
+#cast-section .speakers-duplicates {
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 20px 0;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--st-accent-wash);
+    color: var(--st-accent-text-soft);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+#cast-section .speakers-duplicates > strong {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--st-accent-text-soft);
+    font-weight: 500;
+}
+
+#cast-section .speakers-duplicates .duplicate-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 12.5px;
+}
+
+#cast-section .speakers-duplicates .duplicate-item + .duplicate-item {
+    margin-top: 4px;
+}
+
+#cast-section .speakers-duplicates .duplicate-badge {
+    padding: 1px 7px;
+    border: none;
+    border-radius: 999px;
+    background: var(--st-accent-soft);
+    color: var(--st-accent);
+    font-size: 11px;
+    font-weight: 500;
+}
+
+#cast-section .speakers-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin: 0;
+    padding: 12px 20px 18px;
+}
+
+#cast-section .speakers-actions .btn {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12.5px;
+}
+
+#cast-section #auto-assign-voices-btn,
+#cast-section #build-speaker-profiles-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#cast-section #auto-assign-voices-btn > .ms {
+    --ms-wght: 400;
+    font-size: 16px;
+    color: var(--st-accent);
+}
+
+/* The more_horiz button: markup pinned by tests (`class="btn btn-secondary btn-sm" disabled`). */
+#cast-section #generate-voices-btn {
+    flex: none;
+    width: 30px;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    background: transparent;
+    border-color: var(--st-border-control);
+    color: var(--st-text-btn);
+    font-size: 0;
+}
+
+#cast-section #generate-voices-btn::before {
+    content: 'more_horiz';
+    font-size: 17px;
+    /* The design draws this icon at the font's default weight (400). */
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+#cast-section #generate-voices-btn:hover:not(:disabled) {
+    background: rgba(236, 230, 220, 0.04);
+    border-color: var(--st-border-strong);
+    color: var(--st-text-strong);
+}
+
+#cast-section #generate-voices-btn:disabled:hover {
+    background: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Edit-speaker drawer (#speaker-edit-modal.modal.drawer)
+   -------------------------------------------------------------------------- */
+#speaker-edit-modal:focus {
+    outline: none;
+}
+
+#speaker-edit-modal .speaker-drawer-header {
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--st-border);
+}
+
+#speaker-edit-modal .speaker-drawer-heading {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+#speaker-edit-modal .speaker-drawer-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+#speaker-edit-modal .speaker-drawer-dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cast-color, var(--st-spk-1));
+}
+
+#speaker-edit-modal #speaker-edit-modal-title {
+    min-width: 0;
+    overflow: hidden;
+    font-size: 30px;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#speaker-edit-modal .speaker-drawer-header .help-icon {
+    margin-top: 6px;
+}
+
+#speaker-edit-modal #speaker-edit-modal-close {
+    margin: -2px -6px 0 0;
+    color: var(--st-text-3);
+}
+
+#speaker-edit-modal #speaker-edit-modal-close > .ms {
+    --ms-wght: 400;
+    font-size: 22px;
+}
+
+#speaker-edit-modal .speaker-drawer-body {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+#speaker-edit-modal-body.speaker-assignment-host {
+    display: block;
+    gap: 0;
+}
+
+/* The moved row: a column of drawer sections, ordered Name → Character →
+   Voice → Design a new voice (the profile summary is display:contents). */
+#speaker-edit-modal-body .voice-assignment-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: visible;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+#speaker-edit-modal-body .voice-assignment-row label {
+    min-width: 0;
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: normal;
+    text-transform: none;
+}
+
+#speaker-edit-modal-body .voice-assignment-row select {
+    /* Legacy `flex: 1` (basis 0) would collapse selects in column groups. */
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    height: 34px;
+    max-height: none;
+    min-height: 0;
+    padding: 0 30px 0 10px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background-color: var(--st-bg);
+    color: var(--st-text);
+    font-size: 13px;
+}
+
+#speaker-edit-modal-body .voice-assignment-row input[type="text"],
+#speaker-edit-modal-body .voice-assignment-row input[type="search"],
+#speaker-edit-modal-body .voice-assignment-row input[type="number"] {
+    width: 100%;
+    min-height: 0;
+    height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background: var(--st-bg);
+    color: var(--st-text);
+    font-size: 13px;
+    box-sizing: border-box;
+}
+
+#speaker-edit-modal-body .voice-assignment-row input:focus,
+#speaker-edit-modal-body .voice-assignment-row select:focus,
+#speaker-edit-modal-body .voice-assignment-row textarea:focus {
+    border-color: #8a6a3f;
+    box-shadow: 0 0 0 3px rgba(226, 160, 79, 0.15);
+    outline: none;
+}
+
+#speaker-edit-modal-body .voice-assignment-row .help-text,
+#speaker-edit-modal-body .voice-assignment-row small {
+    display: block;
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+#speaker-edit-modal-body .voice-assignment-row .help-text[hidden],
+#speaker-edit-modal-body .voice-assignment-row small[hidden] {
+    display: none;
+}
+
+#speaker-edit-modal-body .speaker-profile-summary:not(.hidden) {
+    display: contents;
+}
+
+#speaker-edit-modal-body .voice-assignment-row > .assignment-header { order: 0; }
+#speaker-edit-modal-body .speaker-profile-character { order: 1; }
+#speaker-edit-modal-body .voice-assignment-row > .assignment-body { order: 2; }
+#speaker-edit-modal-body .speaker-voice-design { order: 3; }
+#speaker-edit-modal-body [data-gemini-inline-designer] { order: 4; }
+
+/* Section frame: 18px vertical padding, 1px divider inset by 24px. */
+#speaker-edit-modal-body .voice-assignment-row > .assignment-header,
+#speaker-edit-modal-body .speaker-profile-character,
+#speaker-edit-modal-body .voice-assignment-row > .assignment-body,
+#speaker-edit-modal-body .speaker-voice-design {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: auto;
+    margin: 0 24px;
+    padding: 18px 0;
+}
+
+#speaker-edit-modal-body .speaker-profile-character,
+#speaker-edit-modal-body .voice-assignment-row > .assignment-body,
+#speaker-edit-modal-body .speaker-voice-design {
+    border-top: 1px solid var(--st-border);
+}
+
+/* The profile summary (display:contents) still passes on legacy font/color. */
+#speaker-edit-modal-body .speaker-profile-character,
+#speaker-edit-modal-body .speaker-voice-design,
+#speaker-edit-modal-body [data-gemini-inline-designer] {
+    color: var(--st-text);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#speaker-edit-modal-body .speaker-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#speaker-edit-modal-body .speaker-voice-head {
+    align-items: baseline;
+}
+
+#speaker-edit-modal-body .speaker-section-title {
+    margin: 0;
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+#speaker-edit-modal-body .speaker-voice-engine {
+    overflow: hidden;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Name ---- */
+#speaker-edit-modal-body .assignment-header {
+    gap: 8px;
+}
+
+#speaker-edit-modal-body .assignment-header .speaker-label {
+    display: none;
+}
+
+#speaker-edit-modal-body .speaker-field-label {
+    color: var(--st-text-muted);
+}
+
+#speaker-edit-modal-body .speaker-rename {
+    display: flex;
+    gap: 8px;
+}
+
+#speaker-edit-modal-body .speaker-rename-input {
+    flex: 1;
+}
+
+#speaker-edit-modal-body .speaker-rename-btn {
+    flex: none;
+    height: 34px;
+    padding: 0 14px;
+}
+
+#speaker-edit-modal-body .speaker-rename-hint {
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+#speaker-edit-modal-body .speaker-rename-hint code {
+    padding: 0;
+    background: none;
+    color: var(--st-text-2);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+}
+
+/* ---- Character ---- */
+#speaker-edit-modal-body .speaker-profile-character {
+    gap: 10px;
+}
+
+#speaker-edit-modal-body .speaker-profile-character .btn-link {
+    font-size: 13px;
+}
+
+#speaker-edit-modal-body textarea.speaker-profile-card {
+    display: block;
+    width: 100%;
+    min-height: 74px;
+    max-height: 320px;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--st-raised);
+    color: var(--st-text-prose);
+    font-family: var(--st-font-prose);
+    font-size: 15.5px;
+    line-height: 1.55;
+    resize: none;
+    field-sizing: content;
+}
+
+#speaker-edit-modal-body textarea.speaker-profile-card:hover {
+    border-color: var(--st-border-control);
+}
+
+#speaker-edit-modal-body textarea.speaker-profile-card:placeholder-shown {
+    min-height: 0;
+    border: 1px dashed var(--st-border-strong);
+    background: transparent;
+    font-family: var(--st-font-ui);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#speaker-edit-modal-body textarea.speaker-profile-card::placeholder {
+    color: var(--st-text-3);
+}
+
+#speaker-edit-modal-body .speaker-profile-voice-type {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#speaker-edit-modal-body .speaker-profile-voice-type > span {
+    color: var(--st-text-muted);
+}
+
+/* No profile yet: only the dashed callout, like the design. The Voice type
+   field is visually hidden but stays focusable (Tab from the callout reaches
+   it); it shows while the callout or the field is focused, or once either
+   has text. */
+#speaker-edit-modal-body .speaker-profile-character:has(> textarea.speaker-profile-card:placeholder-shown:not(:focus)):has(.speaker-profile-voice-type input:placeholder-shown:not(:focus)) > .speaker-profile-voice-type {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* Voice type reads as text; the field border appears on hover / focus. */
+#speaker-edit-modal-body .speaker-profile-voice-type input[type="text"] {
+    width: calc(100% + 16px);
+    height: 28px;
+    margin: 0 -8px;
+    padding: 0 8px;
+    border-color: transparent;
+    background: transparent;
+}
+
+#speaker-edit-modal-body .speaker-profile-voice-type input[type="text"]:hover {
+    border-color: var(--st-border-control);
+}
+
+#speaker-edit-modal-body .speaker-profile-voice-type input[type="text"]:focus {
+    border-color: #8a6a3f;
+    background: var(--st-bg);
+}
+
+/* ---- Voice ---- */
+#speaker-edit-modal-body .assignment-body {
+    gap: 14px;
+}
+
+#speaker-edit-modal-body .assignment-selection-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+}
+
+#speaker-edit-modal-body .assignment-selection-group > [data-role] {
+    gap: 8px;
+}
+
+/* The section heading already names the engine; show the per-control labels
+   only when both pickers are visible (Breeze API: sample + hosted voice). */
+#speaker-edit-modal-body .assignment-selection-group > [data-role] > label {
+    display: none;
+}
+
+#speaker-edit-modal-body .assignment-selection-group:has(> [data-role="turbo-control"]:not([hidden])):has(> [data-role="kokoro-control"]:not([hidden])) > [data-role] > label {
+    display: block;
+    font-size: 12px;
+}
+
+#speaker-edit-modal-body .voice-sample-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#speaker-edit-modal-body .voice-sample-row > select,
+#speaker-edit-modal-body .speaker-design-controls > select {
+    flex: 1 1 auto;
+    width: auto;
+}
+
+#speaker-edit-modal-body .voice-sample-filter,
+#speaker-edit-modal-body .localai-sample-filter {
+    height: 30px !important;
+    margin: 0;
+    font-size: 12.5px !important;
+}
+
+/* 34px circle play buttons; their text (Play / Stop / Loading…) is rewritten by
+   main.js and voice-manager.js, so the glyph comes from ::before. */
+#speaker-edit-modal-body .voice-sample-row > .btn {
+    flex: none;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--st-border-strong);
+    border-radius: 50%;
+    background: transparent;
+    color: var(--st-text);
+    font-size: 0;
+}
+
+#speaker-edit-modal-body .voice-sample-row > .btn::before {
+    content: 'play_arrow';
+    font-size: 18px;
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+#speaker-edit-modal-body .voice-sample-row > .btn:hover:not(:disabled) {
+    border-color: var(--st-border-dashed);
+    background: var(--st-raised);
+}
+
+#speaker-edit-modal-body .voice-sample-row > .btn.is-playing {
+    border-color: var(--st-accent);
+    color: var(--st-accent);
+}
+
+#speaker-edit-modal-body .voice-sample-row > .btn.is-playing::before {
+    content: 'stop';
+}
+
+#speaker-edit-modal-body .voice-sample-row > .btn.is-loading::before {
+    content: 'progress_activity';
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+    animation: cast-spin 1s linear infinite;
+}
+
+#speaker-edit-modal-body .voice-sample-row > .btn.is-loading {
+    opacity: 1;
+}
+
+#speaker-edit-modal-body .voice-sample-row > .btn.is-loading::after {
+    display: none;
+}
+
+/* Engine options (Qwen3 / Azure / LocalAI): a quiet bordered group under the select. */
+#speaker-edit-modal-body .qwen3-inline-options,
+#speaker-edit-modal-body .azure-speech-inline-options,
+#speaker-edit-modal-body .localai-inline-control {
+    flex-direction: column;
+    gap: 10px;
+    width: auto;
+    margin: 0;
+    padding: 12px 14px 14px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: rgba(27, 25, 22, 0.35);
+}
+
+#speaker-edit-modal-body .qwen3-inline-options::before,
+#speaker-edit-modal-body .azure-speech-inline-options::before,
+#speaker-edit-modal-body .localai-inline-control::before {
+    display: block;
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+#speaker-edit-modal-body .qwen3-inline-options::before {
+    content: 'Engine options · Qwen3';
+}
+
+#speaker-edit-modal-body .azure-speech-inline-options::before {
+    content: 'Engine options · Azure';
+    margin-bottom: 10px;
+}
+
+#speaker-edit-modal-body .localai-inline-control::before {
+    content: 'Engine options · LocalAI';
+}
+
+#speaker-edit-modal-body .qwen3-options-row {
+    gap: 10px;
+}
+
+#speaker-edit-modal-body .azure-speech-inline-options .qwen3-options-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 12px;
+}
+
+#speaker-edit-modal-body .azure-speech-inline-options small {
+    margin-top: 10px;
+}
+
+#speaker-edit-modal-body .qwen3-inline-options .assignment-select,
+#speaker-edit-modal-body .azure-speech-inline-options .assignment-select {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#speaker-edit-modal-body .qwen3-inline-options label,
+#speaker-edit-modal-body .azure-speech-inline-options label,
+#speaker-edit-modal-body .localai-inline-control label {
+    font-size: 12px;
+}
+
+#speaker-edit-modal-body .qwen3-inline-options input,
+#speaker-edit-modal-body .qwen3-inline-options select,
+#speaker-edit-modal-body .azure-speech-inline-options input,
+#speaker-edit-modal-body .azure-speech-inline-options select,
+#speaker-edit-modal-body .localai-inline-control input {
+    height: 32px !important;
+}
+
+/* Pitch / Speed / Quick test (renderFxPanel). */
+#speaker-edit-modal-body .voice-fx-inline {
+    flex-direction: column;
+    gap: 14px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+
+#speaker-edit-modal-body .fx-inline-layout,
+#speaker-edit-modal-body .fx-inline-layout .fx-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* Legacy `.voice-inline-card .fx-field { flex: 1 1 180px }` would become a
+   180px height in this column layout. */
+#speaker-edit-modal-body .voice-fx-inline .fx-field {
+    flex: none;
+    min-width: 0;
+    margin: 0;
+}
+
+#speaker-edit-modal-body .fx-field.fx-slider {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 4px 12px;
+    min-width: 0;
+    margin: 0;
+}
+
+#speaker-edit-modal-body .fx-field.fx-slider > label {
+    grid-row: 1;
+    grid-column: 1;
+    width: auto;
+    color: var(--st-text-muted);
+    font-size: 13px;
+    text-align: left;
+}
+
+#speaker-edit-modal-body .fx-field.fx-slider .slider-group {
+    display: contents;
+}
+
+#speaker-edit-modal-body .fx-field.fx-slider .slider-value {
+    grid-row: 1;
+    grid-column: 2;
+    color: var(--st-text);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+}
+
+#speaker-edit-modal-body .fx-field.fx-slider input[type="range"] {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+}
+
+#speaker-edit-modal-body .fx-field.fx-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 84px;
+    gap: 8px;
+    align-items: stretch;
+    margin: 0;
+}
+
+#speaker-edit-modal-body .fx-preview-label {
+    grid-column: 1 / -1;
+    color: var(--st-text-muted);
+}
+
+#speaker-edit-modal-body .fx-field.fx-preview textarea {
+    grid-column: 1;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background: var(--st-bg);
+    color: var(--st-text-prose);
+    font-family: var(--st-font-prose);
+    font-size: 14.5px;
+    line-height: 1.45;
+    resize: none;
+    /* Fixed at two rows like the design (rows="2"); longer lines scroll. */
+    field-sizing: fixed;
+    height: calc(2 * 1.45em + 18px);
+    min-height: calc(2 * 1.45em + 18px);
+    max-height: calc(2 * 1.45em + 18px);
+    overflow-y: auto;
+}
+
+#speaker-edit-modal-body .fx-preview-actions {
+    display: contents;
+}
+
+#speaker-edit-modal-body [data-role="fx-preview-btn"] {
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 84px;
+    height: auto;
+    min-height: 56px;
+    padding: 6px 4px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background: var(--st-control);
+    color: var(--st-text-strong);
+    font-size: 12.5px;
+}
+
+#speaker-edit-modal-body [data-role="fx-preview-btn"]::before {
+    content: 'graphic_eq';
+    margin: 0;
+    color: var(--st-accent);
+    font-size: 18px;
+    /* The design draws this icon at the font's default weight (400). */
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+#speaker-edit-modal-body [data-role="fx-preview-btn"]:hover:not(:disabled) {
+    background: var(--st-control-2);
+    border-color: var(--st-border-strong);
+}
+
+#speaker-edit-modal-body [data-role="fx-preview-btn"].is-playing::before {
+    content: 'stop_circle';
+}
+
+#speaker-edit-modal-body [data-role="fx-preview-btn"]:disabled {
+    opacity: 1;
+    color: var(--st-text-3);
+    cursor: progress;
+}
+
+#speaker-edit-modal-body [data-role="fx-preview-btn"]:disabled::before {
+    content: 'progress_activity';
+    animation: cast-spin 1s linear infinite;
+}
+
+#speaker-edit-modal-body .fx-status {
+    grid-column: 1 / -1;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#speaker-edit-modal-body .fx-status:empty {
+    display: none;
+}
+
+/* ---- Design a new voice ---- */
+#speaker-edit-modal-body .speaker-voice-design {
+    gap: 10px;
+    padding-bottom: 24px;
+}
+
+#speaker-edit-modal-body .speaker-voice-design .speaker-section-copy {
+    margin: 0;
+    color: var(--st-text-3);
+    line-height: 1.5;
+}
+
+#speaker-edit-modal-body .speaker-design-controls {
+    display: flex;
+    gap: 8px;
+}
+
+#speaker-edit-modal-body .speaker-design-controls select {
+    height: 32px;
+}
+
+#speaker-edit-modal-body .speaker-design-count.input-unit {
+    flex: none;
+    width: 96px;
+    height: 32px;
+}
+
+#speaker-edit-modal-body .speaker-design-count.input-unit > input[type="number"] {
+    height: 100%;
+    padding: 0 0 0 10px;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    font-family: var(--st-font-mono);
+    font-size: 12.5px;
+}
+
+#speaker-edit-modal-body .speaker-design-count.input-unit > span {
+    padding: 0 10px 0 4px;
+}
+
+#speaker-edit-modal-body .speaker-design-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#speaker-edit-modal-body .speaker-design-field > span {
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#speaker-edit-modal-body .speaker-design-field select {
+    height: 32px;
+}
+
+#speaker-edit-modal-body .speaker-voice-design .speaker-profile-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0;
+}
+
+#speaker-edit-modal-body [data-role="speaker-generate-voice"] {
+    height: 32px;
+    padding: 0 14px;
+}
+
+#speaker-edit-modal-body .engine-action-notice {
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--st-accent-wash);
+    color: var(--st-accent-text-soft);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+#speaker-edit-modal-body .engine-action-notice.hidden {
+    display: none;
+}
+
+#speaker-edit-modal-body .speaker-design-advanced > summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+    list-style: none;
+    cursor: pointer;
+    user-select: none;
+}
+
+#speaker-edit-modal-body .speaker-design-advanced > summary::-webkit-details-marker {
+    display: none;
+}
+
+#speaker-edit-modal-body .speaker-design-advanced > summary::before {
+    content: 'chevron_right';
+    font-size: 16px;
+    color: var(--st-text-muted);
+    transition: transform 0.12s ease;
+}
+
+#speaker-edit-modal-body .speaker-design-advanced[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+#speaker-edit-modal-body .speaker-design-advanced > summary:hover {
+    color: var(--st-text);
+}
+
+#speaker-edit-modal-body .speaker-design-advanced .speaker-profile-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+#speaker-edit-modal-body .speaker-design-advanced textarea {
+    width: 100%;
+    margin: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    background: var(--st-bg);
+    color: var(--st-text);
+    font-size: 13px;
+    line-height: 1.5;
+    resize: vertical;
+    field-sizing: content;
+    min-height: 58px;
+    max-height: 180px;
+}
+
+#speaker-edit-modal-body .speaker-design-advanced textarea[readonly] {
+    color: var(--st-text-3);
+    resize: none;
+}
+
+#speaker-edit-modal-body .voice-design-candidates {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 4px 0 0;
+    padding: 0;
+    border: none;
+}
+
+#speaker-edit-modal-body .voice-design-candidates > strong {
+    color: var(--st-text-2);
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+#speaker-edit-modal-body .voice-design-candidate-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin: 0;
+}
+
+#speaker-edit-modal-body .voice-design-candidate {
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-raised);
+}
+
+#speaker-edit-modal-body .voice-design-candidate > strong {
+    color: var(--st-text);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+#speaker-edit-modal-body .voice-design-candidate audio {
+    width: 100%;
+    height: 32px;
+}
+
+#speaker-edit-modal-body .voice-design-selected {
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--st-green-soft);
+    color: var(--st-text);
+    font-size: 12.5px;
+}
+
+#speaker-edit-modal-body .voice-design-selected > .ms {
+    font-size: 16px;
+    color: var(--st-green);
+}
+
+#speaker-edit-modal-body .voice-design-selected > strong {
+    color: var(--st-green);
+    font-weight: 500;
+}
+
+/* Gemini audition (gemini-tts.js, compact mode, appended to the summary). */
+#speaker-edit-modal-body [data-gemini-inline-designer] {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: -12px 24px 0 !important;
+    padding: 0 0 24px;
+    border: none;
+}
+
+#speaker-edit-modal-body [data-gemini-inline-designer] [data-status] {
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+#speaker-edit-modal-body [data-gemini-inline-designer] [data-status]:empty {
+    display: none;
+}
+
+#speaker-edit-modal-body [data-gemini-inline-designer] [data-results] {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-raised);
+}
+
+#speaker-edit-modal-body [data-gemini-inline-designer] [data-results]:empty {
+    display: none;
+}
+
+#speaker-edit-modal-body .gemini-voice-row {
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--st-border-soft);
+}
+
+#speaker-edit-modal-body .gemini-voice-row:last-child {
+    border-bottom: none;
+}
+
+#speaker-edit-modal-body .gemini-voice-row .gemini-voice-identity {
+    font-size: 13px;
+}
+
+#speaker-edit-modal-body .gemini-voice-row > .btn {
+    min-height: 0;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12.5px;
+}
+
+/* ▶ candidate audition button: keep its text for tests/ARIA, show a glyph. */
+#speaker-edit-modal-body .gemini-voice-row > .btn-secondary {
+    width: 28px;
+    padding: 0;
+    border-color: var(--st-border-strong);
+    border-radius: 50%;
+    background: transparent;
+    font-size: 0;
+}
+
+#speaker-edit-modal-body .gemini-voice-row > .btn-secondary::before {
+    content: 'play_arrow';
+    font-size: 17px;
+    font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+}
+
+#speaker-edit-modal-body .gemini-preview-player {
+    width: 100%;
+    height: 32px;
+    margin: 0;
+}
+
+/* ---- Footer ---- */
+#speaker-edit-modal .speaker-drawer-footer {
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--st-border);
+}
+
+#speaker-edit-modal .speaker-ready-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--st-text);
+    font-size: 13px;
+    cursor: pointer;
+    user-select: none;
+}
+
+#speaker-edit-modal .speaker-drawer-footer-spacer {
+    flex: 1;
+}
+
+#speaker-edit-modal #speaker-edit-modal-close-btn {
+    height: 34px;
+    padding: 0 18px;
+}
+
+/* --------------------------------------------------------------------------
+   Generate voices (#speaker-batch-modal) and Auto-assign (#auto-assign-modal)
+   -------------------------------------------------------------------------- */
+#speaker-batch-modal .hidden,
+#auto-assign-modal .hidden {
+    display: none !important;
+}
+
+.cast-modal .modal-close > .ms {
+    font-size: 22px;
+}
+
+.cast-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.cast-modal .modal-body > * {
+    margin: 0;
+}
+
+.cast-modal .cast-modal-intro {
+    color: var(--st-text-3);
+    font-size: 12.5px;
+    line-height: 1.55;
+}
+
+.cast-modal .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+}
+
+.cast-modal .form-group label {
+    margin: 0;
+    color: var(--st-text-2);
+}
+
+.cast-modal .form-group input[type="text"],
+.cast-modal .form-group input[type="number"],
+.cast-modal .form-group select {
+    width: 100%;
+}
+
+.cast-modal .form-group .help-text {
+    margin: 0;
+    font-size: 12px;
+}
+
+#speaker-batch-modal .batch-progress {
+    gap: 6px;
+    margin: 0;
+}
+
+#speaker-batch-modal .batch-progress-track {
+    height: 6px;
+    border: none;
+    border-radius: 999px;
+    background: var(--st-control);
+}
+
+#speaker-batch-modal .batch-progress-fill {
+    background: var(--st-accent);
+}
+
+#speaker-batch-modal .batch-progress-label,
+#speaker-batch-modal #speaker-batch-status {
+    color: var(--st-text-muted);
+    font-size: 12.5px;
+}
+
+#speaker-batch-modal #speaker-batch-status:empty {
+    display: none;
+}
+
+#speaker-batch-modal .batch-complete {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    border: none;
+    border-radius: 8px;
+    background: var(--st-green-soft);
+    color: var(--st-text);
+    text-align: left;
+}
+
+#speaker-batch-modal .batch-complete > .ms {
+    font-size: 20px;
+    color: var(--st-green);
+}
+
+#speaker-batch-modal .batch-complete h4 {
+    margin: 0 0 2px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#speaker-batch-modal .batch-complete .help-text {
+    margin: 0;
+    color: var(--st-text-2);
+}
+
+#auto-assign-modal .auto-assign-threshold-row {
+    gap: 12px;
+    margin: 0;
+}
+
+#auto-assign-modal .auto-assign-threshold-row label {
+    color: var(--st-text-2);
+    font-size: 13px;
+}
+
+#auto-assign-modal #auto-assign-threshold-label {
+    min-width: 40px;
+    color: var(--st-text);
+    font-family: var(--st-font-mono);
+    font-size: 12.5px;
+    font-weight: 400;
+}
+
+#auto-assign-modal .cast-modal-callout {
+    font-size: 12.5px;
+}
+
+#auto-assign-modal .auto-assign-table {
+    margin: 0;
+    font-size: 13px;
+}
+
+#auto-assign-modal .auto-assign-table th {
+    padding: 10px 14px;
+    border-bottom: none;
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+}
+
+#auto-assign-modal .auto-assign-table td {
+    height: 48px;
+    padding: 0 14px;
+    border-top: 1px solid var(--st-border);
+    border-bottom: none;
+}
+
+#auto-assign-modal .auto-assign-table select {
+    min-width: 180px;
+    height: 30px;
+}
+
+#auto-assign-modal .auto-assign-score {
+    padding: 2px 8px;
+    font-size: 11.5px;
+    font-weight: 400;
+}
+
+#auto-assign-modal .auto-assign-score.score-high {
+    background: var(--st-green-soft);
+}
+
+#auto-assign-modal .auto-assign-score.score-med {
+    background: var(--st-accent-soft);
+}
+
+#auto-assign-modal .auto-assign-score.score-none {
+    background: var(--st-control);
+    color: var(--st-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #speakers-list .cast-play.is-loading > .ms,
+    #speaker-edit-modal-body .voice-sample-row > .btn.is-loading::before,
+    #speaker-edit-modal-body [data-role="fx-preview-btn"]:disabled::before {
+        animation: none;
+    }
+}

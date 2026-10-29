@@ -34,7 +34,9 @@
     }
 
     function tabLabel(tabName) {
-        return document.querySelector(`.tab-button[data-tab="${tabName}"]`)?.textContent?.trim() || 'application';
+        const button = document.querySelector(`.tab-button[data-tab="${tabName}"]`);
+        const label = button?.querySelector('.tab-label')?.textContent ?? button?.textContent;
+        return label?.trim() || 'application';
     }
 
     function switchToTab(tabName) {
@@ -528,6 +530,13 @@
             engineButton?.click();
             scrollToElement(document.getElementById(`engine-panel-${detail}`));
             focusElement(engineButton || tabButton);
+        } else if (tabName === 'voices') {
+            // app:voices/<section> opens that sub-tab; a bare app:voices opens Voice prompts.
+            const section = detail || 'prompts';
+            if (typeof window.studioVoicesShowSection === 'function') window.studioVoicesShowSection(section);
+            const subtab = Array.from(document.querySelectorAll('#voices-tab .voices-subtab[data-voices-target]'))
+                .find(item => item.dataset.voicesTarget === section);
+            focusElement(subtab || tabButton);
         } else {
             focusElement(tabButton);
         }
@@ -585,7 +594,12 @@
         const helpTabButton = document.querySelector('.tab-button[data-tab="help"]');
         helpTabButton?.addEventListener('click', () => {
             const active = activeTabName();
-            if (active !== 'help') previousTab = active;
+            if (active !== 'help') {
+                previousTab = active;
+                // A reopened article keeps its page; keep its back label in sync.
+                const backButton = element('help-center-back-to-app');
+                if (backButton && currentArticleId) backButton.textContent = `Back to ${tabLabel(previousTab)}`;
+            }
         }, true);
         helpTabButton?.addEventListener('click', () => {
             if (!currentArticleId && catalog) renderHome();

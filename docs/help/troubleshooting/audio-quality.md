@@ -4,7 +4,7 @@ Repair the smallest faulty scope. A pronunciation problem in one chunk rarely re
 
 ## Mispronounced words
 
-First run a Quick Test using the actual engine and voice. If spelling is the cause, add an Alternate Word replacement with a pronunciation-friendly form, then regenerate the affected chunks.
+First run a **Quick test** using the actual engine and voice. If spelling is the cause, add an Alternate Word replacement with a pronunciation-friendly form, then regenerate the affected chunks.
 
 Alternate Word matching is case-insensitive literal substring replacement, not whole-word matching. Replacing `cat` can also change `concatenate`. Use a longer, unambiguous source phrase when needed and inspect the instance count.
 
@@ -30,7 +30,7 @@ For a cloning engine, inspect the reference prompt:
 - a natural 5–10 second performance; and
 - an exact transcript when the engine requests one.
 
-Use the same prompt in Quick Test and one normal chunk. If the raw prompt is poor, replace it in [Available Voices](app:voices) rather than compensating with pitch and speed.
+Use the same prompt in **Quick test** and one normal chunk. If the raw prompt is poor, replace it in [Voices → Voice prompts](app:voices/prompts) rather than compensating with pitch and speed.
 
 Very short text can also sound less stable than a complete sentence. Keep engine character chunks near the recommended range and avoid splitting inside abbreviations or names.
 
@@ -38,7 +38,7 @@ Very short text can also sound less stable than a complete sentence. Keep engine
 
 Check the source tags before blaming the voice. Speaker tags must be paired correctly. Once valid speaker blocks exist, untagged text is omitted from synthesis. Correct the text, analyze again, and confirm chunk/speaker counts.
 
-![Generate warning explaining that untagged text is omitted when valid speaker tags exist](../../../static/help/screenshots/speaker-tag-warning.png)
+![Tag-issue strip with previous/next arrows and Auto-fix above the manuscript](../../../static/help/screenshots/speaker-tag-warning.png)
 
 *Resolve speaker-tag warnings before generation so narration is not silently excluded or assigned to the wrong voice.*
 
@@ -50,10 +50,10 @@ Play the individual chunks in Library review.
 
 - If the defect exists in a chunk, regenerate that chunk.
 - If chunks are clean but the chapter join is bad, adjust crossfade or chunk silence and rebuild.
-- If a chapter is correct but Full Story is stale, rebuild all outputs.
+- If a chapter is correct but Full story is stale, rebuild all outputs.
 - If a source chunk is missing, rebuild cannot recreate it; regenerate or restore it first.
 
-Crossfade defaults to 0.1 seconds. Increase it only in small steps. The shared Segment Silence setting inserts silence between every chunk during assembly; use Library review's per-chunk leading or trailing silence when only one boundary needs correction.
+Crossfade defaults to 0.1 seconds. Increase it only in small steps. The shared **Segment silence** setting (Settings → Audio & generation) inserts silence between every chunk during assembly; use Library review's per-chunk leading or trailing silence when only one boundary needs correction.
 
 ## Loudness and export
 

@@ -1,0 +1,1647 @@
+/* studio-generate.css — Generate screen (manuscript + output aside).
+   Owned by the generate screen agent of the "Estudio" redesign. Loaded after studio.css. */
+
+/* --------------------------------------------------------------------------
+   Regions
+
+   #generate-tab.generate-screen            grid: manuscript | 340px aside
+     section.manuscript-pane                flex column
+       .manuscript-header                   60px bar
+       .manuscript-toolbar                  44px bar
+       .manuscript-strips                   tag errors / prep progress / resume
+       #text-input-wrapper.manuscript-editor  flex:1 — [data-view=script|raw]
+       .manuscript-footer                   34px stats bar
+     aside.generate-aside                   flex column
+       .generate-aside-scroll               #cast-section (studio-cast.css), .output-section, .chapters-section
+       .generate-aside-footer               sticky: pending notice, Generate, queue line, latest audio
+   -------------------------------------------------------------------------- */
+.app-main > #generate-tab.tab-content.active {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-rows: minmax(0, 1fr);
+}
+
+#generate-tab .manuscript-pane {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Header (60px)
+   -------------------------------------------------------------------------- */
+#generate-tab .manuscript-header {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    height: 60px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--st-border);
+}
+
+#generate-tab .manuscript-title-group {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: baseline;
+    gap: 12px;
+    min-width: 0;
+    white-space: nowrap;
+}
+
+#generate-tab .manuscript-title {
+    flex: none;
+}
+
+#generate-tab .manuscript-subtitle {
+    display: flex;
+    align-items: baseline;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--st-text-muted);
+}
+
+#generate-tab .manuscript-subtitle > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#generate-tab #project-status {
+    color: var(--st-text-muted);
+}
+
+#generate-tab #project-status[data-state="dirty"]::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 7px;
+    border-radius: 50%;
+    background: var(--st-accent);
+    vertical-align: 1px;
+}
+
+/* Upload messages temporarily replace the save status (see manuscript-view.js). */
+#generate-tab .manuscript-subtitle.is-uploading #project-status,
+#generate-tab #document-upload-status:empty {
+    display: none;
+}
+
+#generate-tab #document-upload-status {
+    color: var(--st-green);
+}
+
+#generate-tab #document-upload-status.loading {
+    color: var(--st-text-3);
+}
+
+#generate-tab #document-upload-status.error {
+    color: var(--st-red);
+}
+
+#generate-tab .manuscript-actions {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+#generate-tab .manuscript-upload {
+    display: flex;
+}
+
+#generate-tab .manuscript-header-divider {
+    flex: none;
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background: var(--st-border-control);
+}
+
+/* Joined control: [prompt select | Prep text] */
+#generate-tab .manuscript-prep {
+    display: flex;
+    flex: none;
+    align-items: stretch;
+    height: 32px;
+    border: 1px solid var(--st-border-control);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+#generate-tab .manuscript-prep-select {
+    position: relative;
+    display: flex;
+    border-right: 1px solid var(--st-border-control);
+}
+
+#generate-tab .manuscript-prep-select select {
+    width: auto;
+    min-width: 0;
+    max-width: 240px;
+    height: 100%;
+    padding: 0 28px 0 10px;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+    color: var(--st-text-nav);
+    font-size: 13px;
+}
+
+@media (max-width: 1360px) {
+    #generate-tab .manuscript-prep-select select {
+        max-width: 170px;
+    }
+}
+
+#generate-tab .manuscript-prep-select select:hover {
+    color: var(--st-text);
+}
+
+#generate-tab .manuscript-prep-select select:focus-visible {
+    box-shadow: inset 0 0 0 2px rgba(226, 160, 79, 0.45);
+}
+
+#generate-tab .manuscript-prep-btn {
+    height: 100%;
+    padding: 0 12px;
+    border: none;
+    border-radius: 0;
+    background: var(--st-control);
+    color: var(--st-text-strong);
+}
+
+#generate-tab .manuscript-prep-btn:hover {
+    background: var(--st-control-2);
+}
+
+#generate-tab .manuscript-prep-btn[data-icon]::before {
+    color: var(--st-accent);
+}
+
+#generate-tab .manuscript-prep-btn:disabled {
+    opacity: 1;
+    color: var(--st-text-3);
+    cursor: progress;
+}
+
+/* --------------------------------------------------------------------------
+   Toolbar (44px)
+   -------------------------------------------------------------------------- */
+#generate-tab .manuscript-toolbar {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 28px;
+    border-bottom: 1px solid var(--st-border-soft);
+}
+
+#generate-tab .manuscript-view-toggle .seg-item[aria-disabled="true"] {
+    color: var(--st-text-faint);
+    cursor: not-allowed;
+}
+
+#generate-tab .manuscript-tool-btn {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--st-text-2);
+    font: inherit;
+    line-height: 1.35;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+#generate-tab .manuscript-tool-btn:hover,
+#generate-tab .manuscript-tool-btn.is-open {
+    background: var(--st-raised);
+    color: var(--st-text);
+}
+
+#generate-tab .manuscript-clear-btn {
+    color: var(--st-text-3);
+}
+
+/* The design's Clear has no padding and sits flush at the toolbar edge; the negative
+   margin cancels the shared 8px side padding so layout matches while the hover pill stays. */
+#generate-tab #clear-text-btn {
+    margin: 0 -8px;
+}
+
+#generate-tab .manuscript-clear-btn .ms {
+    --ms-wght: 300;
+}
+
+/* The design draws these icons at the font's default weight (400), not the .ms default 300. */
+#generate-tab .manuscript-insert-trigger .ms,
+#generate-tab .manuscript-tag-status .ms,
+#generate-tab .generate-pending-review .ms,
+#generate-tab .generate-audio-btn > .ms {
+    --ms-wght: 400;
+}
+
+/* The popover is placed from the toolbar (design: top 40px, left 150px), not from the trigger. */
+#generate-tab .manuscript-insert-tag {
+    position: static;
+    flex: none;
+}
+
+#generate-tab .manuscript-tag-menu {
+    position: absolute;
+    top: 40px;
+    left: 150px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 300px;
+    padding: 12px;
+    border: 1px solid var(--st-border-strong);
+    border-radius: 8px;
+    background: var(--st-raised);
+    box-shadow: var(--st-shadow-pop);
+}
+
+#generate-tab .manuscript-tag-menu-label {
+    padding-right: 24px;
+    color: var(--st-text-muted);
+    font-size: 11px;
+}
+
+/* The unchanged #paralinguistic-tags-bar: main.js owns its inline display. */
+#generate-tab .manuscript-tag-menu .paralinguistic-tags-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    margin: 0;
+}
+
+#generate-tab .manuscript-tag-menu .tags-label {
+    position: absolute;
+    top: 9px;
+    right: 10px;
+    font-size: 0;
+    line-height: 1;
+}
+
+#generate-tab .manuscript-tag-menu .tags-label .help-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+}
+
+#generate-tab .manuscript-tag-menu .tags-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#generate-tab .manuscript-tag-menu .btn-tag {
+    height: auto;
+    padding: 3px 8px;
+    border: none;
+    border-radius: 4px;
+    background: var(--st-control-2);
+    color: var(--st-text-soft);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    font-weight: 400;
+    line-height: 1.45;
+}
+
+#generate-tab .manuscript-tag-menu .btn-tag:hover {
+    background: var(--st-seg-active);
+    color: var(--st-text-strong);
+}
+
+#generate-tab .manuscript-tag-menu .btn-tag:active {
+    transform: none;
+}
+
+#generate-tab .manuscript-toolbar-spacer,
+#generate-tab .manuscript-footer-spacer,
+#generate-tab .aside-section-spacer {
+    flex: 1;
+}
+
+#generate-tab .manuscript-tag-status {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--st-text-muted);
+    font: inherit;
+    white-space: nowrap;
+    cursor: default;
+}
+
+#generate-tab .manuscript-tag-status[data-state="valid"] {
+    color: var(--st-green);
+}
+
+#generate-tab .manuscript-tag-status[data-state="issues"] {
+    color: var(--st-accent);
+    cursor: pointer;
+}
+
+#generate-tab .manuscript-tag-status[data-state="issues"]:hover {
+    color: var(--st-accent-link-hover);
+}
+
+#generate-tab .manuscript-tag-status[hidden] + .manuscript-toolbar-divider {
+    display: none;
+}
+
+#generate-tab .manuscript-toolbar-divider {
+    flex: none;
+    width: 1px;
+    height: 16px;
+    background: var(--st-border-control);
+}
+
+/* --------------------------------------------------------------------------
+   Strips under the toolbar: tag issues, prep progress, prep resume
+   -------------------------------------------------------------------------- */
+#generate-tab .manuscript-strips {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+}
+
+#generate-tab .tag-error-banner {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 6px 28px;
+    border: none;
+    border-bottom: 1px solid var(--st-border-soft);
+    border-radius: 0;
+    background: var(--st-accent-wash);
+    color: var(--st-accent-text-soft);
+    font-size: 12.5px;
+}
+
+#generate-tab .tag-error-banner.hidden {
+    display: none;
+}
+
+#generate-tab .tag-error-banner-left {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+#generate-tab .tag-error-banner-left #tag-error-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#generate-tab .tag-error-icon {
+    color: var(--st-accent);
+}
+
+#generate-tab .tag-error-banner-actions {
+    display: flex;
+    flex: none;
+    gap: 6px;
+}
+
+#generate-tab .tag-error-banner-actions .btn-ghost {
+    width: 26px;
+    padding: 0;
+}
+
+#generate-tab .gemini-progress {
+    margin: 0;
+    padding: 8px 28px 10px;
+    border: none;
+    border-bottom: 1px solid var(--st-border-soft);
+    border-radius: 0;
+    background: var(--st-panel);
+}
+
+#generate-tab .gemini-progress .progress-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+}
+
+#generate-tab #gemini-progress-count {
+    color: var(--st-text-muted);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+}
+
+#generate-tab .prep-strip-icon {
+    color: var(--st-accent);
+}
+
+#generate-tab .prep-strip-spacer {
+    flex: 1;
+}
+
+#generate-tab .gemini-progress .progress-bar {
+    height: 3px;
+    margin: 0;
+    border-radius: 999px;
+    background: var(--st-control);
+}
+
+#generate-tab .gemini-progress .progress-bar-fill {
+    border-radius: 999px;
+    background: var(--st-accent);
+}
+
+#generate-tab #gemini-resume-panel {
+    padding: 6px 28px;
+    border-bottom: 1px solid var(--st-border-soft);
+    background: var(--st-accent-wash);
+}
+
+#generate-tab .prep-resume-inner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--st-accent-text-soft);
+    font-size: 12.5px;
+}
+
+#generate-tab #gemini-resume-label {
+    flex: 1;
+    min-width: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Manuscript editor: Script view + Raw tags textarea
+   -------------------------------------------------------------------------- */
+#generate-tab .manuscript-editor {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#generate-tab .manuscript-editor[data-view="script"] #input-text,
+#generate-tab .manuscript-editor[data-view="raw"] .manuscript-script {
+    display: none;
+}
+
+/* Raw tags: the textarea itself, filling the pane, text kept on the design's column. */
+#generate-tab .manuscript-editor #input-text {
+    --mv-side: max(28px, calc((100% - 700px) / 2));
+    flex: 1;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 44px var(--mv-side) 40px calc(var(--mv-side) + 120px);
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--st-text-soft);
+    font-family: var(--st-font-mono);
+    font-size: 13px;
+    line-height: 1.7;
+    resize: none;
+    tab-size: 4;
+}
+
+#generate-tab .manuscript-editor #input-text:focus,
+#generate-tab .manuscript-editor #input-text:focus-visible {
+    border: none;
+    box-shadow: none;
+    outline: none;
+}
+
+#generate-tab .manuscript-editor #input-text.tag-error-highlight,
+#generate-tab .manuscript-editor #input-text.tag-error-highlight:focus {
+    box-shadow: inset 2px 0 0 var(--st-accent);
+}
+
+#generate-tab .manuscript-editor #input-text::placeholder {
+    color: var(--st-text-faint);
+}
+
+/* Empty manuscript helper, shown under the placeholder (pure CSS). */
+#generate-tab .manuscript-help {
+    --mv-side: max(28px, calc((100% - 700px) / 2));
+    position: absolute;
+    top: 160px;
+    right: var(--mv-side);
+    left: calc(var(--mv-side) + 120px);
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 580px;
+    color: var(--st-text-muted);
+    font-size: 13px;
+    line-height: 1.6;
+    pointer-events: none;
+}
+
+#generate-tab .manuscript-editor[data-view="raw"] #input-text:placeholder-shown ~ .manuscript-help {
+    display: flex;
+}
+
+#generate-tab .manuscript-help::before {
+    content: "";
+    width: 32px;
+    height: 1px;
+    margin-bottom: 6px;
+    background: var(--st-border-strong);
+}
+
+#generate-tab .manuscript-help code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--st-control);
+    color: var(--st-text-soft);
+    font-size: 11.5px;
+}
+
+#generate-tab .manuscript-help-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+}
+
+#generate-tab .manuscript-help-links .btn-link {
+    pointer-events: auto;
+    font-size: 12.5px;
+}
+
+/* Script view */
+#generate-tab .manuscript-script {
+    flex: 1;
+    min-height: 0;
+    padding: 44px 28px 40px;
+    overflow: auto;
+    outline: none;
+    overflow-anchor: none;
+}
+
+#generate-tab .mv-column {
+    display: flex;
+    flex-direction: column;
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+#generate-tab .mv-row {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    gap: 24px;
+    margin-bottom: 16px;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 64px;
+    cursor: text;
+}
+
+#generate-tab .mv-gutter {
+    min-width: 0;
+    margin: 0;
+    padding: 5px 0 0;
+    border: none;
+    background: transparent;
+    color: var(--mv-spk, var(--st-text-muted));
+    font-family: var(--st-font-ui);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    line-height: normal;
+    text-align: right;
+    text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#generate-tab button.mv-speaker {
+    align-self: start;
+    cursor: pointer;
+}
+
+#generate-tab button.mv-speaker:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+#generate-tab button.mv-speaker:focus-visible {
+    outline-offset: 1px;
+}
+
+#generate-tab .mv-body {
+    min-width: 0;
+}
+
+#generate-tab .mv-prose {
+    margin: 0;
+    color: var(--st-text-prose);
+    font-family: var(--st-font-prose);
+    font-size: 18px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+}
+
+#generate-tab .mv-direction {
+    display: block;
+    margin-bottom: 2px;
+    color: var(--st-text-muted);
+    font-size: 12.5px;
+    font-style: italic;
+}
+
+#generate-tab .mv-cue {
+    display: inline-block;
+    margin: 0 1px;
+    padding: 0 6px;
+    border-radius: 4px;
+    background: var(--st-control-2);
+    color: var(--st-text-soft);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+    font-style: normal;
+    line-height: 1.6;
+    vertical-align: 2px;
+    white-space: nowrap;
+}
+
+#generate-tab .mv-cue-pause {
+    color: var(--st-text-2);
+}
+
+#generate-tab .mv-row.is-unvoiced .mv-prose {
+    color: var(--st-text-faint);
+    font-size: 16px;
+}
+
+#generate-tab .mv-gutter-note {
+    color: var(--st-text-ghost);
+    font-size: 9.5px;
+}
+
+#generate-tab .mv-heading {
+    margin-bottom: 28px;
+}
+
+#generate-tab .mv-heading:not(:first-child) {
+    margin-top: 28px;
+}
+
+#generate-tab .mv-heading-text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+#generate-tab .mv-heading-kicker {
+    color: var(--st-text-muted);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+#generate-tab .mv-heading-title {
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 38px;
+    font-weight: 400;
+    line-height: 1.05;
+    overflow-wrap: anywhere;
+}
+
+#generate-tab .mv-heading-title.is-long {
+    font-size: 26px;
+    line-height: 1.15;
+}
+
+#generate-tab .mv-pause .mv-body {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 2px;
+}
+
+#generate-tab .mv-pause-note {
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+/* Drag & drop overlay (shown by style.css: .text-input-wrapper.drag-over .drop-overlay) */
+#generate-tab .drop-overlay {
+    inset: 0;
+    z-index: 5;
+    border: none;
+    border-radius: 0;
+    background: rgba(27, 25, 22, 0.92);
+    outline: 1.5px dashed var(--st-accent);
+    outline-offset: -14px;
+}
+
+#generate-tab .drop-overlay-content {
+    gap: 10px;
+    color: var(--st-accent);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+#generate-tab .drop-overlay .drop-icon {
+    font-size: 36px;
+}
+
+/* --------------------------------------------------------------------------
+   Footer stats bar (34px)
+   -------------------------------------------------------------------------- */
+#generate-tab .manuscript-footer {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 18px;
+    height: 34px;
+    padding: 0 28px;
+    border-top: 1px solid var(--st-border);
+    color: var(--st-text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#generate-tab .manuscript-stats {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+}
+
+#generate-tab .manuscript-stats .stat-value {
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+#generate-tab .manuscript-stats .help-icon,
+#generate-tab .aside-section-header .help-icon {
+    width: 16px;
+    height: 16px;
+    border-color: var(--st-border-control);
+    color: var(--st-text-faint);
+    font-size: 10px;
+}
+
+#generate-tab .manuscript-stats .help-icon {
+    margin-left: -8px;
+}
+
+#generate-tab .manuscript-sections-info {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#generate-tab .manuscript-sections-info[title]:not([title=""]) {
+    cursor: help;
+}
+
+/* --------------------------------------------------------------------------
+   Aside: Output and Chapters
+   -------------------------------------------------------------------------- */
+#generate-tab .generate-aside {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    border-left: 1px solid var(--st-border);
+    background: var(--st-panel);
+}
+
+#generate-tab .generate-aside-scroll {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto;
+}
+
+#generate-tab .output-section,
+#generate-tab .chapters-section {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--st-border);
+}
+
+#generate-tab .aside-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#generate-tab .aside-section-header .panel-title {
+    margin: 0;
+    color: var(--st-text);
+    line-height: 1.35;
+}
+
+#generate-tab .output-grid {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    gap: 10px 12px;
+    align-items: center;
+}
+
+#generate-tab .output-label {
+    margin: 0;
+    color: var(--st-text-muted);
+    font-weight: 400;
+}
+
+#generate-tab .output-select {
+    width: 100%;
+    min-width: 0;
+    height: 30px;
+}
+
+#generate-tab .format-controls-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    min-width: 0;
+}
+
+#generate-tab .format-controls-row .compact-field {
+    flex: 1;
+    min-width: 0;
+    gap: 0;
+}
+
+#generate-tab .bitrate-field.disabled {
+    opacity: 1;
+}
+
+#generate-tab .bitrate-field.disabled .output-select,
+#generate-tab .output-select:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+#generate-tab .acx-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+#generate-tab .acx-caption {
+    min-width: 0;
+    color: var(--st-text-3);
+    font-size: 12px;
+    line-height: 1.4;
+    text-wrap: balance;
+}
+
+#generate-tab .review-sections-link {
+    flex: none;
+    font-size: 13px;
+}
+
+#generate-tab .review-sections-link:disabled {
+    opacity: 1;
+    color: var(--st-text-faint);
+    font-weight: 400;
+    cursor: default;
+}
+
+#generate-tab .chapters-switch-row {
+    margin: 0;
+    color: var(--st-text);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+/* #full-story-option keeps main.js's inline display toggle. */
+#generate-tab #full-story-option.chapter-sub-option {
+    margin: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+
+#generate-tab .chapter-sub-option label.chapters-switch-row {
+    display: flex;
+    color: var(--st-text);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+#generate-tab .chapter-hint {
+    margin: -2px 0 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#generate-tab .heading-chips-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+#generate-tab .heading-chips-label {
+    margin-right: 2px;
+    color: var(--st-text-muted);
+}
+
+#generate-tab .heading-chips {
+    display: contents;
+}
+
+#generate-tab .heading-chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+    margin: 0;
+    padding: 1px 7px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: var(--st-control);
+    color: var(--st-text-soft);
+    font: inherit;
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+#generate-tab button.heading-chip:hover {
+    background: var(--st-control-2);
+    color: var(--st-text-strong);
+}
+
+#generate-tab .heading-chip[aria-pressed="false"] {
+    border-color: var(--st-border-control);
+    background: transparent;
+    color: var(--st-text-faint);
+}
+
+#generate-tab .heading-chip[aria-pressed="false"]:hover {
+    background: transparent;
+    color: var(--st-text-3);
+}
+
+#generate-tab .heading-chip.is-custom {
+    padding-right: 3px;
+    cursor: default;
+}
+
+#generate-tab .heading-chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--st-text-muted);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#generate-tab .heading-chip-remove:hover {
+    background: var(--st-seg-active);
+    color: var(--st-text-strong);
+}
+
+#generate-tab .heading-chip.heading-chip-add {
+    border: 1px dashed var(--st-border-dashed);
+    background: transparent;
+    color: var(--st-text-3);
+}
+
+#generate-tab .heading-chip.heading-chip-add:hover,
+#generate-tab .heading-chip.heading-chip-add.is-open {
+    border-color: var(--st-text-faint);
+    background: transparent;
+    color: var(--st-text);
+}
+
+#generate-tab .custom-heading-form {
+    display: flex;
+    gap: 8px;
+}
+
+#generate-tab .custom-heading-form input {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+}
+
+#generate-tab .pause-hint {
+    margin: 0;
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#generate-tab .pause-hint code {
+    padding: 0;
+    background: transparent;
+    color: var(--st-text-2);
+    font-family: var(--st-font-mono);
+    font-size: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   Aside: sticky footer
+   -------------------------------------------------------------------------- */
+#generate-tab .generate-aside-footer {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px 20px 18px;
+    border-top: 1px solid var(--st-border);
+    background: var(--st-panel);
+}
+
+#generate-tab .generate-aside-footer > * {
+    margin: 0;
+}
+
+#generate-tab .generate-pending-review {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--st-accent);
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+#generate-tab .generate-pending-review:hover {
+    color: var(--st-accent-link-hover);
+}
+
+#generate-tab .generate-pending-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#generate-tab .generate-audio-btn {
+    width: 100%;
+    border: none;
+}
+
+#generate-tab .generate-audio-btn.is-busy {
+    cursor: progress;
+    opacity: 0.8;
+}
+
+#generate-tab .generate-queue-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+#generate-tab .queue-summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#generate-tab .generate-view-queue {
+    flex: none;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--st-text-2);
+    font: inherit;
+    cursor: pointer;
+}
+
+#generate-tab .generate-view-queue:hover {
+    color: var(--st-text);
+}
+
+/* #latest-audio-container keeps main.js's inline display toggle (block/none). */
+#generate-tab .latest-audio {
+    padding-top: 10px;
+    border-top: 1px solid var(--st-border-soft);
+}
+
+#generate-tab .latest-audio-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+#generate-tab .latest-audio-text {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    line-height: 1.35;
+}
+
+#generate-tab .latest-audio-kicker {
+    color: var(--st-text-muted);
+    font-size: 11px;
+}
+
+#generate-tab .latest-audio-label {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#generate-tab .latest-audio-time {
+    flex: none;
+    color: var(--st-text-muted);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+}
+
+#generate-tab .latest-audio-seek {
+    display: block;
+    width: 100%;
+    height: 12px;
+    margin: 6px 0 -4px;
+    background: transparent;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#generate-tab .latest-audio-seek::-webkit-slider-runnable-track {
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--st-accent) var(--seek, 0%), var(--st-control-2) var(--seek, 0%));
+}
+
+#generate-tab .latest-audio-seek::-moz-range-track {
+    height: 2px;
+    border-radius: 999px;
+    background: var(--st-control-2);
+}
+
+#generate-tab .latest-audio-seek::-moz-range-progress {
+    height: 2px;
+    border-radius: 999px;
+    background: var(--st-accent);
+}
+
+#generate-tab .latest-audio-seek::-webkit-slider-thumb {
+    width: 10px;
+    height: 10px;
+    margin-top: -4px;
+    border: none;
+    border-radius: 50%;
+    background: var(--st-text);
+    opacity: 0;
+    transition: opacity 0.12s ease;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+#generate-tab .latest-audio-seek::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: none;
+    border-radius: 50%;
+    background: var(--st-text);
+}
+
+#generate-tab .latest-audio-seek:hover::-webkit-slider-thumb,
+#generate-tab .latest-audio-seek:focus-visible::-webkit-slider-thumb {
+    opacity: 1;
+}
+
+#generate-tab .latest-audio-seek:disabled {
+    cursor: default;
+}
+
+/* --------------------------------------------------------------------------
+   Section review / edit modals
+   -------------------------------------------------------------------------- */
+#section-review-modal .modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.section-review-loading,
+.section-review-empty,
+.section-review-error {
+    padding: 36px 20px;
+    color: var(--st-text-muted);
+    text-align: center;
+}
+
+.section-review-error {
+    color: var(--st-red);
+}
+
+.section-review-summary {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--st-text-3);
+    font-size: 13px;
+}
+
+.section-review-summary strong {
+    color: var(--st-text);
+    font-weight: 500;
+}
+
+.section-review-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.section-review-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "title edit"
+        "preview edit";
+    column-gap: 16px;
+    row-gap: 4px;
+    align-items: center;
+    padding: 12px 14px;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+    background: var(--st-bg);
+}
+
+.section-review-title {
+    grid-area: title;
+    margin: 0;
+    color: var(--st-text);
+    font-weight: 500;
+}
+
+.section-review-preview {
+    grid-area: preview;
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--st-text-muted);
+    font-family: var(--st-font-prose);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.section-review-card .section-review-edit {
+    grid-area: edit;
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12.5px;
+}
+
+.section-review-card.section-review-book {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border-color: var(--st-border);
+    background: transparent;
+}
+
+.section-review-book-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    color: var(--st-text);
+    font-family: var(--st-font-serif);
+    font-size: 20px;
+    font-weight: 400;
+}
+
+.section-review-count {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--st-control);
+    color: var(--st-text-2);
+    font-family: var(--st-font-ui);
+    font-size: 11.5px;
+}
+
+.section-edit-note {
+    margin-bottom: 14px;
+    color: var(--st-text-3);
+    font-size: 13px;
+}
+
+#section-edit-modal .form-group {
+    margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Alt word registry (main modal + entry modal; library.js reuses these classes)
+   -------------------------------------------------------------------------- */
+#alt-word-registry-modal .section-title-inline {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.awr-description {
+    margin: 0 0 14px;
+    color: var(--st-text-3);
+    font-size: 13px;
+    line-height: 1.55;
+}
+
+.awr-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.awr-count-label {
+    margin-left: auto;
+    color: var(--st-text-muted);
+    font-size: 12px;
+}
+
+.awr-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--st-border);
+    border-radius: 8px;
+}
+
+.awr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.awr-table th {
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--st-border);
+    color: var(--st-text-muted);
+    font-size: 10.5px;
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+}
+
+.awr-table td {
+    height: 44px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--st-border-soft);
+    vertical-align: middle;
+}
+
+.awr-table tr:last-child td {
+    border-bottom: none;
+}
+
+.awr-table .awr-empty {
+    height: auto;
+    padding: 28px 14px;
+    color: var(--st-text-muted);
+    font-style: normal;
+    text-align: center;
+}
+
+.awr-table .awr-empty strong {
+    color: var(--st-text-2);
+    font-weight: 500;
+}
+
+.awr-original-cell {
+    color: var(--st-text);
+    font-weight: 500;
+}
+
+.awr-replacement-cell {
+    color: var(--st-accent-text-soft);
+}
+
+.awr-instances-cell {
+    color: var(--st-text-muted);
+    font-size: 12px;
+    text-align: left;
+}
+
+.awr-instances-badge {
+    display: inline-block;
+    min-width: 26px;
+    padding: 1px 8px;
+    border: none;
+    border-radius: 999px;
+    background: var(--st-control);
+    color: var(--st-text-2);
+    font-family: var(--st-font-mono);
+    font-size: 11.5px;
+    text-align: center;
+}
+
+.awr-instances-badge.awr-zero {
+    background: transparent;
+    color: var(--st-text-faint);
+}
+
+.awr-actions-cell {
+    width: 72px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* Row buttons carry emoji text from JS; draw Material Symbols instead. */
+.awr-edit-btn,
+.awr-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--st-text-3);
+    font-size: 0;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.awr-edit-btn::before,
+.awr-delete-btn::before {
+    font-family: var(--st-font-icon);
+    font-size: 17px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+    line-height: 1;
+    -webkit-font-feature-settings: 'liga';
+    font-feature-settings: 'liga';
+}
+
+.awr-edit-btn::before {
+    content: "edit";
+}
+
+.awr-delete-btn::before {
+    content: "delete";
+}
+
+.awr-edit-btn:hover {
+    background: var(--st-raised);
+    color: var(--st-text-strong);
+}
+
+.awr-delete-btn:hover {
+    background: rgba(229, 138, 122, 0.1);
+    color: var(--st-red);
+}
+
+.awr-entry-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.awr-field-row,
+.awr-preview-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.awr-label {
+    color: var(--st-text-2);
+    font-size: 13px;
+    font-weight: 400;
+}
+
+.awr-text-input,
+.awr-text-input:focus {
+    height: 34px;
+    padding: 0 10px;
+    font-size: 13px;
+}
+
+.awr-text-input {
+    border: 1px solid var(--st-border-control);
+    background-color: var(--st-bg);
+    color: var(--st-text);
+}
+
+.awr-preview-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 14px;
+    border-top: 1px solid var(--st-border);
+}
+
+.awr-preview-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.awr-preview-field {
+    flex: 1;
+    min-width: 140px;
+}
+
+.awr-preview-field-voice {
+    flex: 2;
+}
+
+.awr-select {
+    height: 34px;
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: 10px;
+    border: 1px solid var(--st-border-control);
+    background-color: var(--st-bg);
+    color: var(--st-text);
+    font-size: 13px;
+}
+
+.awr-select option,
+.awr-select optgroup {
+    background: var(--st-panel);
+    color: var(--st-text);
+}
+
+.awr-preview-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.awr-preview-status {
+    color: var(--st-text-muted);
+    font-size: 12px;
+    font-style: normal;
+}

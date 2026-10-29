@@ -1,25 +1,25 @@
 # Alternate Word Registry
 
-The **Alt Word Registry** substitutes text immediately before chunks are sent to the TTS engine. Use it for names, abbreviations, or phrases that a selected voice consistently pronounces incorrectly.
+The **Alt word registry** substitutes text immediately before chunks are sent to the TTS engine. Use it for names, abbreviations, or phrases that a selected voice consistently pronounces incorrectly.
 
 The working manuscript remains readable while the engine receives the replacement.
 
 ## Add and test an entry
 
 1. Open [Generate](app:generate).
-2. Select **Alt Word Registry** below the input field.
-3. Select **+ Add Entry**.
+2. Click **Alt word registry** (the spellcheck icon next to **Load document** in the Manuscript header).
+3. Click **Add entry**.
 4. Enter the **Original word / phrase** exactly as it appears in the manuscript.
 5. Enter the phonetic or expanded **Replacement word / phrase**.
-6. Choose a **TTS Engine** and compatible **Voice**.
-7. Compare **Play Original** with **Play Replacement**.
+6. Choose a **TTS engine** and a compatible **Voice**.
+7. Compare **Play original** with **Play replacement**.
 8. Select **OK**.
 
-![Alternate Word entry dialog with original text, replacement text, engine, voice, and playback tests](../../../static/help/screenshots/alt-word-entry.png)
+![Add alt word entry dialog with original text, replacement text, TTS engine, voice, and Play original / Play replacement](../../../static/help/screenshots/alt-word-entry.png)
 
 *Test the original and replacement with the intended engine and voice before saving the pronunciation rule.*
 
-The registry table reports how many case-insensitive occurrences of the original text currently appear in **Input Text**. A zero count means the rule will not affect the current manuscript as written.
+The **In text** column of the registry table reports how many case-insensitive occurrences of the original text currently appear in the manuscript. A zero count means the rule will not affect the current manuscript as written.
 
 ## Replacements are substrings, not whole words
 
@@ -53,10 +53,10 @@ The current registry has no drag-to-reorder control. To change order, delete and
 The Generate-page registry is session-only by default:
 
 - Refreshing or reopening the page clears unsaved working entries.
-- Saving with **Manage Projects** includes the current entries in that browser project.
+- Saving a project in **Projects** includes the current entries in that project.
 - Loading the project restores them.
 - Submitting a job stores the rules with the job so Library review and later regeneration can reuse them.
-- Updating a completed Library item's registry does not retroactively change existing audio. Regenerate every affected chunk so the new rule is applied, then rebuild its chapter and the Full Story. Rebuilding alone only merges the existing audio files.
+- Updating a completed Library item's registry does not retroactively change existing audio. Regenerate every affected chunk so the new rule is applied, then rebuild its chapter and the Full story. Rebuilding alone only merges the existing audio files.
 
 See [Save and Restore Projects](help:projects) and [Review and Regenerate Chunks](help:job-review).
 
@@ -67,7 +67,7 @@ A strong pronunciation workflow is:
 1. Select the actual job engine and voice first.
 2. Quick-test the full sentence without a rule.
 3. Add a precise replacement.
-4. Use **Play Original** and **Play Replacement**.
+4. Use **Play original** and **Play replacement**.
 5. Test the full sentence again; isolated words can sound different in context.
 6. Generate one representative chunk.
 
