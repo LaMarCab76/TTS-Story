@@ -11,6 +11,7 @@ DOUBTFUL_CONFIDENCE = 0.6
 MAX_DIALOGUE_PER_BATCH = 40
 MAX_CHARS_PER_BATCH = 7000
 CONTEXT_PARAGRAPHS = 3
+FOLLOWING_PARAGRAPHS = 2
 
 ATTRIBUTION_SCHEMA = {
     "type": "object",
@@ -61,10 +62,13 @@ ATTRIBUTION_SCHEMA = {
 
 
 def build_batches(segments: Sequence[Segment], segment_ids: Optional[Iterable[str]] = None) -> List[List[int]]:
-    """Group paragraph indexes so each batch has a bounded amount of dialogue.
+    """Group consecutive paragraph indexes so each batch has a bounded amount of dialogue.
 
-    When ``segment_ids`` is given only paragraphs containing those segments are
-    considered (used for targeted re-runs).
+    Each batch is a contiguous run of paragraphs: narration between two target
+    paragraphs is kept, because it often names the speaker (``Bob entered and
+    shouted a greeting.``). When ``segment_ids`` is given only those segments
+    are targets (used for targeted re-runs); a gap of non-target paragraphs
+    that would overflow the size budget starts a new batch instead.
     """
     wanted = set(segment_ids) if segment_ids is not None else None
     paragraphs: Dict[int, List[Segment]] = {}
@@ -72,19 +76,28 @@ def build_batches(segments: Sequence[Segment], segment_ids: Optional[Iterable[st
         paragraphs.setdefault(segment.para, []).append(segment)
     batches: List[List[int]] = []
     current: List[int] = []
+    gap: List[int] = []
+    gap_size = 0
     dialogue_count = 0
     char_count = 0
     for para in sorted(paragraphs):
         members = paragraphs[para]
+        size = sum(s.end - s.start for s in members)
         targets = [s for s in members if s.kind == KIND_DIALOGUE and not s.locked
                    and (wanted is None or s.id in wanted)]
         if not targets:
+            if current:
+                gap.append(para)
+                gap_size += size
             continue
-        size = sum(s.end - s.start for s in members)
         if current and (dialogue_count + len(targets) > MAX_DIALOGUE_PER_BATCH
-                        or char_count + size > MAX_CHARS_PER_BATCH):
+                        or char_count + gap_size + size > MAX_CHARS_PER_BATCH):
             batches.append(current)
             current, dialogue_count, char_count = [], 0, 0
+        else:
+            current.extend(gap)
+            char_count += gap_size
+        gap, gap_size = [], 0
         current.append(para)
         dialogue_count += len(targets)
         char_count += size
@@ -138,6 +151,13 @@ def build_attribution_prompt(source: str, segments: Sequence[Segment], batch: Li
     lines.append("PASSAGE TO ATTRIBUTE:")
     for para in batch:
         lines.append(render_paragraph(source, by_para[para], registry, targets, True))
+    last_para = max(batch)
+    following = [p for p in sorted(by_para) if p > last_para][:FOLLOWING_PARAGRAPHS]
+    if following:
+        lines.append("")
+        lines.append("FOLLOWING CONTEXT (do not answer for it):")
+        for para in following:
+            lines.append(render_paragraph(source, by_para[para], registry, set(), False))
 
     known = []
     for character in registry.active():

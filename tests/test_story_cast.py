@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 
 import pytest
 
-from src.story_cast.attribution import build_batches
+from src.story_cast.attribution import build_attribution_prompt, build_batches
 from src.story_cast.casting import assign_unique, normalize_catalog, propose_sharing
 from src.story_cast.llm_json import LLMJSONError, extract_json
 from src.story_cast.registry import CharacterRegistry, materialize, slugify
@@ -146,21 +147,37 @@ def test_billing_classification():
 class FakeLLM:
     """Scripted LLM: answers attribution prompts by looking at the segment text."""
 
-    def __init__(self, speaker_for=None, provider="openrouter", invalid=False, narration=None):
+    def __init__(self, speaker_for=None, provider="openrouter", invalid=False, narration=None,
+                 chain=None, failing=()):
         self.calls = []
+        self.attempts = []
         self.speaker_for = speaker_for or (lambda text: ("juan", 0.9))
         self.provider = provider
+        self.chain = chain
+        self.failing = set(failing)
         self.invalid = invalid
         self.narration = narration
 
-    def __call__(self, prompt, local_only):
-        self.calls.append({"prompt": prompt, "local_only": local_only})
-        if local_only and self.provider != "local":
-            raise RuntimeError("No configured LLM profile is allowed for this request")
+    def __call__(self, prompt, request_gate):
+        # Mirrors the app's failover chain: the gate is asked before every attempt.
+        failures, chosen = [], None
+        for provider in self.chain or [self.provider]:
+            if not request_gate(provider):
+                continue
+            self.attempts.append(provider)
+            if provider in self.failing:
+                failures.append({"provider": provider, "failure_kind": "advance_profile"})
+                continue
+            chosen = provider
+            break
+        if chosen is None:
+            raise RuntimeError("LLM provider chain stopped")
+        self.calls.append({"prompt": prompt, "provider": chosen})
+        profile = {"provider": chosen}
         if self.invalid:
-            return "I cannot do that", {"provider": self.provider}, []
+            return "I cannot do that", profile, failures
         if "VOICE CATALOG" in prompt:
-            return json.dumps({"rankings": []}), {"provider": self.provider}, []
+            return json.dumps({"rankings": []}), profile, failures
         passage = prompt.split("PASSAGE TO ATTRIBUTE:", 1)[1]
         attributions, characters = [], {}
         for seg_id, text in re.findall(r"<<(s\d+) SPEECH>>(.*?)<</\1>>", passage):
@@ -171,7 +188,7 @@ class FakeLLM:
         answer = {"language": "es", "characters": list(characters.values()), "attributions": attributions}
         if self.narration:
             answer["narration"] = self.narration
-        return json.dumps(answer), {"provider": self.provider}, []
+        return json.dumps(answer), profile, failures
 
 
 def make_service(tmp_path, llm, limit=200):
@@ -299,14 +316,33 @@ def test_paid_limit_pauses_and_asks_while_local_models_are_never_counted(tmp_pat
 
 def test_limit_reached_retries_with_local_profiles_only(tmp_path):
     long_text = "\n".join(f"—Línea {i} —dijo Juan." for i in range(120))
-    llm = FakeLLM(provider="openrouter")
+    llm = FakeLLM(chain=["openrouter", "local"])
     service = make_service(tmp_path, llm, limit=1)
     session = service.create(long_text)
     service.store.update(session["id"], lambda s: s["budget"].update(paid_requests=1))
-    llm.provider = "local"
     service.start_attribution(session["id"])
     service.wait(session["id"])
-    assert all(call["local_only"] for call in llm.calls)
+    assert llm.calls and all(call["provider"] == "local" for call in llm.calls)
+    assert service.store.load(session["id"])["budget"]["paid_requests"] == 1
+
+
+def test_paid_limit_is_enforced_before_each_backup_attempt(tmp_path):
+    # One paid request left: the primary fails, so the paid backup must not be sent.
+    llm = FakeLLM(chain=["openrouter", "gemini", "local"], failing={"openrouter"})
+    service = make_service(tmp_path, llm, limit=1)
+    session = run_attribution(service)
+    assert llm.attempts[:2] == ["openrouter", "local"]
+    assert "gemini" not in llm.attempts
+    assert session["budget"]["paid_requests"] == 1
+
+
+def test_failed_paid_chain_still_counts_and_asks(tmp_path):
+    llm = FakeLLM(chain=["openrouter", "gemini"], failing={"openrouter", "gemini"})
+    service = make_service(tmp_path, llm, limit=1)
+    session = run_attribution(service)
+    assert llm.attempts == ["openrouter"]
+    assert session["budget"]["paid_requests"] == 1
+    assert any(q["type"] == "budget_limit" and q["status"] == "pending" for q in session["questions"])
 
 
 def test_model_cannot_approve_shared_voices(tmp_path):
@@ -390,3 +426,62 @@ def test_interrupted_sessions_after_restart(tmp_path):
     store.update(session["id"], lambda s: s.update(status="running"))
     assert store.mark_interrupted() == 1
     assert store.load(session["id"])["status"] == "interrupted"
+
+
+def test_attribution_prompt_keeps_narration_between_speech_paragraphs():
+    text = "“Hi,” said Alice.\nBob entered and shouted a greeting.\n“Hello!”"
+    segments = segment_text(text)
+    batches = build_batches(segments)
+    assert batches == [[0, 1, 2]]
+    built = build_attribution_prompt(text, segments, batches[0], CharacterRegistry([]), examples=[])
+    assert "Bob entered and shouted a greeting." in built["prompt"].split("PASSAGE TO ATTRIBUTE:", 1)[1]
+
+
+def test_targeted_batches_split_instead_of_including_long_gaps():
+    filler = "\n".join("Plain narration paragraph number %d, long enough to count." % i for i in range(200))
+    text = "“First,” she said.\n" + filler + "\n“Last,” he said."
+    segments = segment_text(text)
+    dialogue = [s.id for s in segments if s.kind == "dialogue"]
+    batches = build_batches(segments, dialogue)
+    assert len(batches) == 2 and all(len(batch) == 1 for batch in batches)
+
+
+def test_resume_while_previous_request_is_in_flight_keeps_session_paused(tmp_path):
+    release, entered = threading.Event(), threading.Event()
+    inner = FakeLLM(provider="local")
+
+    def slow_llm(prompt, gate):
+        entered.set()
+        release.wait(10)
+        return inner(prompt, gate)
+
+    service = make_service(tmp_path, slow_llm)
+    session = service.create(SPANISH)
+    service.start_attribution(session["id"])
+    assert entered.wait(5)
+    service.pause(session["id"])
+    with pytest.raises(StoryCastError) as error:
+        service.resume(session["id"])
+    assert error.value.code == "busy"
+    assert service.store.load(session["id"])["status"] == "paused"
+    release.set()
+    service.wait(session["id"])
+    service.resume(session["id"])
+    service.wait(session["id"])
+    assert service.store.load(session["id"])["status"] in ("idle", "waiting_user")
+
+
+def test_recasting_with_another_engine_invalidates_old_sharing_proposals(tmp_path):
+    service = make_service(tmp_path, FakeLLM(lambda text: ("maria", 0.9) if "miedo" in text or "No puedo" in text else ("juan", 0.9)))
+    session = run_attribution(service)
+    service.start_casting(session["id"], "kokoro", [{"id": "ef_dora"}, {"id": "em_alex"}])
+    service.wait(session["id"])
+    share = next(q for q in service.store.load(session["id"])["questions"] if q["type"] == "share_voices")
+    new_catalog = [{"id": "ef_one"}, {"id": "em_two"}, {"id": "em_three"}]
+    service.start_casting(session["id"], "other", new_catalog)
+    service.wait(session["id"])
+    session = service.store.load(session["id"])
+    assert next(q for q in session["questions"] if q["id"] == share["id"])["status"] == "obsolete"
+    with pytest.raises(StoryCastError):
+        service.answer(session["id"], share["id"], "approve")
+    assert set(session["casting"]["assignments"].values()) <= {v["id"] for v in new_catalog}

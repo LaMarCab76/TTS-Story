@@ -57,8 +57,12 @@ DEFAULT_PAID_REQUEST_LIMIT = 200
 BUDGET_STEP = 200
 MAX_LOG = 60
 MAX_SOURCE_CHARS = 3_000_000
+CASTING_QUESTIONS = ("share_voices", "catalog_language")
 
-LLMRunner = Callable[[str, bool], Tuple[str, Dict, List[Dict]]]
+# run_llm(prompt, request_gate) -> (text, profile, failures). The runner calls
+# request_gate(provider) right before every provider request, retries included,
+# and must skip that request when the gate returns False.
+LLMRunner = Callable[[str, Callable[[str], bool]], Tuple[str, Dict, List[Dict]]]
 
 
 class StoryCastError(RuntimeError):
@@ -160,15 +164,24 @@ class StoryCastService:
         return self.store.create(session)
 
     # ----------------------------------------------------------------- workers
-    def _spawn(self, session_id: str, target: Callable, *args) -> None:
+    def _start_worker(self, session_id: str, begin: Callable[[Dict], None], target: Callable) -> Dict:
+        """Persist ``begin`` and start ``target`` as one step.
+
+        The worker slot is checked before the session is marked running: a
+        paused worker can still be inside an LLM request, and marking the
+        session running without a live worker would leave it stuck.
+        """
         with self._workers_lock:
             existing = self._workers.get(session_id)
             if existing and existing.is_alive():
-                raise StoryCastError("Auto cast is already running for this session", "busy", 409)
-            thread = threading.Thread(target=self._guarded, args=(session_id, target, *args),
+                raise StoryCastError(
+                    "Auto cast is still finishing its previous request. Try again in a moment.", "busy", 409)
+            session = self.store.update(session_id, begin)
+            thread = threading.Thread(target=self._guarded, args=(session_id, target, session["generation"]),
                                       name=f"story-cast-{session_id[:8]}", daemon=True)
             self._workers[session_id] = thread
             thread.start()
+        return session
 
     def is_running(self, session_id: str) -> bool:
         with self._workers_lock:
@@ -209,29 +222,48 @@ class StoryCastService:
         session["progress"] = {"done": 0, "total": 0, "label": label}
 
     # --------------------------------------------------------------- LLM calls
+    def _reserve_request(self, session_id: str, provider: str) -> bool:
+        """Count one provider request before it is sent; False skips it.
+
+        Called by the LLM runner for every attempt (backups and retries too),
+        so the paid-request limit can never be exceeded mid-chain.
+        """
+        billing = billing_for_provider(provider)
+        if billing == "local":
+            return True
+        allowed = {"value": False}
+
+        def reserve(session):
+            budget = session["budget"]
+            if budget.get("local_only"):
+                return
+            if billing == "pay_per_use":
+                limit = int(budget.get("limit") or 0)
+                used = int(budget.get("paid_requests", 0))
+                if limit > 0 and used >= limit:
+                    return
+                budget["paid_requests"] = used + 1
+            allowed["value"] = True
+        self.store.update(session_id, reserve)
+        return allowed["value"]
+
     def _call_llm(self, session_id: str, prompt: str) -> Tuple[str, Dict]:
-        session = self.store.load(session_id)
-        budget = session["budget"]
-        limit = int(budget.get("limit") or 0)
-        local_only = bool(budget.get("local_only"))
-        limit_reached = limit > 0 and int(budget.get("paid_requests", 0)) >= limit
+        blocked: List[str] = []
+
+        def gate(provider: str) -> bool:
+            if self._reserve_request(session_id, provider):
+                return True
+            blocked.append(str(provider or ""))
+            return False
+
         with self._llm_lock:
             try:
-                text, profile, failures = self.run_llm(prompt, local_only or limit_reached)
+                text, profile, _failures = self.run_llm(prompt, gate)
             except Exception as exc:
-                if limit_reached and not local_only:
+                local_only = bool(self.store.load(session_id)["budget"].get("local_only"))
+                if blocked and not local_only:
                     raise BudgetExceeded(str(exc)) from exc
                 raise
-        paid = 1 if billing_for_provider(profile.get("provider")) == "pay_per_use" else 0
-        paid += sum(
-            1 for failure in failures or []
-            if billing_for_provider(failure.get("provider")) == "pay_per_use"
-            and failure.get("failure_kind") not in ("daily_limit", "unsupported_structured_output", "filtered")
-        )
-        if paid:
-            def count(s):
-                s["budget"]["paid_requests"] = int(s["budget"].get("paid_requests", 0)) + paid
-            self.store.update(session_id, count)
         return text, profile
 
     def _handle_worker_error(self, session_id: str, exc: Exception, resume_phase: str) -> None:
@@ -267,9 +299,7 @@ class StoryCastService:
             if session["status"] == "running":
                 raise StoryCastError("Auto cast is already running", "busy", 409)
             self._begin(session, "attribution", "Identifying speakers")
-        session = self.store.update(session_id, begin)
-        self._spawn(session_id, self._attribution_worker, session["generation"])
-        return session
+        return self._start_worker(session_id, begin, self._attribution_worker)
 
     def _attribution_worker(self, session_id: str, generation: int) -> None:
         session = self._check_generation(session_id, generation)
@@ -569,7 +599,13 @@ class StoryCastService:
             _log(session, "Voice sharing declined: assign the remaining characters manually")
             return
         casting = session["casting"]
-        for proposal in question["payload"].get("proposals", []):
+        catalog_ids = {voice.get("id") for voice in casting.get("catalog") or []}
+        proposals = question["payload"].get("proposals", [])
+        if (question["payload"].get("engine", "") != casting.get("engine", "")
+                or any(p.get("voice") not in catalog_ids for p in proposals)):
+            _log(session, "Ignored a voice-sharing proposal from an earlier casting run; cast the voices again")
+            return
+        for proposal in proposals:
             casting["assignments"][proposal["character"]] = proposal["voice"]
             casting["origin"][proposal["character"]] = "shared"
             session["approvals"].append({
@@ -688,9 +724,7 @@ class StoryCastService:
             if not session.get("pending_rerun_targets"):
                 raise StoryCastError("Nothing to re-check", "nothing_to_rerun")
             self._begin(session, session.get("phase") or "review", "Re-checking lines with your examples")
-        session = self.store.update(session_id, begin)
-        self._spawn(session_id, self._rerun_worker, session["generation"])
-        return session
+        return self._start_worker(session_id, begin, self._rerun_worker)
 
     def _rerun_worker(self, session_id: str, generation: int) -> None:
         session = self._check_generation(session_id, generation)
@@ -820,17 +854,24 @@ class StoryCastService:
                 session["casting"] = {"engine": engine, "assignments": {}, "alternatives": {}, "origin": {}}
             session["casting"]["engine"] = engine
             session["casting"]["catalog"] = normalized
+            session["casting"].pop("language_override", None)
+            self._obsolete_casting_questions(session)
             self._begin(session, "casting", "Casting voices")
-        session = self.store.update(session_id, begin)
-        self._spawn(session_id, self._casting_worker, session["generation"])
-        return session
+        return self._start_worker(session_id, begin, self._casting_worker)
+
+    def _obsolete_casting_questions(self, session: Dict) -> None:
+        """A new casting run replaces earlier proposals made for another catalog."""
+        for question in session["questions"]:
+            if question["type"] in CASTING_QUESTIONS and question["status"] == "pending":
+                question["status"] = "obsolete"
 
     def _restart_casting(self, session_id: str) -> Dict:
         def begin(session):
+            if session["status"] == "running":
+                raise StoryCastError("Auto cast is already running", "busy", 409)
+            self._obsolete_casting_questions(session)
             self._begin(session, "casting", "Casting voices")
-        session = self.store.update(session_id, begin)
-        self._spawn(session_id, self._casting_worker, session["generation"])
-        return session
+        return self._start_worker(session_id, begin, self._casting_worker)
 
     def _casting_worker(self, session_id: str, generation: int) -> None:
         session = self._check_generation(session_id, generation)
@@ -898,7 +939,7 @@ class StoryCastService:
                              + ". You can also design new voices with Generate voices or switch engines.",
                         options=[{"value": "approve", "label": "Approve the shared voices"},
                                  {"value": "manual", "label": "I will assign them myself"}],
-                        payload={"proposals": proposals},
+                        payload={"proposals": proposals, "engine": c.get("engine", "")},
                     )
             _log(s, f"Cast {len(outcome['assignments'])} character(s)")
             self._settle(s, "done")

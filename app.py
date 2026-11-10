@@ -4293,6 +4293,7 @@ def _run_llm_prompt_with_failover(
     response_schema_name=None,
     response_schema_strict=True,
     profile_filter=None,
+    request_gate=None,
 ) -> tuple[str, Dict[str, Any], List[Dict[str, Any]]]:
     """Run a prompt through the configured profile chain.
 
@@ -4303,6 +4304,10 @@ def _run_llm_prompt_with_failover(
     ``profile_filter`` optionally restricts the chain (for example Auto cast
     uses it to continue with local profiles only once its paid-request limit
     is reached).
+
+    ``request_gate(profile)`` is called right before every provider request,
+    including OpenRouter retries. Returning False skips that request without
+    sending it (Auto cast counts its paid requests here).
     """
     structured_options = {}
     if response_schema is not None:
@@ -4338,6 +4343,14 @@ def _run_llm_prompt_with_failover(
                 "failure_kind": "unsupported_structured_output",
             })
             continue
+        if request_gate is not None and not request_gate(profile):
+            failures.append({
+                "profile_id": profile["id"], "profile_name": profile["name"],
+                "provider": provider, "model": profile.get("model") or "",
+                "error": "Request limit reached; skipped without an API request",
+                "failure_kind": "request_gate",
+            })
+            continue
         allowed, used, limit = _reserve_llm_profile_request(profile)
         if not allowed:
             failures.append({
@@ -4366,6 +4379,10 @@ def _run_llm_prompt_with_failover(
                 retryable=False,
             )
         def reserve_retry():
+            if request_gate is not None and not request_gate(profile):
+                gate_error = OpenRouterProcessorError("Request limit reached; retry was not submitted")
+                gate_error.retries_exhausted = True
+                raise gate_error
             retry_allowed, retry_used, retry_limit = _reserve_llm_profile_request(profile)
             if not retry_allowed:
                 limit_error = OpenRouterProcessorError(
@@ -4425,6 +4442,12 @@ def _run_llm_prompt_with_failover(
         from src.structured_output import StructuredOutputError
         raise StructuredOutputError("No compatible structured-output profile succeeded. " +
                                     "; ".join(f"{f['profile_name']}: {f['error']}" for f in failures))
+    if failures:
+        raise LLMProviderChainError(
+            "LLM provider chain stopped (" + "; ".join(
+                f"{entry['profile_name']}: {entry['error']}" for entry in failures) + ")",
+            retryable=False,
+        )
     raise LLMProviderChainError("No LLM providers are configured")
 
 
@@ -14769,10 +14792,12 @@ from src.story_cast.store import SessionNotFound as StoryCastSessionNotFound  # 
 STORY_CAST_DIR = Path(__file__).resolve().parent / "data" / "story_cast"
 
 
-def _story_cast_run_llm(prompt: str, local_only: bool):
-    config = load_config()
-    profile_filter = (lambda profile: profile.get("provider") == "local") if local_only else None
-    return _run_llm_prompt_with_failover(prompt, config, profile_filter=profile_filter)
+def _story_cast_run_llm(prompt: str, request_gate):
+    """Auto cast runner: ``request_gate(provider)`` reserves each request."""
+    return _run_llm_prompt_with_failover(
+        prompt, load_config(),
+        request_gate=lambda profile: request_gate(profile.get("provider")),
+    )
 
 
 def _story_cast_paid_limit() -> int:

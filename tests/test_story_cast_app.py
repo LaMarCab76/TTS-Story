@@ -48,7 +48,7 @@ def test_profile_filter_restricts_chain_to_local_profiles(monkeypatch):
 
 
 def test_generate_is_blocked_while_auto_cast_questions_are_pending(monkeypatch, tmp_path):
-    def fake_llm(prompt, local_only):
+    def fake_llm(prompt, request_gate):
         ids = [part.split(" ")[0] for part in prompt.split("<<")[1:] if part.startswith("s") and " SPEECH>>" in part]
         return json.dumps({"attributions": [{"id": i, "speaker": "unknown", "confidence": 0} for i in ids]}), {"provider": "local"}, []
 
@@ -71,7 +71,7 @@ def test_generate_is_blocked_while_auto_cast_questions_are_pending(monkeypatch, 
 def test_routes_create_answer_and_materialize(tmp_path):
     from flask import Flask
 
-    def fake_llm(prompt, local_only):
+    def fake_llm(prompt, request_gate):
         ids = [part.split(" ")[0] for part in prompt.split("<<")[1:] if part.startswith("s") and " SPEECH>>" in part]
         return json.dumps({
             "language": "en",
@@ -95,3 +95,27 @@ def test_routes_create_answer_and_materialize(tmp_path):
     materialized = client.post(f"/api/cast/sessions/{session_id}/materialize").get_json()
     assert materialized["text"] == "[mary-female]“Hello,”[/mary-female] [narrator]said Mary.[/narrator]"
     assert client.get("/api/cast/sessions/0123").status_code == 404
+
+
+def test_request_gate_skips_attempts_and_openrouter_retries(monkeypatch):
+    calls = []
+
+    def fake_run(prompt, config, provider, **kwargs):
+        calls.append(provider)
+        if kwargs.get("before_retry"):
+            kwargs["before_retry"]()
+        return "ok"
+
+    monkeypatch.setattr(app_module, "_run_llm_prompt_for_provider", fake_run)
+    monkeypatch.setattr(app_module, "_reserve_llm_profile_request", lambda profile: (True, 0, 0))
+    config = {"llm_provider": "openrouter", "openrouter_api_key": "key"}
+    seen = []
+    with pytest.raises(app_module.LLMProviderChainError):
+        app_module._run_llm_prompt_with_failover(
+            "prompt", config, request_gate=lambda profile: seen.append(profile["provider"]) or False)
+    assert calls == [] and seen == ["openrouter"]
+
+    allowed = iter([True, False])
+    with pytest.raises(Exception):
+        app_module._run_llm_prompt_with_failover("prompt", config, request_gate=lambda profile: next(allowed))
+    assert calls == ["openrouter"]
