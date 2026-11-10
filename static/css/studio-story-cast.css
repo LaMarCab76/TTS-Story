@@ -1,0 +1,354 @@
+/* studio-story-cast.css — Auto cast assistant (Generate screen).
+   Markup: templates/index.html #story-cast-panel; behaviour: static/js/story-cast.js. */
+
+#generate-tab .story-cast-launch {
+    height: 30px;
+    margin-left: 6px;
+    white-space: nowrap;
+}
+
+#generate-tab .story-cast-launch[data-icon]::before {
+    color: var(--st-accent);
+}
+
+#generate-tab .story-cast-launch.has-pending::after {
+    content: '';
+    width: 7px;
+    height: 7px;
+    margin-left: 6px;
+    border-radius: 50%;
+    background: var(--st-accent);
+}
+
+.story-cast-panel {
+    margin: 0 0 4px;
+    padding: 0 0 14px;
+    border-bottom: 1px solid var(--st-border);
+    background: var(--st-accent-wash);
+}
+
+.story-cast-panel[hidden] {
+    display: none;
+}
+
+.story-cast-panel .sc-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px 8px;
+}
+
+.story-cast-panel .sc-header > .ms {
+    color: var(--st-accent);
+    font-size: 18px;
+}
+
+.story-cast-panel .sc-header .panel-title {
+    margin: 0;
+    color: var(--st-text);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.story-cast-panel .sc-status {
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--st-control);
+    color: var(--st-text-3);
+    font-size: 11.5px;
+    white-space: nowrap;
+}
+
+.story-cast-panel .sc-status[data-state="running"] { color: var(--st-accent-text-soft); }
+.story-cast-panel .sc-status[data-state="waiting_user"] { background: var(--st-accent-soft); color: var(--st-accent); }
+.story-cast-panel .sc-status[data-state="idle"] { color: var(--st-green); }
+.story-cast-panel .sc-status[data-state="error"],
+.story-cast-panel .sc-status[data-state="paused"],
+.story-cast-panel .sc-status[data-state="interrupted"] { color: var(--st-red); }
+
+.story-cast-panel .sc-spacer { flex: 1; }
+
+.story-cast-panel .sc-progress {
+    display: grid;
+    gap: 4px;
+    padding: 0 20px 8px;
+}
+
+.story-cast-panel .sc-progress[hidden] { display: none; }
+
+.story-cast-panel .sc-progress-bar {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--st-control);
+}
+
+.story-cast-panel .sc-progress-fill {
+    width: 0;
+    height: 100%;
+    background: var(--st-accent);
+    transition: width 0.3s ease;
+}
+
+.story-cast-panel .sc-progress-label,
+.story-cast-panel .sc-meta,
+.story-cast-panel .sc-hint {
+    color: var(--st-text-muted);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.story-cast-panel .sc-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    padding: 0 20px 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.story-cast-panel .sc-meta strong {
+    color: var(--st-text-2);
+    font-weight: 500;
+}
+
+.story-cast-panel .sc-meta .is-near-limit strong {
+    color: var(--st-accent);
+}
+
+.story-cast-panel .sc-error {
+    margin: 0 20px 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--st-red-border);
+    border-radius: 6px;
+    color: var(--st-red);
+    font-size: 12px;
+}
+
+.story-cast-panel .sc-error[hidden] { display: none; }
+
+.story-cast-panel .sc-controls,
+.story-cast-panel .sc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 0 20px 8px;
+}
+
+.story-cast-panel .sc-controls:not(:has(button:not([hidden]))) { display: none; }
+
+/* Questions ---------------------------------------------------------------- */
+.story-cast-panel .sc-questions {
+    display: grid;
+    gap: 8px;
+    padding: 0 20px 10px;
+}
+
+.story-cast-panel .sc-questions:empty { display: none; }
+
+.story-cast-panel .sc-question {
+    padding: 10px 12px;
+    border: 1px solid var(--st-border-strong);
+    border-left: 3px solid var(--st-accent);
+    border-radius: 6px;
+    background: var(--st-panel);
+}
+
+.story-cast-panel .sc-question-title {
+    margin: 0 0 4px;
+    color: var(--st-text-strong);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.story-cast-panel .sc-question-title.is-quote {
+    font-family: var(--st-font-prose);
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.story-cast-panel .sc-question-body {
+    margin: 0 0 8px;
+    color: var(--st-text-3);
+    font-size: 12px;
+    line-height: 1.45;
+}
+
+.story-cast-panel .sc-question-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.story-cast-panel .sc-question-options .btn {
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+}
+
+.story-cast-panel .sc-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.story-cast-panel .sc-review-items {
+    display: grid;
+    gap: 4px;
+    max-height: 260px;
+    margin: 0 0 8px;
+    overflow: auto;
+}
+
+.story-cast-panel .sc-review-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+    color: var(--st-text-2);
+    font-size: 12px;
+}
+
+.story-cast-panel .sc-review-item q {
+    color: var(--st-text-prose);
+    font-family: var(--st-font-prose);
+}
+
+.story-cast-panel .sc-review-item .sc-change {
+    display: block;
+    color: var(--st-text-muted);
+}
+
+/* Characters --------------------------------------------------------------- */
+.story-cast-panel .sc-characters {
+    display: grid;
+    gap: 2px;
+    padding: 0 12px 6px;
+}
+
+.story-cast-panel .sc-character {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+}
+
+.story-cast-panel .sc-character:hover { background: var(--st-raised); }
+
+.story-cast-panel .sc-character-name {
+    overflow: hidden;
+    color: var(--st-text);
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.story-cast-panel .sc-character-name code {
+    margin-left: 6px;
+    color: var(--st-text-faint);
+    font-family: var(--st-font-mono);
+    font-size: 10.5px;
+}
+
+.story-cast-panel .sc-character-stats {
+    color: var(--st-text-muted);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.story-cast-panel .sc-character-voice {
+    grid-column: 1 / -1;
+    overflow: hidden;
+    color: var(--st-text-3);
+    font-size: 11.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.story-cast-panel .sc-character-voice.is-shared { color: var(--st-accent-text-soft); }
+.story-cast-panel .sc-character-voice.is-missing { color: var(--st-red); }
+
+/* Details: lines, examples, log ------------------------------------------- */
+.story-cast-panel .sc-details {
+    margin: 0 20px;
+    border-top: 1px solid var(--st-border-soft);
+}
+
+.story-cast-panel .sc-details > summary {
+    padding: 8px 0;
+    color: var(--st-text-2);
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+.story-cast-panel .sc-lines-toolbar { padding: 0 0 6px; }
+
+.story-cast-panel .sc-lines,
+.story-cast-panel .sc-examples {
+    display: grid;
+    gap: 6px;
+    max-height: 340px;
+    padding-bottom: 8px;
+    overflow: auto;
+}
+
+.story-cast-panel .sc-line {
+    display: grid;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--st-panel);
+}
+
+.story-cast-panel .sc-line.is-doubtful { box-shadow: inset 2px 0 0 var(--st-accent); }
+
+.story-cast-panel .sc-line-text {
+    color: var(--st-text-prose);
+    font-family: var(--st-font-prose);
+    font-size: 13.5px;
+    line-height: 1.4;
+}
+
+.story-cast-panel .sc-line-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--st-text-muted);
+    font-size: 11.5px;
+}
+
+.story-cast-panel .sc-line-meta select { max-width: 60%; }
+
+.story-cast-panel .sc-example {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    color: var(--st-text-2);
+    font-size: 12px;
+}
+
+.story-cast-panel .sc-example.is-disabled { opacity: 0.55; }
+
+.story-cast-panel .sc-log {
+    display: grid;
+    gap: 3px;
+    margin: 0;
+    padding: 0 0 8px 18px;
+    color: var(--st-text-muted);
+    font-size: 11.5px;
+}
+
+.story-cast-panel .sc-empty {
+    color: var(--st-text-faint);
+    font-size: 12px;
+}
+
+@media (max-width: 720px) {
+    #generate-tab .story-cast-launch { margin-left: 0; }
+}

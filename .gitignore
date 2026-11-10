@@ -84,6 +84,7 @@ data/voice_prompts/*
 jobs.db
 data/jobs/
 data/breeze_productions/
+data/story_cast/
 data/prep/
 data/benchmarks/
 data/*-benchmark/

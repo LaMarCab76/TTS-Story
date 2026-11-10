@@ -299,6 +299,7 @@ DEFAULT_CONFIG = {
     "gemini_speaker_profile_prompt": "",
     "llm_provider": DEFAULT_LLM_PROVIDER,
     "llm_backup_profiles": [],
+    "story_cast_paid_request_limit": 200,
     "atlas_cloud_api_key": "",
     "atlas_cloud_base_url": DEFAULT_ATLAS_CLOUD_BASE_URL,
     "atlas_cloud_model": DEFAULT_ATLAS_CLOUD_MODEL,
@@ -1586,6 +1587,25 @@ def _prepare_voice_assignments(text: str, voice_assignments: Any) -> Dict[str, D
     if "default" not in normalized and len(normalized) > 1:
         normalized["default"] = next(iter(normalized.values()))
     return normalized
+
+
+def _strict_assignment_problems(text: str, voice_assignments: Any) -> List[str]:
+    """List speakers that would silently inherit another speaker's voice.
+
+    Used by Auto cast (strict mode): the "default" fallback applied by
+    ``_prepare_voice_assignments`` must never give a character someone else's
+    voice without the user noticing.
+    """
+    normalized = _normalize_voice_assignments_map(voice_assignments)
+    missing: List[str] = []
+    for speaker in _extract_speakers_for_text(text):
+        if speaker == "default":
+            if "default" not in normalized:
+                missing.append("text outside speaker tags")
+            continue
+        if _normalize_speaker_key(speaker) not in normalized:
+            missing.append(speaker)
+    return missing
 
 
 def _extract_speakers_for_text(text: str) -> List[str]:
@@ -4272,12 +4292,17 @@ def _run_llm_prompt_with_failover(
     response_schema=None,
     response_schema_name=None,
     response_schema_strict=True,
+    profile_filter=None,
 ) -> tuple[str, Dict[str, Any], List[Dict[str, Any]]]:
     """Run a prompt through the configured profile chain.
 
     A preferred profile is used by multi-section prep after failover so every
     later section does not repeatedly consume time against a provider already
     known to be unavailable for that run.
+
+    ``profile_filter`` optionally restricts the chain (for example Auto cast
+    uses it to continue with local profiles only once its paid-request limit
+    is reached).
     """
     structured_options = {}
     if response_schema is not None:
@@ -4294,6 +4319,13 @@ def _run_llm_prompt_with_failover(
     )
     if preferred_index is not None:
         profiles = profiles[preferred_index:]
+    if profile_filter is not None:
+        profiles = [profile for profile in profiles if profile_filter(profile)]
+        if not profiles:
+            raise LLMProviderChainError(
+                "No configured LLM profile is allowed for this request",
+                retryable=False,
+            )
 
     failures: List[Dict[str, Any]] = []
     for index, profile in enumerate(profiles):
@@ -11064,6 +11096,28 @@ def generate_audio():
         if requested_acx is not None:
             config['acx_compliance'] = bool(requested_acx)
 
+        story_cast_session_id = str(data.get('story_cast_session_id') or '').strip()
+        if story_cast_session_id:
+            try:
+                blockers = STORY_CAST_SERVICE.generation_blockers(story_cast_session_id)
+            except StoryCastSessionNotFound:
+                blockers = []
+            if blockers:
+                return jsonify({
+                    "success": False,
+                    "error": "; ".join(blockers),
+                    "code": "story_cast_pending",
+                }), 409
+        if data.get('strict_assignments') is True:
+            missing_speakers = _strict_assignment_problems(text, voice_assignments)
+            if missing_speakers:
+                return jsonify({
+                    "success": False,
+                    "error": "Every speaker needs its own voice assignment. Missing: " + ", ".join(missing_speakers),
+                    "code": "missing_assignments",
+                    "missing_speakers": missing_speakers,
+                }), 400
+
         voice_assignments = _prepare_voice_assignments(text, voice_assignments)
 
         _validate_voice_assignments_for_engine(
@@ -14700,6 +14754,38 @@ def _cleanup_orphaned_regen_folders():
     
     if cleaned:
         logger.info("Cleaned up %d orphaned chunk regen temp folders", cleaned)
+
+
+# ---------------------------------------------------------------------------
+# Auto cast (LLM speaker attribution + voice casting)
+# ---------------------------------------------------------------------------
+from src.story_cast import (  # noqa: E402
+    StoryCastService,
+    StoryCastStore,
+    create_story_cast_blueprint,
+)
+from src.story_cast.store import SessionNotFound as StoryCastSessionNotFound  # noqa: E402
+
+STORY_CAST_DIR = Path(__file__).resolve().parent / "data" / "story_cast"
+
+
+def _story_cast_run_llm(prompt: str, local_only: bool):
+    config = load_config()
+    profile_filter = (lambda profile: profile.get("provider") == "local") if local_only else None
+    return _run_llm_prompt_with_failover(prompt, config, profile_filter=profile_filter)
+
+
+def _story_cast_paid_limit() -> int:
+    try:
+        return max(0, int(load_config().get("story_cast_paid_request_limit", 200)))
+    except (TypeError, ValueError):
+        return 200
+
+
+STORY_CAST_STORE = StoryCastStore(STORY_CAST_DIR)
+STORY_CAST_SERVICE = StoryCastService(STORY_CAST_STORE, _story_cast_run_llm, _story_cast_paid_limit)
+STORY_CAST_STORE.mark_interrupted()
+app.register_blueprint(create_story_cast_blueprint(STORY_CAST_SERVICE))
 
 
 if __name__ == '__main__':

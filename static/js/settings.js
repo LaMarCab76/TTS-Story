@@ -2314,6 +2314,7 @@ function applySettings(settings) {
     setCheckboxValue('llm-gemini-chunk-chapters', settings.llm_gemini_chunk_chapters ?? true, true);
     setCheckboxValue('llm-local-chunk-chapters', settings.llm_local_chunk_chapters ?? true, true);
     setLLMBackupProfiles(settings.llm_backup_profiles || []);
+    setElementValue('story-cast-paid-request-limit', settings.story_cast_paid_request_limit ?? 200, 200);
 
     // Engine + Chatterbox settings
     const ttsEngineSelect = document.getElementById('settings-tts-engine');
@@ -2837,6 +2838,7 @@ async function saveSettings() {
         gemini_prompt_presets: geminiPresetState.list.map(preset => ({ ...preset })),
         llm_provider: document.getElementById('llm-provider')?.value || 'gemini',
         llm_backup_profiles: llmBackupProfiles.map(profile => ({ ...profile })),
+        story_cast_paid_request_limit: (value => (Number.isFinite(value) ? Math.max(0, value) : 200))(parseInt(document.getElementById('story-cast-paid-request-limit')?.value, 10)),
         atlas_cloud_api_key: document.getElementById('atlas-cloud-api-key')?.value || '',
         atlas_cloud_base_url: document.getElementById('atlas-cloud-base-url')?.value || ATLAS_CLOUD_BASE_URL,
         atlas_cloud_model: document.getElementById('atlas-cloud-model')?.value || 'deepseek-v3',
@@ -3156,6 +3158,7 @@ async function resetSettings() {
         gemini_prompt_presets: [],
         llm_provider: 'gemini',
         llm_backup_profiles: [],
+        story_cast_paid_request_limit: 200,
         atlas_cloud_api_key: '',
         atlas_cloud_base_url: ATLAS_CLOUD_BASE_URL,
         atlas_cloud_model: 'deepseek-v3',

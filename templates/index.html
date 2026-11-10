@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/static/css/studio.css?v=1">
     <link rel="stylesheet" href="/static/css/studio-generate.css?v=1">
     <link rel="stylesheet" href="/static/css/studio-cast.css?v=1">
+    <link rel="stylesheet" href="/static/css/studio-story-cast.css?v=1">
     <link rel="stylesheet" href="/static/css/studio-queue.css?v=1">
     <link rel="stylesheet" href="/static/css/studio-library.css?v=1">
     <link rel="stylesheet" href="/static/css/studio-voices.css?v=1">
@@ -71,6 +72,7 @@
                             </div>
                             <button id="gemini-process-btn" class="btn manuscript-prep-btn" data-icon="auto_fix_high">Prep text</button>
                         </div>
+                        <button type="button" id="story-cast-btn" class="btn btn-secondary btn-sm story-cast-launch" data-icon="groups" title="Auto cast: the LLM finds who says each line, asks you when unsure, and casts a different voice for every character. The story text is never rewritten.">Auto cast</button>
                     </div>
                 </div>
                 <div class="manuscript-toolbar">
@@ -202,6 +204,54 @@
 
             <aside class="generate-aside" aria-label="Cast and output settings">
                 <div class="generate-aside-scroll">
+                    <!-- Auto cast assistant (static/js/story-cast.js, static/css/studio-story-cast.css). -->
+                    <section id="story-cast-panel" class="story-cast-panel" hidden aria-labelledby="story-cast-title">
+                        <div class="sc-header">
+                            <span class="ms" aria-hidden="true">groups</span>
+                            <h3 class="panel-title" id="story-cast-title">Auto cast</h3>
+                            <span class="sc-status" id="story-cast-status" aria-live="polite"></span>
+                            <span class="sc-spacer"></span>
+                            <button type="button" id="story-cast-hide" class="btn btn-ghost btn-icon btn-xs" title="Hide the assistant (the session is kept)" aria-label="Hide Auto cast"><span class="ms ms-16" aria-hidden="true">close</span></button>
+                        </div>
+                        <div class="sc-progress" id="story-cast-progress" hidden>
+                            <div class="sc-progress-bar"><div class="sc-progress-fill" id="story-cast-progress-fill"></div></div>
+                            <span class="sc-progress-label" id="story-cast-progress-label"></span>
+                        </div>
+                        <div class="sc-meta" id="story-cast-meta"></div>
+                        <div class="sc-error" id="story-cast-error" role="alert" hidden></div>
+                        <div class="sc-controls">
+                            <button type="button" id="story-cast-pause" class="btn btn-ghost btn-xs" data-icon="pause" hidden>Pause</button>
+                            <button type="button" id="story-cast-resume" class="btn btn-primary btn-xs" data-icon="play_arrow" hidden>Resume</button>
+                            <button type="button" id="story-cast-cancel" class="btn btn-ghost btn-xs" data-icon="stop" hidden>Cancel session</button>
+                        </div>
+                        <div class="sc-questions" id="story-cast-questions" aria-live="polite"></div>
+                        <div class="sc-actions" id="story-cast-actions">
+                            <button type="button" id="story-cast-apply" class="btn btn-primary btn-sm" data-icon="edit_note" disabled title="Write the tagged story into the manuscript">Apply to manuscript</button>
+                            <button type="button" id="story-cast-cast" class="btn btn-secondary btn-sm" data-icon="record_voice_over" disabled title="Choose a voice for every character with the selected engine">Cast voices</button>
+                        </div>
+                        <div class="sc-characters" id="story-cast-characters"></div>
+                        <details class="sc-details" id="story-cast-lines-details">
+                            <summary>Review lines</summary>
+                            <div class="sc-lines-toolbar">
+                                <label for="story-cast-lines-filter" class="sr-only">Show</label>
+                                <select id="story-cast-lines-filter" class="select-compact">
+                                    <option value="doubtful">Unclear speaker</option>
+                                    <option value="all">All speech</option>
+                                </select>
+                            </div>
+                            <div class="sc-lines" id="story-cast-lines"></div>
+                        </details>
+                        <details class="sc-details" id="story-cast-examples-details">
+                            <summary>Learned examples <span id="story-cast-examples-count"></span></summary>
+                            <p class="sc-hint">Your corrections teach the model. Turn one off to stop using it as an example; the corrected line keeps its speaker.</p>
+                            <div class="sc-examples" id="story-cast-examples"></div>
+                        </details>
+                        <details class="sc-details">
+                            <summary>Activity</summary>
+                            <ol class="sc-log" id="story-cast-log"></ol>
+                        </details>
+                    </section>
+
                     <!-- Cast block: owned by the cast screen (styled in static/css/studio-cast.css). -->
                     <section id="cast-section" class="cast-section" aria-labelledby="cast-section-title">
                         <div class="cast-header">
@@ -2378,6 +2428,11 @@
                                     <input type="number" id="llm-backup-profile-count" class="input-mono" min="0" max="100" step="1" value="0">
                                     <small>Up to 100, tried in order when the primary fails.</small>
                                 </div>
+                                <div class="form-group">
+                                    <label for="story-cast-paid-request-limit">Auto cast paid-request limit</label>
+                                    <input type="number" id="story-cast-paid-request-limit" class="input-mono" min="0" max="100000" step="10" value="200">
+                                    <small>Per Auto cast session. Counts only pay-per-use API requests; local models are never limited. 0 = no limit. Adjustable during a session.</small>
+                                </div>
                                 <div class="form-group" id="gemini-credentials">
                                     <label for="gemini-api-key">Gemini API key</label>
                                     <input type="password" id="gemini-api-key" placeholder="AIza...">
@@ -3206,15 +3261,16 @@
 
     <script src="/static/js/help.js?v=4"></script>
     <script src="/static/js/localai-models.js?v=1"></script>
-    <script src="/static/js/main.js?v=95"></script>
+    <script src="/static/js/main.js?v=96"></script>
     <script src="/static/js/breeze-api.js?v=5"></script>
     <script src="/static/js/gemini-tts.js?v=13"></script>
     <script src="/static/js/queue.js?v=9"></script>
 <script src="/static/js/library.js?v=63"></script>
     <script src="/static/js/voice-manager.js?v=19"></script>
-<script src="/static/js/settings.js?v=37"></script>
+<script src="/static/js/settings.js?v=38"></script>
     <script src="/static/js/studio.js?v=1"></script>
     <script src="/static/js/manuscript-view.js?v=1"></script>
     <script src="/static/js/cast-view.js?v=1"></script>
+    <script src="/static/js/story-cast.js?v=1"></script>
 </body>
 </html>

@@ -6310,7 +6310,8 @@ function getProjectState() {
         voice_design_candidate_groups: serializeVoiceDesignCandidateGroups(),
         bulk_voice_generation_state: bulkVoiceGenerationState
             ? JSON.parse(JSON.stringify(bulkVoiceGenerationState))
-            : null
+            : null,
+        story_cast_session_id: window.storyCast?.getSessionId?.() || null
     };
 }
 
@@ -6370,6 +6371,7 @@ function closeProjectModal() {
 
 async function applyProjectState(project) {
     if (!project) return;
+    window.storyCast?.onProjectLoaded?.(project);
     pendingProjectLoad = project;
     activeProjectId = project.id || null;
     setCurrentProjectLabel(project.name);
@@ -7162,6 +7164,14 @@ async function submitGenerateAudioJob() {
         }
     }
 
+    // Auto cast: never generate while the assistant still has open questions.
+    const storyCastBlocker = window.storyCast?.generationBlocker?.();
+    if (storyCastBlocker) {
+        showNotification(storyCastBlocker, 'warning');
+        window.storyCast?.reveal?.();
+        return;
+    }
+
     // Get voice assignments
     let voiceAssignments = getVoiceAssignments();
     
@@ -7225,6 +7235,9 @@ async function submitGenerateAudioJob() {
         payload.output_bitrate_kbps = parseInt(outputBitrate, 10);
     }
     payload.acx_compliance = acxCompliance;
+    // Auto cast manuscripts use strict assignments: no speaker may silently
+    // inherit another speaker's voice.
+    window.storyCast?.decorateGeneratePayload?.(payload);
     try {
         const response = await fetch('/api/generate', {
             method: 'POST',
