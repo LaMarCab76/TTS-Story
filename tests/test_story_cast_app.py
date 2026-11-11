@@ -132,3 +132,15 @@ def test_deleting_a_project_deletes_its_auto_cast_sessions(monkeypatch, tmp_path
     response = app_module.app.test_client().delete("/api/projects/p1")
     assert response.status_code == 200
     assert [s["id"] for s in service.store.list_sessions()] == [kept["id"]]
+
+
+def test_deleting_an_already_deleted_project_still_cleans_up_sessions(monkeypatch, tmp_path):
+    service = StoryCastService(StoryCastStore(tmp_path / "cast"), lambda prompt, gate: ("{}", {"provider": "local"}, []))
+    monkeypatch.setattr(app_module, "STORY_CAST_SERVICE", service)
+    projects_file = tmp_path / "projects.json"
+    projects_file.write_text("[]", encoding="utf-8")
+    monkeypatch.setattr(app_module, "PROJECTS_FILE", projects_file)
+    service.create("“Hi,” said Ann.", project_id="gone")
+    response = app_module.app.test_client().delete("/api/projects/gone")
+    assert response.status_code == 404
+    assert service.store.list_sessions() == []

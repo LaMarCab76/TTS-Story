@@ -151,3 +151,13 @@ def test_app_daily_cap_counts_retries(monkeypatch, tmp_path):
         with pytest.raises(a.LLMProviderChainError):
             a._run_llm_prompt_with_failover('hello',{})
         assert post.call_count == 2
+
+
+@patch('src.openrouter_processor.requests.post')
+def test_retry_is_authorized_after_the_backoff_wait(post):
+    events = []
+    post.side_effect = lambda *a, **k: events.append('post') or (error() if len(events) == 1 else Reply())
+    with patch('src.openrouter_processor.time.sleep', side_effect=lambda _d: events.append('sleep')):
+        p = OpenRouterProcessor('key', 'model', before_retry=lambda: events.append('authorize'))
+        assert p.generate_text('hello') == 'OK'
+    assert events == ['post', 'sleep', 'authorize', 'post']

@@ -13892,17 +13892,20 @@ def import_saved_projects():
 
 @app.route('/api/projects/<project_id>', methods=['DELETE'])
 def delete_saved_project(project_id: str):
+    # Auto cast sessions keep a copy of the manuscript; they go with the project.
+    # They are deleted first, and also when the project is already gone, so a
+    # retry after a failed cleanup still removes them.
+    try:
+        STORY_CAST_SERVICE.delete_project_sessions(project_id)
+    except Exception as exc:
+        logger.warning("Could not delete Auto cast sessions for project %s: %s", project_id, exc)
+        return jsonify({"success": False, "error": "Could not delete the project's Auto cast sessions."}), 500
     with PROJECTS_LOCK:
         projects = _load_saved_projects()
         remaining = [project for project in projects if str(project.get("id")) != str(project_id)]
         if len(remaining) == len(projects):
             return jsonify({"success": False, "error": "Project not found."}), 404
         write_json_atomic(PROJECTS_FILE, remaining, ensure_ascii=False)
-    try:
-        # Auto cast sessions keep a copy of the manuscript; they go with the project.
-        STORY_CAST_SERVICE.delete_project_sessions(project_id)
-    except Exception as exc:  # the project itself is already deleted
-        logger.warning("Could not delete Auto cast sessions for project %s: %s", project_id, exc)
     return jsonify({"success": True})
 
 
