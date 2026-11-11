@@ -299,6 +299,7 @@ DEFAULT_CONFIG = {
     "gemini_speaker_profile_prompt": "",
     "llm_provider": DEFAULT_LLM_PROVIDER,
     "llm_backup_profiles": [],
+    "story_cast_paid_request_limit": 200,
     "atlas_cloud_api_key": "",
     "atlas_cloud_base_url": DEFAULT_ATLAS_CLOUD_BASE_URL,
     "atlas_cloud_model": DEFAULT_ATLAS_CLOUD_MODEL,
@@ -1586,6 +1587,25 @@ def _prepare_voice_assignments(text: str, voice_assignments: Any) -> Dict[str, D
     if "default" not in normalized and len(normalized) > 1:
         normalized["default"] = next(iter(normalized.values()))
     return normalized
+
+
+def _strict_assignment_problems(text: str, voice_assignments: Any) -> List[str]:
+    """List speakers that would silently inherit another speaker's voice.
+
+    Used by Auto cast (strict mode): the "default" fallback applied by
+    ``_prepare_voice_assignments`` must never give a character someone else's
+    voice without the user noticing.
+    """
+    normalized = _normalize_voice_assignments_map(voice_assignments)
+    missing: List[str] = []
+    for speaker in _extract_speakers_for_text(text):
+        if speaker == "default":
+            if "default" not in normalized:
+                missing.append("text outside speaker tags")
+            continue
+        if _normalize_speaker_key(speaker) not in normalized:
+            missing.append(speaker)
+    return missing
 
 
 def _extract_speakers_for_text(text: str) -> List[str]:
@@ -4272,12 +4292,22 @@ def _run_llm_prompt_with_failover(
     response_schema=None,
     response_schema_name=None,
     response_schema_strict=True,
+    profile_filter=None,
+    request_gate=None,
 ) -> tuple[str, Dict[str, Any], List[Dict[str, Any]]]:
     """Run a prompt through the configured profile chain.
 
     A preferred profile is used by multi-section prep after failover so every
     later section does not repeatedly consume time against a provider already
     known to be unavailable for that run.
+
+    ``profile_filter`` optionally restricts the chain (for example Auto cast
+    uses it to continue with local profiles only once its paid-request limit
+    is reached).
+
+    ``request_gate(profile)`` is called right before every provider request,
+    including OpenRouter retries. Returning False skips that request without
+    sending it (Auto cast counts its paid requests here).
     """
     structured_options = {}
     if response_schema is not None:
@@ -4294,6 +4324,13 @@ def _run_llm_prompt_with_failover(
     )
     if preferred_index is not None:
         profiles = profiles[preferred_index:]
+    if profile_filter is not None:
+        profiles = [profile for profile in profiles if profile_filter(profile)]
+        if not profiles:
+            raise LLMProviderChainError(
+                "No configured LLM profile is allowed for this request",
+                retryable=False,
+            )
 
     failures: List[Dict[str, Any]] = []
     for index, profile in enumerate(profiles):
@@ -4304,6 +4341,14 @@ def _run_llm_prompt_with_failover(
                 "provider": provider, "model": profile.get("model") or "",
                 "error": "Profile cannot honor the requested JSON schema; skipped without an API request",
                 "failure_kind": "unsupported_structured_output",
+            })
+            continue
+        if request_gate is not None and not request_gate(profile):
+            failures.append({
+                "profile_id": profile["id"], "profile_name": profile["name"],
+                "provider": provider, "model": profile.get("model") or "",
+                "error": "Request limit reached; skipped without an API request",
+                "failure_kind": "request_gate",
             })
             continue
         allowed, used, limit = _reserve_llm_profile_request(profile)
@@ -4333,7 +4378,11 @@ def _run_llm_prompt_with_failover(
                 f"LLM provider chain stopped ({summary})",
                 retryable=False,
             )
-        def reserve_retry():
+        def reserve_retry(profile=profile):
+            if request_gate is not None and not request_gate(profile):
+                gate_error = OpenRouterProcessorError("Request limit reached; retry was not submitted")
+                gate_error.retries_exhausted = True
+                raise gate_error
             retry_allowed, retry_used, retry_limit = _reserve_llm_profile_request(profile)
             if not retry_allowed:
                 limit_error = OpenRouterProcessorError(
@@ -4393,6 +4442,12 @@ def _run_llm_prompt_with_failover(
         from src.structured_output import StructuredOutputError
         raise StructuredOutputError("No compatible structured-output profile succeeded. " +
                                     "; ".join(f"{f['profile_name']}: {f['error']}" for f in failures))
+    if failures:
+        raise LLMProviderChainError(
+            "LLM provider chain stopped (" + "; ".join(
+                f"{entry['profile_name']}: {entry['error']}" for entry in failures) + ")",
+            retryable=False,
+        )
     raise LLMProviderChainError("No LLM providers are configured")
 
 
@@ -11064,6 +11119,28 @@ def generate_audio():
         if requested_acx is not None:
             config['acx_compliance'] = bool(requested_acx)
 
+        story_cast_session_id = str(data.get('story_cast_session_id') or '').strip()
+        if story_cast_session_id:
+            try:
+                blockers = STORY_CAST_SERVICE.generation_blockers(story_cast_session_id)
+            except StoryCastSessionNotFound:
+                blockers = []
+            if blockers:
+                return jsonify({
+                    "success": False,
+                    "error": "; ".join(blockers),
+                    "code": "story_cast_pending",
+                }), 409
+        if data.get('strict_assignments') is True:
+            missing_speakers = _strict_assignment_problems(text, voice_assignments)
+            if missing_speakers:
+                return jsonify({
+                    "success": False,
+                    "error": "Every speaker needs its own voice assignment. Missing: " + ", ".join(missing_speakers),
+                    "code": "missing_assignments",
+                    "missing_speakers": missing_speakers,
+                }), 400
+
         voice_assignments = _prepare_voice_assignments(text, voice_assignments)
 
         _validate_voice_assignments_for_engine(
@@ -13815,6 +13892,14 @@ def import_saved_projects():
 
 @app.route('/api/projects/<project_id>', methods=['DELETE'])
 def delete_saved_project(project_id: str):
+    # Auto cast sessions keep a copy of the manuscript; they go with the project.
+    # They are deleted first, and also when the project is already gone, so a
+    # retry after a failed cleanup still removes them.
+    try:
+        STORY_CAST_SERVICE.delete_project_sessions(project_id)
+    except Exception as exc:
+        logger.warning("Could not delete Auto cast sessions for project %s: %s", project_id, exc)
+        return jsonify({"success": False, "error": "Could not delete the project's Auto cast sessions."}), 500
     with PROJECTS_LOCK:
         projects = _load_saved_projects()
         remaining = [project for project in projects if str(project.get("id")) != str(project_id)]
@@ -14700,6 +14785,40 @@ def _cleanup_orphaned_regen_folders():
     
     if cleaned:
         logger.info("Cleaned up %d orphaned chunk regen temp folders", cleaned)
+
+
+# ---------------------------------------------------------------------------
+# Auto cast (LLM speaker attribution + voice casting)
+# ---------------------------------------------------------------------------
+from src.story_cast import (  # noqa: E402
+    StoryCastService,
+    StoryCastStore,
+    create_story_cast_blueprint,
+)
+from src.story_cast.store import SessionNotFound as StoryCastSessionNotFound  # noqa: E402
+
+STORY_CAST_DIR = Path(__file__).resolve().parent / "data" / "story_cast"
+
+
+def _story_cast_run_llm(prompt: str, request_gate):
+    """Auto cast runner: ``request_gate(provider)`` reserves each request."""
+    return _run_llm_prompt_with_failover(
+        prompt, load_config(),
+        request_gate=lambda profile: request_gate(profile.get("provider")),
+    )
+
+
+def _story_cast_paid_limit() -> int:
+    try:
+        return max(0, int(load_config().get("story_cast_paid_request_limit", 200)))
+    except (TypeError, ValueError):
+        return 200
+
+
+STORY_CAST_STORE = StoryCastStore(STORY_CAST_DIR)
+STORY_CAST_SERVICE = StoryCastService(STORY_CAST_STORE, _story_cast_run_llm, _story_cast_paid_limit)
+STORY_CAST_STORE.mark_interrupted()
+app.register_blueprint(create_story_cast_blueprint(STORY_CAST_SERVICE))
 
 
 if __name__ == '__main__':

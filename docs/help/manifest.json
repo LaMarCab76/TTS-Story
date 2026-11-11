@@ -24,6 +24,7 @@
         "input-text",
         "speaker-tags",
         "prep-text",
+        "auto-cast",
         "alt-word-registry",
         "text-statistics",
         "assign-voices",
@@ -212,6 +213,14 @@
       "summary": "Prepare a manuscript with an LLM or build profiles from text that is already speaker-tagged.",
       "keywords": ["Prep Text", "LLM", "cleanup", "speaker detection", "prompt preset", "Build Profile", "Build Profiles"],
       "related": ["llm-overview", "llm-prompts", "speaker-tags"]
+    },
+    {
+      "id": "auto-cast",
+      "file": "create-audio/auto-cast.md",
+      "title": "Auto Cast a Story",
+      "summary": "Let the LLM find who says each line, answer its questions, and give every character its own voice.",
+      "keywords": ["auto cast", "casting", "characters", "dialogue attribution", "who speaks", "first person", "shared voice", "paid request limit"],
+      "related": ["prep-text", "assign-voices", "llm-local"]
     },
     {
       "id": "alt-word-registry",

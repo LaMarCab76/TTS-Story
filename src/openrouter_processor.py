@@ -335,13 +335,15 @@ class OpenRouterProcessor:
                 # retrying early. Preserve it for the UI/manual retry decision.
                 error.retries_exhausted = True
                 raise error
-            if self.before_retry is not None:
-                self.before_retry()  # Reserve each retry against profile daily cap.
             record['retry_delay_seconds'] = delay
             logging.getLogger(__name__).warning(
                 'OpenRouter retry %s/%s in %.1fs: %s', attempt + 1, self.max_attempts, delay, error)
             time.sleep(delay)
             waited += delay
+            if self.before_retry is not None:
+                # Reserve (and authorize) the retry right before it is sent, after
+                # the wait: the caller may have been cancelled during the delay.
+                self.before_retry()
         content = self._extract_content(result)
         self.last_response_text = content
         self.last_usage = result.get("usage") or {}
