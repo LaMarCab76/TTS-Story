@@ -536,11 +536,15 @@ def test_late_error_after_cancel_keeps_session_cancelled(tmp_path):
 
 
 def test_invalid_answer_is_not_repaired_after_cancel(tmp_path):
-    def invalid(prompt, gate):
-        if not gate("local"):
-            raise RuntimeError("stopped")
-        return "not json", {"provider": "local"}, []
-    llm, release, entered, calls = _blocking_llm(invalid)
+    release, entered, calls = threading.Event(), threading.Event(), []
+
+    def llm(prompt, gate):
+        calls.append(prompt)
+        assert gate("local")  # the first dispatch is allowed while the session runs
+        entered.set()
+        release.wait(10)
+        return "not json", {"provider": "local"}, []  # invalid: ask_json wants a repair retry
+
     service = make_service(tmp_path, llm)
     session = service.create(SPANISH)
     service.start_attribution(session["id"])

@@ -4378,7 +4378,7 @@ def _run_llm_prompt_with_failover(
                 f"LLM provider chain stopped ({summary})",
                 retryable=False,
             )
-        def reserve_retry():
+        def reserve_retry(profile=profile):
             if request_gate is not None and not request_gate(profile):
                 gate_error = OpenRouterProcessorError("Request limit reached; retry was not submitted")
                 gate_error.retries_exhausted = True

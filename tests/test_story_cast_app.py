@@ -116,6 +116,6 @@ def test_request_gate_skips_attempts_and_openrouter_retries(monkeypatch):
     assert calls == [] and seen == ["openrouter"]
 
     allowed = iter([True, False])
-    with pytest.raises(Exception):
+    with pytest.raises((app_module.OpenRouterProcessorError, app_module.LLMProviderChainError)):
         app_module._run_llm_prompt_with_failover("prompt", config, request_gate=lambda profile: next(allowed))
     assert calls == ["openrouter"]
