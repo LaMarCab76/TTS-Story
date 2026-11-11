@@ -24,17 +24,34 @@ DIALOGUE_DASHES = "—―–"  # em dash, horizontal bar, en dash
 SPEAKER_TAG_PATTERN = re.compile(r"\[([a-zA-Z0-9_\-]+)\](.*?)\[/\1\]", re.DOTALL)
 DIRECTION_PATTERN = re.compile(r"\[(direction|emotion)\].*?\[/\1\]", re.DOTALL | re.IGNORECASE)
 RESERVED_TAG_NAMES = {"direction", "emotion"}
+_NUMBER_WORDS = (
+    # English
+    "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|"
+    "sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|"
+    "first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last|final|"
+    # Spanish
+    "uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce|quince|"
+    "diecis[eé]is|diecisiete|dieciocho|diecinueve|veinte|veinti[a-zá-ú]+|treinta|cuarenta|cincuenta|cien|"
+    "primer[oa]?|segund[oa]|tercer[oa]?|cuart[oa]|quint[oa]|sext[oa]|s[eé]ptim[oa]|octav[oa]|"
+    "noven[oa]|d[eé]cim[oa]|[uú]ltim[oa]"
+)
+# A number word, possibly compound: "Twenty-One", "Twenty One", "treinta y dos".
+_NUMBER_WORD = r"(?:" + _NUMBER_WORDS + r")(?:(?:[-\s]|\s+y\s+)(?:" + _NUMBER_WORDS + r"))*"
+# A well-formed roman numeral, so words such as "did" or "mild" do not count.
+_ROMAN = r"(?=[ivxlcdm])m{0,4}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3})\b"
 HEADING_PATTERN = re.compile(
     r"^(?:chapter|cap[ií]tulo|part|parte|book|libro|section|secci[oó]n|"
     r"prologue|pr[oó]logo|epilogue|ep[ií]logo|interlude|interludio|"
     r"chapitre|kapitel|capitolo)"
     # Only the keyword, the keyword plus a title ("Prologue: ..."), or a number,
-    # roman numeral or single number word ("Chapter 3", "Part IV", "Book One"),
-    # optionally followed by a title. "Part of me knew." is narration.
-    r"(?:\s*$|\s*[-—–:.]\s*\S.*$|\s+(?:\d+|[ivxlcdm]+|[^\W\d_]+)\.?(?:\s*[-—–:.]\s*.*)?$)",
+    # roman numeral or number word ("Chapter 3", "Part IV", "Book One"),
+    # optionally followed by a title. "Part of me knew." and "Part failed."
+    # are narration.
+    r"(?:\s*$|\s*[-—–:.]\s*\S.*$|\s+(?:\d+|" + _ROMAN + "|" + _NUMBER_WORD + r")\.?(?:\s*[-—–:.]\s*.*)?$)",
     re.IGNORECASE,
 )
-_HEADING_QUOTES = "\"«»“”‘’"
+# Every quote character the dialogue parser opens or closes on.
+_HEADING_QUOTES = "\"«»“”‘’„‚‹›"
 _TERMINAL_CHARS = set(".!?:;\"'»”’)]*—…")
 
 

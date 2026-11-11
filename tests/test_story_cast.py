@@ -488,13 +488,15 @@ def test_recasting_with_another_engine_invalidates_old_sharing_proposals(tmp_pat
 
 
 @pytest.mark.parametrize("line", ["Chapter 3", "Capítulo IV: El viaje", "Prologue", "Prólogo — La noche",
-                                  "Book One", "PARTE 2"])
+                                  "Book One", "PARTE 2", "Chapter Twenty-One", "Capítulo treinta y dos",
+                                  "Part XIV. The Return", "Libro primero"])
 def test_real_headings_are_detected(line):
     assert [s.kind for s in segment_text(line)] == [KIND_HEADING]
 
 
 @pytest.mark.parametrize("line", ["Part of me knew.", "Parte de mí lo sabía.", 'Book in hand, she said, "Let\'s go."',
-                                  "Section 8 was closed."])
+                                  "Section 8 was closed.", "Part failed.", "Book: „Hello“", "Part did.",
+                                  "Chapter closed: nobody came."])
 def test_sentences_starting_with_heading_words_are_not_headings(line):
     assert KIND_HEADING not in [s.kind for s in segment_text(line)]
 
