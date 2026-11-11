@@ -485,3 +485,68 @@ def test_recasting_with_another_engine_invalidates_old_sharing_proposals(tmp_pat
     with pytest.raises(StoryCastError):
         service.answer(session["id"], share["id"], "approve")
     assert set(session["casting"]["assignments"].values()) <= {v["id"] for v in new_catalog}
+
+
+@pytest.mark.parametrize("line", ["Chapter 3", "Capítulo IV: El viaje", "Prologue", "Prólogo — La noche",
+                                  "Book One", "PARTE 2"])
+def test_real_headings_are_detected(line):
+    assert [s.kind for s in segment_text(line)] == [KIND_HEADING]
+
+
+@pytest.mark.parametrize("line", ["Part of me knew.", "Parte de mí lo sabía.", 'Book in hand, she said, "Let\'s go."',
+                                  "Section 8 was closed."])
+def test_sentences_starting_with_heading_words_are_not_headings(line):
+    assert KIND_HEADING not in [s.kind for s in segment_text(line)]
+
+
+def test_text_that_is_only_speaker_tags_is_reported_empty(tmp_path):
+    service = make_service(tmp_path, FakeLLM())
+    with pytest.raises(StoryCastError) as error:
+        service.create("[bob]  [/bob]", strip_existing_tags=True)
+    assert error.value.code == "empty_text"
+
+
+def _blocking_llm(behaviour):
+    release, entered = threading.Event(), threading.Event()
+    calls = []
+
+    def llm(prompt, gate):
+        calls.append(prompt)
+        entered.set()
+        release.wait(10)
+        return behaviour(prompt, gate)
+    return llm, release, entered, calls
+
+
+def test_late_error_after_cancel_keeps_session_cancelled(tmp_path):
+    def fail(prompt, gate):
+        raise RuntimeError("provider exploded")  # error path, not the dispatch fence
+    llm, release, entered, _calls = _blocking_llm(fail)
+    service = make_service(tmp_path, llm, limit=1)
+    session = service.create(SPANISH)
+    service.start_attribution(session["id"])
+    assert entered.wait(5)
+    service.cancel(session["id"])
+    release.set()
+    service.wait(session["id"])
+    session = service.store.load(session["id"])
+    assert session["status"] == "cancelled"
+    assert not [q for q in session["questions"] if q["status"] == "pending"]
+    assert service.generation_blockers(session["id"]) == []
+
+
+def test_invalid_answer_is_not_repaired_after_cancel(tmp_path):
+    def invalid(prompt, gate):
+        if not gate("local"):
+            raise RuntimeError("stopped")
+        return "not json", {"provider": "local"}, []
+    llm, release, entered, calls = _blocking_llm(invalid)
+    service = make_service(tmp_path, llm)
+    session = service.create(SPANISH)
+    service.start_attribution(session["id"])
+    assert entered.wait(5)
+    service.cancel(session["id"])
+    release.set()
+    service.wait(session["id"])
+    assert len(calls) == 1
+    assert service.store.load(session["id"])["status"] == "cancelled"

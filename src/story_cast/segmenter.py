@@ -27,9 +27,14 @@ RESERVED_TAG_NAMES = {"direction", "emotion"}
 HEADING_PATTERN = re.compile(
     r"^(?:chapter|cap[ií]tulo|part|parte|book|libro|section|secci[oó]n|"
     r"prologue|pr[oó]logo|epilogue|ep[ií]logo|interlude|interludio|"
-    r"chapitre|kapitel|capitolo)\b",
+    r"chapitre|kapitel|capitolo)"
+    # Only the keyword, the keyword plus a title ("Prologue: ..."), or a number,
+    # roman numeral or single number word ("Chapter 3", "Part IV", "Book One"),
+    # optionally followed by a title. "Part of me knew." is narration.
+    r"(?:\s*$|\s*[-—–:.]\s*\S.*$|\s+(?:\d+|[ivxlcdm]+|[^\W\d_]+)\.?(?:\s*[-—–:.]\s*.*)?$)",
     re.IGNORECASE,
 )
+_HEADING_QUOTES = "\"«»“”‘’"
 _TERMINAL_CHARS = set(".!?:;\"'»”’)]*—…")
 
 
@@ -128,6 +133,8 @@ def split_paragraphs(text: str) -> List[Tuple[int, int]]:
 def _looks_like_heading(paragraph: str) -> bool:
     candidate = paragraph.strip().strip("*").strip()
     if not candidate or len(candidate) > 80 or "\n" in candidate:
+        return False
+    if any(q in candidate for q in _HEADING_QUOTES) or candidate[0] in DIALOGUE_DASHES:
         return False
     if HEADING_PATTERN.match(candidate):
         return True

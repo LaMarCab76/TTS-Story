@@ -128,6 +128,8 @@ class StoryCastService:
                     "already_tagged", 409,
                 )
             source = strip_speaker_tags(source)
+            if not source.strip():
+                raise StoryCastError("The manuscript is empty", "empty_text")
         segments = segment_text(source)
         problems = verify_coverage(source, segments)
         if problems:
@@ -247,27 +249,44 @@ class StoryCastService:
         self.store.update(session_id, reserve)
         return allowed["value"]
 
-    def _call_llm(self, session_id: str, prompt: str) -> Tuple[str, Dict]:
+    def _is_current(self, session_id: str, generation: int) -> bool:
+        session = self.store.load(session_id)
+        return session.get("generation") == generation and session.get("status") == "running"
+
+    def _call_llm(self, session_id: str, prompt: str, generation: int) -> Tuple[str, Dict]:
+        """Send one prompt. Every provider attempt (JSON repair, backups and
+        retries included) is fenced by the worker generation, so nothing is
+        sent after a pause or cancel."""
         blocked: List[str] = []
+        stopped = {"value": False}
 
         def gate(provider: str) -> bool:
+            if not self._is_current(session_id, generation):
+                stopped["value"] = True
+                return False
             if self._reserve_request(session_id, provider):
                 return True
             blocked.append(str(provider or ""))
             return False
 
         with self._llm_lock:
+            if not self._is_current(session_id, generation):
+                raise SessionStopped()
             try:
                 text, profile, _failures = self.run_llm(prompt, gate)
             except Exception as exc:
+                if stopped["value"]:
+                    raise SessionStopped() from exc
                 local_only = bool(self.store.load(session_id)["budget"].get("local_only"))
                 if blocked and not local_only:
                     raise BudgetExceeded(str(exc)) from exc
                 raise
         return text, profile
 
-    def _handle_worker_error(self, session_id: str, exc: Exception, resume_phase: str) -> None:
+    def _handle_worker_error(self, session_id: str, exc: Exception, resume_phase: str, generation: int) -> None:
         def mark(session):
+            if session.get("generation") != generation:
+                return  # paused, cancelled or restarted meanwhile: keep that state
             session["status"] = "paused"
             if resume_phase in ("attribution", "casting"):
                 session["phase"] = resume_phase
@@ -319,13 +338,15 @@ class StoryCastService:
                 examples=session.get("examples", []), only_ids=set(pending_ids), first_batch=first_batch,
             )
             try:
-                result, _calls = ask_json(lambda p: self._call_llm(session_id, p), built["prompt"], ATTRIBUTION_SCHEMA)
+                result, _calls = ask_json(lambda p: self._call_llm(session_id, p, generation), built["prompt"], ATTRIBUTION_SCHEMA)
             except LLMJSONError as exc:
                 failed_batches += 1
                 result = {"attributions": []}
                 logger.warning("Auto cast batch %s returned invalid JSON: %s", index + 1, exc)
+            except SessionStopped:
+                return
             except Exception as exc:
-                self._handle_worker_error(session_id, exc, "attribution")
+                self._handle_worker_error(session_id, exc, "attribution", generation)
                 return
 
             def commit(s, result=result, built=built, index=index):
@@ -739,11 +760,13 @@ class StoryCastService:
             built = build_attribution_prompt(session["source"], segments, batch, registry,
                                              examples=session.get("examples", []), only_ids=targets)
             try:
-                result, _calls = ask_json(lambda p: self._call_llm(session_id, p), built["prompt"], ATTRIBUTION_SCHEMA)
+                result, _calls = ask_json(lambda p: self._call_llm(session_id, p, generation), built["prompt"], ATTRIBUTION_SCHEMA)
             except LLMJSONError:
                 continue
+            except SessionStopped:
+                return
             except Exception as exc:
-                self._handle_worker_error(session_id, exc, "rerun")
+                self._handle_worker_error(session_id, exc, "rerun", generation)
                 return
             # Proposals only: characters may be registered, segments untouched.
             def collect(s, result=result, built=built, index=index):
@@ -908,13 +931,15 @@ class StoryCastService:
         rankings: Dict = {}
         try:
             prompt = build_ranking_prompt(characters, voices, session.get("language", ""), casting.get("engine", ""))
-            result, _calls = ask_json(lambda p: self._call_llm(session_id, p), prompt, RANKING_SCHEMA)
+            result, _calls = ask_json(lambda p: self._call_llm(session_id, p, generation), prompt, RANKING_SCHEMA)
             rankings = parse_rankings(result, characters, voices)
         except LLMJSONError:
             rankings = heuristic_rankings(characters, voices)
+        except SessionStopped:
+            return
         except Exception as exc:
             if isinstance(exc, BudgetExceeded):
-                self._handle_worker_error(session_id, exc, "casting")
+                self._handle_worker_error(session_id, exc, "casting", generation)
                 return
             logger.warning("Auto cast voice ranking failed, using heuristics: %s", exc)
             rankings = heuristic_rankings(characters, voices)

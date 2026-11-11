@@ -6,13 +6,17 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '../static/js/story-cast.js'), 'utf8');
 
-function load(sessionPayload) {
+function load(sessionPayload, storage = {}) {
     const listeners = {};
     const context = vm.createContext({
         console,
         setTimeout: () => 0,
         clearTimeout: () => {},
-        localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+        localStorage: {
+            getItem: key => (key in storage ? storage[key] : null),
+            setItem: (key, value) => { storage[key] = String(value); },
+            removeItem: key => { delete storage[key]; },
+        },
         CSS: { escape: value => value },
         document: {
             readyState: 'complete',
@@ -70,4 +74,11 @@ test('story text is never rendered as HTML', () => {
     assert.ok(assignments.length > 0);
     assignments.forEach(statement => assert.match(statement, /innerHTML\s*=\s*''/));
     assert.doesNotMatch(source, /insertAdjacentHTML|outerHTML\s*=/);
+});
+
+test('loading a project without a session forgets the previous one', () => {
+    const storage = { 'tts-story:story-cast-session': 'b'.repeat(32) };
+    const context = load(baseSession(), storage);
+    context.window.storyCast.onProjectLoaded({ name: 'Other project' });
+    assert.equal(storage['tts-story:story-cast-session'], undefined);
 });

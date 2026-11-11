@@ -653,6 +653,7 @@
         segmentsCache = null;
         render();
         if (project && project.story_cast_session_id) attach(project.story_cast_session_id);
+        else rememberSession(null);  // a project without a session must not reopen the previous one
     }
 
     function init() {
