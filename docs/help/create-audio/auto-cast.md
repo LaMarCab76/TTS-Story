@@ -52,6 +52,6 @@ Each session counts requests sent to pay-per-use API providers. When the limit i
 
 ## Sessions
 
-Sessions are stored on the TTS-Story server and saved with the Project. **Pause** stops after the current request; **Resume** continues where it stopped, including after a restart of TTS-Story. **Cancel session** closes the assistant without touching the manuscript or voices already applied.
+Sessions are stored on the TTS-Story server and saved with the Project. **Pause** stops after the current request; **Resume** continues where it stopped, including after a restart of TTS-Story. **Cancel session** closes the assistant without touching the manuscript or voices already applied. Each session keeps a copy of the story; deleting a Project also deletes its Auto cast sessions.
 
 Cloud providers receive the story text for the requests they serve. Use a local provider when the story must stay on this computer. See [LM Studio and Ollama](help:llm-local).

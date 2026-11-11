@@ -13898,6 +13898,11 @@ def delete_saved_project(project_id: str):
         if len(remaining) == len(projects):
             return jsonify({"success": False, "error": "Project not found."}), 404
         write_json_atomic(PROJECTS_FILE, remaining, ensure_ascii=False)
+    try:
+        # Auto cast sessions keep a copy of the manuscript; they go with the project.
+        STORY_CAST_SERVICE.delete_project_sessions(project_id)
+    except Exception as exc:  # the project itself is already deleted
+        logger.warning("Could not delete Auto cast sessions for project %s: %s", project_id, exc)
     return jsonify({"success": True})
 
 

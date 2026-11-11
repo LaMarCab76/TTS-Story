@@ -49,7 +49,7 @@ from .segmenter import (
     strip_speaker_tags,
     verify_coverage,
 )
-from .store import StoryCastStore, utc_now
+from .store import SessionNotFound, StoryCastStore, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -196,19 +196,24 @@ class StoryCastService:
         if thread:
             thread.join(timeout)
 
-    def _guarded(self, session_id: str, target: Callable, *args) -> None:
+    def _guarded(self, session_id: str, target: Callable, generation: int) -> None:
         try:
-            target(session_id, *args)
-        except SessionStopped:
-            pass
+            target(session_id, generation)
+        except (SessionStopped, SessionNotFound):
+            pass  # paused, cancelled or deleted meanwhile
         except Exception as exc:  # pragma: no cover - defensive
             logger.error("Auto cast worker failed: %s", exc, exc_info=True)
 
             def mark(session):
+                if session.get("generation") != generation:
+                    return  # a newer state (pause, cancel, restart) wins
                 session["status"] = "error"
                 session["error"] = str(exc)[:500]
                 _log(session, f"Stopped: {str(exc)[:200]}")
-            self.store.update(session_id, mark)
+            try:
+                self.store.update(session_id, mark)
+            except SessionNotFound:
+                pass
 
     def _check_generation(self, session_id: str, generation: int) -> Dict:
         session = self.store.load(session_id)
@@ -1029,6 +1034,23 @@ class StoryCastService:
                     question["status"] = "obsolete"
             _log(session, "Cancelled")
         return self.store.update(session_id, apply)
+
+    def delete_project_sessions(self, project_id: str) -> int:
+        """Delete every session (and its manuscript copy) owned by a project.
+
+        Running workers are stopped first: the generation bump makes them
+        discard results, and a deleted session can no longer be written.
+        """
+        deleted = 0
+        for summary in self.store.list_sessions(str(project_id)):
+            session_id = summary.get("id")
+            try:
+                self.cancel(session_id)
+            except SessionNotFound:
+                continue
+            if self.store.delete(session_id):
+                deleted += 1
+        return deleted
 
     def generation_blockers(self, session_id: str) -> List[str]:
         session = self.store.load(session_id)

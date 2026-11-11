@@ -43,6 +43,15 @@ class StoryCastStore:
                 raise SessionNotFound(session_id)
             return json.loads(path.read_text(encoding="utf-8"))
 
+    def delete(self, session_id: str) -> bool:
+        path = self._path(session_id)
+        with self._lock:
+            try:
+                path.unlink()
+                return True
+            except FileNotFoundError:
+                return False
+
     def create(self, session: Dict) -> Dict:
         with self._lock:
             session["rev"] = 1

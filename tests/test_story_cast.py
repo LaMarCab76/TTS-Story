@@ -554,3 +554,44 @@ def test_invalid_answer_is_not_repaired_after_cancel(tmp_path):
     service.wait(session["id"])
     assert len(calls) == 1
     assert service.store.load(session["id"])["status"] == "cancelled"
+
+
+def test_deleting_a_project_deletes_its_sessions_even_while_running(tmp_path):
+    release, entered = threading.Event(), threading.Event()
+    inner = FakeLLM(provider="local")
+
+    def slow_llm(prompt, gate):
+        entered.set()
+        release.wait(10)
+        return inner(prompt, gate)
+
+    service = make_service(tmp_path, slow_llm)
+    running = service.create(SPANISH, project_id="p1")
+    idle = service.create(SPANISH, project_id="p1")
+    other = service.create(SPANISH, project_id="p2")
+    service.start_attribution(running["id"])
+    assert entered.wait(5)
+    assert service.delete_project_sessions("p1") == 2
+    release.set()
+    service.wait(running["id"])
+    assert [s["id"] for s in service.store.list_sessions()] == [other["id"]]
+    with pytest.raises(Exception):
+        service.store.load(idle["id"])
+
+
+def test_unexpected_worker_crash_does_not_override_a_newer_state(tmp_path):
+    service = make_service(tmp_path, FakeLLM())
+    session = service.create(SPANISH)
+    release, entered = threading.Event(), threading.Event()
+
+    def crash(session_id, generation):
+        entered.set()
+        release.wait(10)
+        raise ValueError("bug")
+
+    service._start_worker(session["id"], lambda s: service._begin(s, "attribution", "x"), crash)
+    assert entered.wait(5)
+    service.cancel(session["id"])
+    release.set()
+    service.wait(session["id"])
+    assert service.store.load(session["id"])["status"] == "cancelled"

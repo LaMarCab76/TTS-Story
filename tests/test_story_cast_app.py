@@ -119,3 +119,16 @@ def test_request_gate_skips_attempts_and_openrouter_retries(monkeypatch):
     with pytest.raises((app_module.OpenRouterProcessorError, app_module.LLMProviderChainError)):
         app_module._run_llm_prompt_with_failover("prompt", config, request_gate=lambda profile: next(allowed))
     assert calls == ["openrouter"]
+
+
+def test_deleting_a_project_deletes_its_auto_cast_sessions(monkeypatch, tmp_path):
+    service = StoryCastService(StoryCastStore(tmp_path / "cast"), lambda prompt, gate: ("{}", {"provider": "local"}, []))
+    monkeypatch.setattr(app_module, "STORY_CAST_SERVICE", service)
+    projects_file = tmp_path / "projects.json"
+    projects_file.write_text(json.dumps([{"id": "p1", "name": "Story"}]), encoding="utf-8")
+    monkeypatch.setattr(app_module, "PROJECTS_FILE", projects_file)
+    kept = service.create("“Hi,” said Ann.", project_id="p2")
+    service.create("“Hi,” said Ann.", project_id="p1")
+    response = app_module.app.test_client().delete("/api/projects/p1")
+    assert response.status_code == 200
+    assert [s["id"] for s in service.store.list_sessions()] == [kept["id"]]
