@@ -18,6 +18,10 @@ class SessionNotFound(KeyError):
     pass
 
 
+class Unchanged(Exception):
+    """Raised by an ``update`` mutation to leave the session untouched (no save, no new rev)."""
+
+
 class RevisionConflict(RuntimeError):
     pass
 
@@ -68,7 +72,10 @@ class StoryCastStore:
                 raise RevisionConflict(
                     f"Session changed (revision {session.get('rev')}, expected {expected_rev}); reload it first"
                 )
-            result = mutate(session)
+            try:
+                result = mutate(session)
+            except Unchanged:
+                return self.load(session_id)
             if result is not None:
                 session = result
             session["rev"] = int(session.get("rev", 0)) + 1

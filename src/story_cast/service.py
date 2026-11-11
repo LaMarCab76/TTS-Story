@@ -49,7 +49,7 @@ from .segmenter import (
     strip_speaker_tags,
     verify_coverage,
 )
-from .store import SessionNotFound, StoryCastStore, utc_now
+from .store import SessionNotFound, StoryCastStore, Unchanged, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -179,10 +179,23 @@ class StoryCastService:
                 raise StoryCastError(
                     "Auto cast is still finishing its previous request. Try again in a moment.", "busy", 409)
             session = self.store.update(session_id, begin)
-            thread = threading.Thread(target=self._guarded, args=(session_id, target, session["generation"]),
-                                      name=f"story-cast-{session_id[:8]}", daemon=True)
+            generation = session["generation"]
+            try:
+                thread = threading.Thread(target=self._guarded, args=(session_id, target, generation),
+                                          name=f"story-cast-{session_id[:8]}", daemon=True)
+                thread.start()
+            except Exception as exc:
+                self._workers.pop(session_id, None)
+
+                def revert(s):
+                    if s.get("generation") != generation or s.get("status") != "running":
+                        raise Unchanged()
+                    s["status"] = "error"
+                    s["error"] = f"Could not start Auto cast: {str(exc)[:200]}"
+                    _log(s, s["error"])
+                self.store.update(session_id, revert)
+                raise StoryCastError("Could not start Auto cast. Try again.", "start_failed", 500) from exc
             self._workers[session_id] = thread
-            thread.start()
         return session
 
     def is_running(self, session_id: str) -> bool:
@@ -206,7 +219,7 @@ class StoryCastService:
 
             def mark(session):
                 if session.get("generation") != generation:
-                    return  # a newer state (pause, cancel, restart) wins
+                    raise Unchanged()  # a newer state (pause, cancel, restart) wins
                 session["status"] = "error"
                 session["error"] = str(exc)[:500]
                 _log(session, f"Stopped: {str(exc)[:200]}")
@@ -243,13 +256,15 @@ class StoryCastService:
         def reserve(session):
             budget = session["budget"]
             if budget.get("local_only"):
-                return
-            if billing == "pay_per_use":
-                limit = int(budget.get("limit") or 0)
-                used = int(budget.get("paid_requests", 0))
-                if limit > 0 and used >= limit:
-                    return
-                budget["paid_requests"] = used + 1
+                raise Unchanged()
+            if billing != "pay_per_use":
+                allowed["value"] = True
+                raise Unchanged()  # subscriptions are allowed but not counted
+            limit = int(budget.get("limit") or 0)
+            used = int(budget.get("paid_requests", 0))
+            if limit > 0 and used >= limit:
+                raise Unchanged()
+            budget["paid_requests"] = used + 1
             allowed["value"] = True
         self.store.update(session_id, reserve)
         return allowed["value"]
@@ -291,7 +306,7 @@ class StoryCastService:
     def _handle_worker_error(self, session_id: str, exc: Exception, resume_phase: str, generation: int) -> None:
         def mark(session):
             if session.get("generation") != generation:
-                return  # paused, cancelled or restarted meanwhile: keep that state
+                raise Unchanged()  # paused, cancelled or restarted meanwhile: keep that state
             session["status"] = "paused"
             if resume_phase in ("attribution", "casting"):
                 session["phase"] = resume_phase
@@ -487,7 +502,7 @@ class StoryCastService:
                 raise StoryCastError("Unknown question", "unknown_question", 404)
             if question["status"] != "pending":
                 if question.get("answer") == answer:
-                    return  # idempotent repeat
+                    raise Unchanged()  # idempotent repeat
                 raise StoryCastError("This question was already answered", "already_answered", 409)
             value = self._validate_answer(question, answer)
             handler = getattr(self, f"_on_{question['type']}")

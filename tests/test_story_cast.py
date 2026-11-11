@@ -597,3 +597,37 @@ def test_unexpected_worker_crash_does_not_override_a_newer_state(tmp_path):
     release.set()
     service.wait(session["id"])
     assert service.store.load(session["id"])["status"] == "cancelled"
+
+
+def test_failed_thread_start_does_not_leave_session_running(tmp_path, monkeypatch):
+    service = make_service(tmp_path, FakeLLM())
+    session = service.create(SPANISH)
+
+    def refuse(self):
+        raise RuntimeError("can't start new thread")
+    monkeypatch.setattr(threading.Thread, "start", refuse)
+    with pytest.raises(StoryCastError) as error:
+        service.start_attribution(session["id"])
+    assert error.value.code == "start_failed"
+    stored = service.store.load(session["id"])
+    assert stored["status"] == "error" and "can't start" in stored["error"]
+    assert service.generation_blockers(session["id"]) == []
+    monkeypatch.undo()
+    service.resume(session["id"])
+    service.wait(session["id"])
+    assert service.store.load(session["id"])["status"] in ("idle", "waiting_user")
+
+
+def test_ignored_writes_do_not_bump_the_revision(tmp_path):
+    service = make_service(tmp_path, FakeLLM(lambda text: ("unknown", 0.0)))
+    session = run_attribution(service)
+    question = next(q for q in session["questions"] if q["status"] == "pending")
+    service.answer(session["id"], question["id"], "narrator")
+    rev = service.store.load(session["id"])["rev"]
+    service.answer(session["id"], question["id"], "narrator")  # idempotent repeat
+    service._handle_worker_error(session["id"], RuntimeError("late"), "attribution", generation=-1)
+    assert service.store.load(session["id"])["rev"] == rev
+    service.store.update(session["id"], lambda s: s["budget"].update(local_only=True))
+    rev = service.store.load(session["id"])["rev"]
+    assert service._reserve_request(session["id"], "openrouter") is False
+    assert service.store.load(session["id"])["rev"] == rev
