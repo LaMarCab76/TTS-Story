@@ -22,7 +22,7 @@ from src.story_cast.segmenter import (
     verify_coverage,
 )
 from src.story_cast.service import StoryCastError, StoryCastService, billing_for_provider
-from src.story_cast.store import StoryCastStore
+from src.story_cast.store import SessionNotFound, StoryCastStore
 
 SPANISH = """CAPÍTULO 1
 
@@ -577,7 +577,7 @@ def test_deleting_a_project_deletes_its_sessions_even_while_running(tmp_path):
     release.set()
     service.wait(running["id"])
     assert [s["id"] for s in service.store.list_sessions()] == [other["id"]]
-    with pytest.raises(Exception):
+    with pytest.raises(SessionNotFound):
         service.store.load(idle["id"])
 
 
